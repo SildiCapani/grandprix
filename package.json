@@ -1,0 +1,23 @@
+{
+  "name": "apex-rush",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Apex Rush – 3D Kart-Racer mit Items, Drifts und Online-Multiplayer",
+  "scripts": {
+    "dev": "concurrently -k -n server,client -c yellow,cyan \"node --watch server/server.js\" \"vite\"",
+    "build": "vite build",
+    "start": "node server/server.js",
+    "serve": "vite build && node server/server.js"
+  },
+  "dependencies": {
+    "peerjs": "1.5.5",
+    "three": "0.180.0",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0",
+    "vite": "^6.3.0"
+  },
+  "engines": { "node": ">=20" }
+}

@@ -1,0 +1,7 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    { "label": "Spiel starten (dev)", "type": "npm", "script": "dev", "isBackground": true, "group": { "kind": "build", "isDefault": true }, "problemMatcher": [] },
+    { "label": "Bauen + Server starten", "type": "npm", "script": "serve", "problemMatcher": [] }
+  ]
+}

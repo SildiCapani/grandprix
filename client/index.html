@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#101b20">
+<title>Apex Rush</title>
+<meta name="description" content="Kart-Racer in neun Welten mit Items, Drifts, Offroad-Abkürzungen und Online-Räumen.">
+</head>
+<body>
+<div id="viewport" role="img" aria-label="3D-Rennstrecke"></div><div class="vignette"></div>
+<header><a class="brand" href="#"><svg viewBox="0 0 40 30" aria-hidden="true"><path d="M3 3h34l-4 8H23v17H13V11H0z"/></svg><span>APEX <b>RUSH</b><small>MINI-FORMEL · GRAND PRIX</small></span></a><div class="top-actions"><button id="sound" aria-label="Sound einschalten" aria-pressed="false" title="Sound">♪<span>SOUND AUS</span></button><button id="camera" aria-label="Kamera wechseln" title="Kamera wechseln (C)">◈</button><button id="pause" aria-label="Pause" title="Pause (P)">Ⅱ</button><button id="fullscreen" aria-label="Vollbild" title="Vollbild">⛶</button><button id="help" aria-label="Anleitung" title="Anleitung">?</button></div></header>
+<div class="race-top" id="raceTop" hidden><div class="lap-box"><small>RUNDE</small><b id="lap">1<span> / 3</span></b></div><div class="time-box"><small>RENNZEIT</small><strong id="timer">00:00.000</strong><span>BESTE RUNDE <b id="bestLap">—</b></span></div></div>
+<div class="leaderboard" id="leaderboard" hidden><span class="eyebrow">STARTERFELD</span><div id="driverRows"></div></div>
+<div class="sector" id="sector" hidden><span class="sector-dot"></span><div><small>DU BIST HIER</small><b id="sectorName">START</b></div></div>
+<div class="points-hud" id="pointsHud" hidden><span>STYLE-PUNKTE</span><strong id="styleScore">0</strong><div><b id="chipCount">0 / 36</b> CHIPS <i>·</i> <b id="driftCount">0.0s</b> DRIFT</div><small id="medalTarget">GOLD ≤ 00:48</small></div><div class="countdown" id="countdown" hidden><div class="start-lights"><i></i><i></i><i></i></div><b id="countText">3</b></div>
+<div class="toast" id="toast" role="status"></div>
+<div class="speed-hud" id="speedHud" hidden><div class="gear" id="gear">N</div><div class="speed-value"><b id="speed">0</b><span>KM/H</span></div><div class="speed-bars" id="speedBars"></div></div>
+<div class="item-hud" id="itemHud" hidden><div class="item-slot" id="itemSlot"><span id="itemIcon"></span></div><div class="item-meta"><small>ITEM</small><b id="itemName">LEER</b><span><kbd>E</kbd> benutzen</span></div></div>
+<div class="place-hud" id="placeHud" hidden><b id="placeNum">1</b><span id="placeOf">/ 8</span><small id="placeNote"></small></div>
+<div class="threat-hud" id="threatHud" hidden></div>
+<div class="map-hud" id="mapHud" hidden><div><span>STRECKE</span><span id="position">P5 / 8</span></div><canvas id="minimap" width="360" height="225" aria-label="Streckenkarte mit Fahrzeugpositionen"></canvas><small>3 RUNDEN · GRAND PRIX</small></div>
+<div class="keyboard-hint" id="keyboardHint" hidden><span><kbd>WASD</kbd> / <kbd>↑←↓→</kbd> Fahren</span><span><kbd>SPACE</kbd> Drift</span><span><kbd>E</kbd> Item</span><span><kbd>R</kbd> Zurücksetzen</span><span><kbd>C</kbd> Kamera</span><span><kbd>G</kbd> Grafik</span></div>
+<div class="touch-controls" id="touchControls" hidden><div class="steer-buttons"><button id="left" aria-label="Links lenken">◀</button><button id="right" aria-label="Rechts lenken">▶</button></div><div class="pedals"><button id="touchBrake" aria-label="Bremsen und driften">DRIFT</button><button id="touchBoost" aria-label="Item benutzen">ITEM</button><button id="touchGas" aria-label="Gas geben">GAS</button></div></div>
+<div class="menu-layer" id="menuLayer"><section class="menu" id="menu"><h1>APEX<br>RUSH.</h1><p>Strecke wird aufgebaut …</p></section><div class="mobile-start"><button class="primary" id="mobileStartButton">RENNEN STARTEN <span>↗</span></button></div><div class="location-tag"><span>APEX RUSH · SAISON 1</span><b>9 WELTEN</b><p>Riviera Küstenring</p><small>Küste · Canyon · City · Vulkan · Gletscher · All · Dschungel · Savanne · Pilzwald<br>7 KI-Teams · Online-Räume bis 8 Fahrer</small></div></div>
+<div id="webglError" class="webgl-error" hidden><h2>Die 3D-Grafik konnte nicht starten.</h2><p>Öffne die Datei in einem aktuellen Chrome, Edge oder Firefox mit aktivierter Hardwarebeschleunigung.</p><details><summary>Technische Details</summary><pre id="errorDetails"></pre></details></div><div class="sr-only" id="announcer" aria-live="polite"></div>
+<script type="module" src="/src/main.js"></script>
+</body>
+</html>
