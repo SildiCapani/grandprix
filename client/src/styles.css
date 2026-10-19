@@ -302,3 +302,12 @@ header.in-garage .top-actions{display:none}
 .battle-balloons i{width:26px;height:32px;border-radius:50% 50% 46% 46%;background:radial-gradient(circle at 35% 30%,#ffffffaa,var(--b) 45%);animation:trophy-bob 1.8s ease-in-out infinite}
 .battle-balloons i:nth-child(2){animation-delay:.3s}.battle-balloons i:nth-child(3){animation-delay:.6s}
 .driver.out{opacity:.4}
+.battle-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px}
+.battle-card{text-align:left;background:#132d35b8;border:1px solid #ffffff22;border-radius:7px;padding:12px;display:flex;flex-direction:column;gap:4px}
+.battle-card.selected{border-color:var(--orange);box-shadow:0 0 0 1px var(--orange) inset;background:#1a3a44d0}
+.battle-card .battle-icon{font-size:26px;line-height:1.1}
+.battle-card b{font-size:10px;letter-spacing:1px;font-style:italic;font-weight:900;color:#ffd04a}
+.battle-card strong{font-size:12px}
+.battle-card small{font-size:8px;color:#a9bfb2}
+.battle-card.theme-colosseum{border-top:3px solid #ffb347}.battle-card.theme-ice{border-top:3px solid #5ff4ff}.battle-card.theme-arena{border-top:3px solid #ff4fd8}
+#lap span{font-size:.5em;opacity:.7}

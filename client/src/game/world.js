@@ -110,6 +110,8 @@ export function createWorld(map, track) {
     sakura: { color: 0x8fae68, base: '#88a862', dots: ['rgba(60,90,40,.45)', 'rgba(255,170,200,.55)', 'rgba(255,220,235,.5)', 'rgba(140,170,90,.4)'] },
     moon: { color: 0x9a9ca2, base: '#97999f', dots: ['rgba(40,42,48,.45)', 'rgba(200,202,210,.4)', 'rgba(70,72,80,.35)'] },
     arena: { color: 0x22252c, base: '#23262d', dots: ['rgba(10,10,14,.5)', 'rgba(90,60,140,.25)'] },
+    colosseum: { color: 0xd8b07a, base: '#d4ab74', dots: ['rgba(160,110,60,.45)', 'rgba(240,200,150,.45)'] },
+    ice: { color: 0xeef4fa, base: '#e8f0f8', dots: ['rgba(180,200,225,.45)', 'rgba(255,255,255,.6)'] },
   }[theme];
   const groundTex = canvasTex(512, (g, s) => {
     g.fillStyle = groundSpec.base; g.fillRect(0, 0, s, s);
@@ -138,7 +140,7 @@ export function createWorld(map, track) {
     const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setIndex(idx); geo.computeVertexNormals();
     const mesh = new THREE.Mesh(geo, material); mesh.receiveShadow = true; group.add(mesh); return mesh;
   }
-  const shoulderMat = std({ day: 0x9b9886, desert: 0xc98f5b, night: 0x6b6f78, volcano: 0x3a3132, snow: 0xf4f8fc, space: 0x000000, jungle: 0x6a5a3a, savanna: 0xb88a52, forest: 0x7a6a4a, sky: 0xffffff, sakura: 0x9a8a72, moon: 0x7c7e84, arena: 0x3a3550 }[theme], { side: THREE.DoubleSide, roughness: .9 });
+  const shoulderMat = std({ day: 0x9b9886, desert: 0xc98f5b, night: 0x6b6f78, volcano: 0x3a3132, snow: 0xf4f8fc, space: 0x000000, jungle: 0x6a5a3a, savanna: 0xb88a52, forest: 0x7a6a4a, sky: 0xffffff, sakura: 0x9a8a72, moon: 0x7c7e84, arena: 0x3a3550, colosseum: 0xb08850, ice: 0xbcd8ee }[theme], { side: THREE.DoubleSide, roughness: .9 });
   if (theme !== 'space' && theme !== 'sky') for (const side of [-1, 1]) band(side * (W / 2 + .5), side * (W / 2 + (theme === 'night' ? 5 : 3.5)), theme === 'night' ? .03 : -.02, shoulderMat);
 
   // --- start/finish area: grandstand with crowd and a pit building ---
@@ -194,7 +196,7 @@ export function createWorld(map, track) {
   }
 
   // ===================== THEMES =====================
-  const builders = { day: buildCoast, desert: buildDesert, volcano: buildVolcano, snow: buildSnow, space: buildSpace, jungle: buildJungle, savanna: buildSavanna, forest: buildForest, night: buildCity, sky: buildSky, sakura: buildSakura, moon: buildMoon, arena: buildArena };
+  const builders = { day: buildCoast, desert: buildDesert, volcano: buildVolcano, snow: buildSnow, space: buildSpace, jungle: buildJungle, savanna: buildSavanna, forest: buildForest, night: buildCity, sky: buildSky, sakura: buildSakura, moon: buildMoon, arena: buildArena, colosseum: buildArena, ice: buildArena };
   (builders[theme] || buildCity)();
 
   function scatter(n, minD, maxR, place, tries = 6) {
@@ -934,20 +936,40 @@ export function createWorld(map, track) {
 
   function buildArena() {
     const A = map.arena;
-    // --- centre island: neon-rimmed plinth with a giant balloon trio ---
-    const plinth = std(0x2c2f3a, { roughness: .5, metalness: .4 });
+    // Three looks: neon stadium (balloons), desert colosseum (coins), ice palace (crown).
+    const S = {
+      arena: { plinth: 0x2c2f3a, rim: 0xff4fd8, tier: 0x3a3f4c, bannerBg: '#120a24', banner: ['#ff4fd8', '#39b8ff', '#ffd04a'], text: 'APEX RUSH · BATTLE ·', lights: 'flood' },
+      colosseum: { plinth: 0xc8a06a, rim: 0xffb347, tier: 0xc9a26a, bannerBg: '#5a1a12', banner: ['#ffd04a', '#ffffff', '#ffb347'], text: 'MÜNZJAGD · APEX RUSH ·', lights: 'torch' },
+      ice: { plinth: 0xcfe6f8, rim: 0x5ff4ff, tier: 0xbcd4ea, bannerBg: '#0a2a44', banner: ['#5ff4ff', '#ffffff', '#ffd04a'], text: 'KRONENJAGD · APEX RUSH ·', lights: 'flood' },
+    }[theme] || {};
+    // --- centre island with its statue ---
+    const plinth = std(S.plinth, { roughness: .5, metalness: theme === 'colosseum' ? 0 : .4 });
     inst(G.cyl, plinth, M(A.x, .5, A.z, A.inner - .3, 1, A.inner - .3));
-    const neonRim = new THREE.Mesh(new THREE.TorusGeometry(A.inner - .2, .18, 8, 64), new THREE.MeshBasicMaterial({ color: 0xff4fd8, toneMapped: false }));
+    const neonRim = new THREE.Mesh(new THREE.TorusGeometry(A.inner - .2, .18, 8, 64), new THREE.MeshBasicMaterial({ color: S.rim, toneMapped: false }));
     neonRim.rotation.x = Math.PI / 2; neonRim.position.set(A.x, 1.02, A.z); group.add(neonRim);
     inst(G.cyl, std(0xd8dce4, { metalness: .8, roughness: .25 }), M(A.x, 3, A.z, 1.2, 4, 1.2));
     const trio = new THREE.Group(); trio.position.set(A.x, 5, A.z); group.add(trio);
-    [['#ff4a4a', 0], ['#39b8ff', 2.1], ['#ffd04a', 4.2]].forEach(([c, a]) => {
-      const b = new THREE.Mesh(new THREE.SphereGeometry(2.2, 24, 16), new THREE.MeshStandardMaterial({ color: c, roughness: .25, metalness: .1, emissive: c, emissiveIntensity: .25 }));
-      b.scale.y = 1.2; b.position.set(Math.cos(a) * 1.9, 3 + Math.sin(a * 2) * .5, Math.sin(a) * 1.9); b.castShadow = true; trio.add(b);
-    });
+    const gold = new THREE.MeshStandardMaterial({ color: 0xffc83a, roughness: .2, metalness: .9, emissive: 0x6a4a10, emissiveIntensity: .35 });
+    if (theme === 'colosseum') {
+      // a giant spinning coin
+      const coin = new THREE.Mesh(new THREE.CylinderGeometry(3.4, 3.4, .7, 40), gold); coin.rotation.x = Math.PI / 2; coin.position.y = 3.6; coin.castShadow = true; trio.add(coin);
+      const star = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 1.6, .8, 5), new THREE.MeshStandardMaterial({ color: 0xfff1a8, metalness: .6, roughness: .3 })); star.rotation.x = Math.PI / 2; star.position.y = 3.6; trio.add(star);
+    } else if (theme === 'ice') {
+      // a giant golden crown over ice crystals
+      const band = new THREE.Mesh(new THREE.CylinderGeometry(2.6, 2.4, 1.6, 32, 1, true), gold); band.position.y = 3; band.material.side = THREE.DoubleSide; trio.add(band);
+      for (let k = 0; k < 6; k++) { const a = k / 6 * Math.PI * 2, spike = new THREE.Mesh(new THREE.ConeGeometry(.55, 1.8, 8), gold); spike.position.set(Math.cos(a) * 2.5, 4.6, Math.sin(a) * 2.5); trio.add(spike);
+        const gem = new THREE.Mesh(new THREE.SphereGeometry(.32, 12, 8), new THREE.MeshStandardMaterial({ color: k % 2 ? 0xff3a5a : 0x3ab8ff, emissive: k % 2 ? 0xff3a5a : 0x3ab8ff, emissiveIntensity: .6 })); gem.position.set(Math.cos(a) * 2.6, 3, Math.sin(a) * 2.6); trio.add(gem); }
+      const crystal = new THREE.MeshStandardMaterial({ color: 0xbfefff, roughness: .05, metalness: .1, transparent: true, opacity: .75, emissive: 0x3ab8ff, emissiveIntensity: .25, flatShading: true });
+      for (let k = 0; k < 7; k++) { const a = k / 7 * Math.PI * 2 + .3, d = A.inner - 2.2, h = 3 + r() * 4; inst(G.cone, crystal, M(A.x + Math.cos(a) * d, h / 2 + .9, A.z + Math.sin(a) * d, .9, h, .9, r()), { cast: false }); }
+    } else {
+      [['#ff4a4a', 0], ['#39b8ff', 2.1], ['#ffd04a', 4.2]].forEach(([c, a]) => {
+        const b = new THREE.Mesh(new THREE.SphereGeometry(2.2, 24, 16), new THREE.MeshStandardMaterial({ color: c, roughness: .25, metalness: .1, emissive: c, emissiveIntensity: .25 }));
+        b.scale.y = 1.2; b.position.set(Math.cos(a) * 1.9, 3 + Math.sin(a * 2) * .5, Math.sin(a) * 1.9); b.castShadow = true; trio.add(b);
+      });
+    }
     updaters.push((dt, t) => { trio.rotation.y = t * .4; trio.position.y = 5 + Math.sin(t * 1.3) * .25; });
     // --- stadium bowl: stepped tiers all around, full of cheering fans ---
-    const tierMat = std(0x3a3f4c, { roughness: .7 }), crowdMat = std(0xffffff, { roughness: .8 });
+    const tierMat = std(S.tier, { roughness: theme === 'ice' ? .3 : .7 }), crowdMat = std(0xffffff, { roughness: .8 });
     const fans = ['#ff4a4a', '#39b8ff', '#ffd04a', '#7ad35a', '#ff8adf', '#f5f5f0', '#bda0ff'].map(c => new THREE.Color(c));
     for (let k = 0; k < 9; k++) {
       const rad = A.outer + 7 + k * 3.4, h = 1.2 + k * 1.6, n = Math.round(rad * .9);
@@ -958,12 +980,36 @@ export function createWorld(map, track) {
       }
     }
     // --- neon banner wall around the arena floor ---
-    const bannerTex = canvasTex(1024, (g, s) => { g.fillStyle = '#120a24'; g.fillRect(0, 0, s, s); g.font = 'italic 900 120px Arial'; g.textBaseline = 'middle';
-      for (let i = 0; i < 3; i++) { g.fillStyle = ['#ff4fd8', '#39b8ff', '#ffd04a'][i]; g.fillText('APEX RUSH · BATTLE ·', i * 360 - 80, s / 2); } }, 1);
+    const bannerTex = canvasTex(1024, (g, s) => { g.fillStyle = S.bannerBg; g.fillRect(0, 0, s, s); g.font = 'italic 900 120px Arial'; g.textBaseline = 'middle';
+      for (let i = 0; i < 3; i++) { g.fillStyle = S.banner[i]; g.fillText(S.text, i * 360 - 80, s / 2); } }, 1);
     bannerTex.wrapS = THREE.RepeatWrapping; bannerTex.repeat.set(6, 1);
     const banner = new THREE.Mesh(new THREE.CylinderGeometry(A.outer + 3.5, A.outer + 3.5, 2.4, 96, 1, true), new THREE.MeshStandardMaterial({ map: bannerTex, emissive: 0xffffff, emissiveMap: bannerTex, emissiveIntensity: .32, side: THREE.DoubleSide }));
     banner.position.set(A.x, 1.4, A.z); group.add(banner);
     updaters.push((dt, t) => { bannerTex.offset.x = (t * .02) % 1; });
+    if (theme === 'colosseum') {
+      // outer wall with arches and burning torches
+      const stone = std(0xd2ac74, { roughness: .95 }), dark = std(0x5a3a22, { roughness: 1 });
+      const wallR = A.outer + 7 + 9 * 3.4 + 2, n = 48;
+      for (let i = 0; i < n; i++) { const a = i / n * Math.PI * 2, x = A.x + Math.sin(a) * wallR, z = A.z + Math.cos(a) * wallR, seg = wallR * Math.PI * 2 / n;
+        inst(G.box, stone, M(x, 11, z, seg * .35, 22, 3, a + Math.PI / 2)); inst(G.box, stone, M(x, 20, z, seg + .2, 4, 3, a + Math.PI / 2)); inst(G.box, dark, M(x, 8, z, seg * .6, 14, 2.6, a + Math.PI / 2), { cast: false }); }
+      const fire = glowTex('rgba(255,210,120,1)', 'rgba(255,90,20,0)');
+      for (let i = 0; i < 16; i++) { const a = i / 16 * Math.PI * 2, rr = A.outer + 4, x = A.x + Math.sin(a) * rr, z = A.z + Math.cos(a) * rr;
+        inst(G.cylLow, dark, M(x, 2, z, .18, 4, .18));
+        const f = new THREE.Sprite(new THREE.SpriteMaterial({ map: fire, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false })); f.position.set(x, 4.4, z); f.scale.set(2.4, 3.2, 1); f.userData.ph = r() * 6; group.add(f);
+        updaters.push((dt, t) => { const k = 1 + Math.sin(t * 9 + f.userData.ph) * .12; f.scale.set(2.4 * k, 3.2 * k, 1); }); }
+      // dunes and palms beyond the walls
+      const sand = std(0xd8b07a, { roughness: 1, flatShading: true });
+      for (let i = 0; i < 40; i++) { const a = r() * Math.PI * 2, d = 200 + r() * 500; inst(G.sphere, sand, M(Math.sin(a) * d, -4, Math.cos(a) * d, 40 + r() * 60, 8 + r() * 14, 30 + r() * 50, r() * 3), { cast: false }); }
+      for (let i = 0; i < 24; i++) { const a = r() * Math.PI * 2, d = 140 + r() * 120; palm(Math.sin(a) * d, Math.cos(a) * d, 7 + r() * 5); }
+      return;
+    }
+    if (theme === 'ice') {
+      const peaks = std(0x8aa4c4, { roughness: 1, flatShading: true }), caps = std(0xf4f8ff, { roughness: .9 });
+      for (let i = 0; i < 22; i++) { const a = r() * Math.PI * 2, d = 420 + r() * 380, h = 120 + r() * 160; inst(G.cone, peaks, M(Math.sin(a) * d, h / 2 - 10, Math.cos(a) * d, 90 + r() * 80, h, 90 + r() * 80, r()), { cast: false }); inst(G.cone, caps, M(Math.sin(a) * d, h * .82 - 10, Math.cos(a) * d, 30, h * .36, 30), { cast: false }); }
+      const pine = std(0x2a5a42, { flatShading: true });
+      for (let i = 0; i < 120; i++) { const a = r() * Math.PI * 2, d = 140 + r() * 220, h = 8 + r() * 8; inst(G.cone, pine, M(Math.sin(a) * d, h / 2, Math.cos(a) * d, h * .3, h, h * .3)); inst(G.cone, caps, M(Math.sin(a) * d, h * .82, Math.cos(a) * d, h * .16, h * .3, h * .16), { cast: false }); }
+      weather(600, 0xffffff, .22, 2.2, 80, 34, 1.2);
+    }
     // --- floodlight towers ---
     const steel = std(0x8a8f96, { metalness: .7, roughness: .35 }), lampMat = new THREE.MeshBasicMaterial({ color: 0xd8d2c0 });
     for (let i = 0; i < 4; i++) {
@@ -973,6 +1019,7 @@ export function createWorld(map, track) {
       const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex('rgba(255,250,230,.9)', 'rgba(255,240,200,0)'), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false }));
       glow.position.copy(head.position); glow.scale.set(16, 16, 1); glow.material.opacity = .55; group.add(glow);
     }
+    if (theme === 'ice') return;
     // --- city skyline beyond the stadium ---
     const tower = std(0x1c1f2a, { roughness: .6, emissive: 0x2a1a5a, emissiveIntensity: .25 });
     for (let i = 0; i < 60; i++) { const a = r() * Math.PI * 2, d = 230 + r() * 260, h = 30 + r() * 120; inst(G.box, tower, M(Math.sin(a) * d, h / 2, Math.cos(a) * d, 14 + r() * 20, h, 14 + r() * 20, r()), { cast: false }); }
