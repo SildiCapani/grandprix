@@ -1,6 +1,6 @@
 // Four-player, host-authoritative WebRTC sessions. Signalling stays in the
 // invitation/answer codes; only car and race data travel over the data channels.
-const MAP_IDS = new Set(['coast', 'canyon', 'neon', 'volcano', 'glacier', 'stars', 'jungle', 'savanna', 'forest']);
+const MAP_IDS = new Set(['coast', 'canyon', 'neon', 'volcano', 'glacier', 'stars', 'jungle', 'savanna', 'forest', 'sky', 'sakura', 'moon']);
 const KART_IDS = new Set(['allround', 'bolide', 'flitzer', 'brummer', 'drifter', 'buggy']);
 const DEFAULT_COLOR = '#ee4b37';
 const CAR_COLORS = ['#ee4b37', '#42c9cb', '#edc44b', '#9b87e5'];

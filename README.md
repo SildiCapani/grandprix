@@ -1,6 +1,6 @@
 # Apex Rush 🏁
 
-3D-Kart-Racer (three.js) mit Items, Power-Drifts, Boost-Pads, 6 Fahrzeugen (3D-Garage), 9 Strecken und Speed-Klassen 80/100/120 km/h.
+3D-Kart-Racer (three.js) mit Items, Power-Drifts, Boost-Pads, 6 Fahrzeugen (3D-Garage), 12 Strecken, optionaler Karriere mit Aufträgen und Speed-Klassen 80/100/120 km/h.
 Online-Multiplayer läuft über einen **eigenen Node.js-Server** (Raumcodes, bis 8 Fahrer, KI-Auffüllung).
 
 ## Voraussetzungen
@@ -72,8 +72,21 @@ Die Werte stehen in `client/src/game/karts.js`.
 5. **Gletscherpass**: Serpentinen den Berg hinauf (über 40 m Höhenunterschied), Gipfelabfahrt mit Sprungschanzen.
 6. **Sternenbahn**: eine Regenbogenstraße im All mit Spirale und Sprüngen über Lücken.
 7. **Dschungel-Tempel**, 8. **Savannen-Safari**, 9. **Pilzwald**: jeweils zwei Offroad-Abkürzungen (gelbe Schilder, gestrichelt auf der Karte). Ohne Pilz, Stern oder Turbo bist du dort sehr langsam, mit dem Rally Buggy fast so schnell wie auf der Straße.
+10. **Wolkeninseln**: schwebende Straße über einem Wolkenmeer. Eine Acht mit Brücke über die eigene Strecke und zwei Sprünge durch die Wolken.
+11. **Kirschblütental**: Torii-Tore, Pagode am See und eine Abkürzung durch den Bambushain.
+12. **Mondbasis Luna**: wenig Schwerkraft. Drei lange Kratersprünge, bei denen du höher fliegst und länger in der Luft bleibst.
 
-Alle Strecken sind von Anfang an frei.
+## Karriere (optional)
+Im Menü unter **Karriere-Fortschritt** lässt sie sich AN- oder AUSschalten.
+
+- **AN:** Dein Fahrerlevel schaltet nach und nach frei:
+  - Strecken: Start mit Küste, Canyon und Neon.
+  - Karts: Flitzer ab Level 2, Drifter ab 3, Buggy ab 4, Bolide ab 5, Brummer ab 6.
+  - Lack-Finishes: Gold ab Level 3, Chrom ab 5, Neon ab 7.
+- **Aufträge:** Es sind immer drei offen, z. B. „Überhole 25 Gegner“ oder „Lande 12 Sprünge“. Sie geben Bonus-XP und werden nach dem Abschluss ersetzt. Mit jeder Runde durch alle Aufträge werden sie etwas schwerer. Es gibt keine Timer und keine Tages-Aufgaben.
+- **AUS:** Alles ist sofort frei, und es gibt keine Aufträge.
+
+Mit `?alle` in der Adresse ist zum Testen auch alles frei.
 
 ## Projektstruktur
 ```
@@ -91,7 +104,7 @@ client/
     multiplayer.js    Lobby- & Rennprotokoll (Host-Autorität)
     room-signaling.js Raumcodes, P2P-/Server-Verbindung
     mqtt-relay.js     Server-Relay (eigener Server + öffentliche Fallbacks)
-    progression.js    XP, Level, Bestzeiten
+    progression.js    XP, Level, Bestzeiten, Freischaltungen, Aufträge
     race-audio.js     Sound
 server/server.js      Statische Auslieferung + WebSocket-Relay /ws
 ```

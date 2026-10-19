@@ -81,7 +81,7 @@ const LAYOUT = {
   buggy:    { body: [1.02, 1.05, .95], zf: .5, zr: -.46, x: .5, wf: 1.42, wr: 1.48, lift: .14 },
 };
 
-export function createCar(color = '#e34335', number = '07', kart = 'allround') {
+export function createCar(color = '#e34335', number = '07', kart = 'allround', finish = 'standard') {
   const L = LAYOUT[kart] || LAYOUT.allround;
   const car = new THREE.Group();
   car.name = `Mini Formula ${number}`;
@@ -98,6 +98,11 @@ export function createCar(color = '#e34335', number = '07', kart = 'allround') {
   const driver = new THREE.MeshPhysicalMaterial({ color: '#f6cf42', roughness: .25, metalness: .1, clearcoat: 1, clearcoatRoughness: .04 });
   const visor = new THREE.MeshPhysicalMaterial({ color: '#0c1820', roughness: .03, metalness: .7, clearcoat: 1, envMapIntensity: 1.6 });
   const upholstery = material('#24313b', 0.9, 0.02);
+  // Career paint finishes on top of the chosen colour.
+  if (finish === 'gold') { paint.color.set('#d9a93c'); paint.metalness = .95; paint.roughness = .2; darkPaint.color.set('#8a6420'); darkPaint.metalness = .9; }
+  else if (finish === 'chrome') { paint.color.set('#e6edf3'); paint.metalness = 1; paint.roughness = .05; darkPaint.color.set('#9aa4ae'); darkPaint.metalness = 1; darkPaint.roughness = .1; }
+  else if (finish === 'neon') { paint.emissive.set(color); paint.emissiveIntensity = .65; darkPaint.emissive.set(color); darkPaint.emissiveIntensity = .25; }
+  paint.userData.baseEmissive = paint.emissive.getHex(); paint.userData.baseEI = paint.emissiveIntensity;
 
   // Black floor, tapered monocoque and broad sculpted sidepods.
   prism(body, [[-.25,-.65],[.25,-.65],[.32,-.3],[.29,.29],[.14,.57],[-.14,.57],[-.29,.29],[-.32,-.3]], .04, carbon, .075);

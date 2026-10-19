@@ -200,3 +200,29 @@ header.in-garage .top-actions{display:none}
 @keyframes victory-rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
 @media (max-width:700px){.victory-title{font-size:78px;letter-spacing:-3px}.victory-trophy{width:68px;height:68px}.victory-sub{font-size:12px;letter-spacing:2px}}
 @media (prefers-reduced-motion:reduce){.victory-card,.victory-trophy,.victory-title,.victory-sub{animation:none}}
+/* Career: optional switch, missions and the next reward */
+.career-switch{display:flex;align-items:center;justify-content:space-between;gap:10px;border-top:1px solid #ffffff13;margin-top:10px;padding-top:9px;font-size:7px;letter-spacing:1px;color:#dce6df;font-weight:700}
+.career-switch small{display:block;font-size:6px;letter-spacing:.4px;color:#91a99d;font-weight:400;margin-top:3px}
+.career-switch button{display:flex;align-items:center;gap:6px;min-width:52px;padding:4px 8px 4px 4px;border-radius:999px;border:1px solid #ffffff2a;background:#ffffff10;font-size:7px;font-weight:900;letter-spacing:1px;color:#b5c0c2}
+.career-switch button i{width:12px;height:12px;border-radius:50%;background:#b5c0c2;transition:transform .2s}
+.career-switch button.on{background:#ff653d2e;border-color:#ff653d88;color:#fff}
+.career-switch button.on i{background:var(--orange);transform:translateX(2px)}
+.missions{margin-top:9px;display:grid;gap:6px}
+.missions-title{font-size:6px;letter-spacing:1.3px;color:#91ada3;display:flex;justify-content:space-between}
+.missions-title span{letter-spacing:.3px}
+.mission{background:#ffffff0a;border:1px solid #ffffff12;border-radius:5px;padding:6px 8px}
+.mission>div:first-child{display:flex;justify-content:space-between;gap:8px;font-size:8px;color:#edf0e5}
+.mission>div:first-child b{color:#d9f28a;font-size:7px;white-space:nowrap}
+.mission-bar{height:3px;border-radius:3px;background:#ffffff14;overflow:hidden;margin-top:5px}
+.mission-bar i{display:block;height:100%;background:linear-gradient(90deg,#ff653d,#ffd04a);border-radius:3px;min-width:2px}
+.mission small{display:block;font-size:6px;color:#91a99d;margin-top:3px;text-align:right}
+.next-reward{margin-top:8px;font-size:6px;letter-spacing:.8px;color:#91a99d}
+.next-reward b{color:#ffd04a;letter-spacing:.4px}
+.mission-done{display:grid;gap:5px;margin:12px 0 4px}
+.mission-done span{font-size:8px;color:#d9f28a;background:#d9f28a10;border:1px solid #d9f28a40;border-radius:4px;padding:8px 10px;letter-spacing:.4px;animation:victory-rise .45s ease-out both}
+.mission-done b{float:right;color:#fff}
+.g-finishes .g-finish{padding:6px 10px;border-radius:999px;border:1px solid #ffffff2e;background:#ffffff0d;font-size:10px;font-weight:900;letter-spacing:1px}
+.g-finishes .g-finish.selected{border-color:var(--orange);background:#ff653d33}
+.g-finishes .g-finish.locked{opacity:.5}
+.g-tag .g-lock{color:#ffd04a}
+.kart-btn.locked{opacity:.55}

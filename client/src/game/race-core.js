@@ -48,7 +48,7 @@ const RESTITUTION = 0.32;
 // ---- items ----
 export const ITEM_TYPES = ['mushroom', 'banana', 'green', 'red', 'star', 'rocket'];
 const STAR_TIME = 7, MUSHROOM_TIME = 1.3, SPIN_TIME = 1.15, ROULETTE_TIME = 1.1;
-const BOX_RESPAWN = 3, BOX_RADIUS = 1.5;
+const BOX_RESPAWN = 3, BOX_RADIUS = 1.5, RAMP_LEN_BOX = 8;
 const GREEN_SPEED = 40, RED_SPEED = 36, GREEN_BOUNCES = 3;
 // ---- power drift: hold longer for a stronger mini-turbo (blue → orange → purple) ----
 export const DRIFT_TIERS = [{ at: .75, time: .55, speed: 25.5 }, { at: 1.7, time: 1.0, speed: 27 }, { at: 2.8, time: 1.5, speed: 28.5 }];
@@ -121,7 +121,10 @@ function makeBody(extra) {
 export function itemBoxLayout(track) {
   const rows = Math.max(4, Math.round(track.length / 330)), boxes = [];
   for (let r = 0; r < rows; r++) {
-    const t = wrap(.07 + r / rows), s = track.sample(t), half = track.width / 2 - 1.5;
+    let t = wrap(.07 + r / rows);
+    // Never float a row of boxes over a jump gap or on a ramp: slide it to just past the landing.
+    for (const j of track.jumps) { const ds = (wrap(t - j.t + .5) - .5) * track.length; if (ds > -RAMP_LEN_BOX && ds < j.gap + 8) t = wrap(j.t + (j.gap + 10) / track.length); }
+    const s = track.sample(t), half = track.width / 2 - 1.5;
     for (let k = 0; k < 5; k++) {
       const lane = -half + k * (half * 2 / 4);
       boxes.push({ x: s.x + s.nx * lane, z: s.z + s.nz * lane, y: s.y, t, active: true, respawn: 0 });
@@ -157,7 +160,7 @@ export class RaceCore {
     this.mode = 'race';
     this.countdown = 3;
     this.elapsed = 0;
-    this.stats = { collisions: 0, driftSeconds: 0, boostSeconds: 0, resets: 0, rams: 0, overtakes: 0, hitsDealt: 0, hitsTaken: 0 };
+    this.stats = { collisions: 0, driftSeconds: 0, boostSeconds: 0, resets: 0, rams: 0, overtakes: 0, hitsDealt: 0, hitsTaken: 0, jumps: 0 };
     this.lapsCompleted = 0;
     this.lap = 1;
     this.lapTimes = [];
@@ -538,8 +541,10 @@ export class RaceCore {
       if (!crossed || c.rocketT > 0) continue;
       const v = Math.max(c.speed, (TOP_SPEED * K) * (j.gap ? .95 : .7));
       c.speed = v; c.vx = Math.sin(c.angle) * v; c.vz = Math.cos(c.angle) * v;
-      c.airDur = clamp(((j.gap || 6) + 5) / v + .3, .55, 1.3); c.airT = c.airDur;
-      c.airY0 = T.heightAt(j.t) + RAMP_H; c.airH = 1.1 + (j.gap || 3) * .13; c.drift = 0; c.driftT = 0; c.drifting = false;
+      // Low gravity (moon): the same jump flies higher and hangs longer in the air.
+      const lg = 1 / (T.gravity || 1), hang = Math.sqrt(lg);
+      c.airDur = clamp((((j.gap || 6) + 5) / v + .3) * hang, .55, 1.3 * hang); c.airT = c.airDur;
+      c.airY0 = T.heightAt(j.t) + RAMP_H; c.airH = (1.1 + (j.gap || 3) * .13) * lg; c.drift = 0; c.driftT = 0; c.drifting = false;
       if (c === this.player) this.emit('jump', { gap: j.gap });
     }
     const ground = c.offroad ? c.scY : this._ground(t);
@@ -548,7 +553,7 @@ export class RaceCore {
       const u = 1 - c.airT / c.airDur, y = c.airY0 + (ground - c.airY0) * u + c.airH * 4 * u * (1 - u);
       const v = Math.max(4, Math.abs(c.speed)), dy = (ground - c.airY0) / c.airDur + c.airH * 4 * (1 - 2 * u) / c.airDur;
       c.pitch = Math.atan2(dy, v) * .8; c.y = y;
-      if (c.airT === 0) { c.y = ground; this._turbo(c, .5, DRIFT_TIERS[0].speed * K, 'trick'); if (c === this.player) this.emit('land', {}); }
+      if (c.airT === 0) { c.y = ground; this._turbo(c, .5, DRIFT_TIERS[0].speed * K, 'trick'); if (c === this.player) { if (this.status === 'racing') this.stats.jumps++; this.emit('land', {}); } }
       return;
     }
     // Hovering over a gap without air time (e.g. after a spin-out): float across.

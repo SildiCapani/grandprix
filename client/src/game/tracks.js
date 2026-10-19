@@ -22,6 +22,15 @@ const STARS = [[-200, 180, 0], [-60, 180, 0], [80, 180, 0], [186, 160, 2], [244,
 
 const JUNGLE = [[-170, 180], [-40, 180], [80, 180], [170, 165], [215, 120], [222, 60], [222, 0], [209.7, -34.7], [180, -47], [150.3, -34.7], [138, -5], [138, 60], [118, 100], [60, 110], [-20, 105], [-80, 90], [-105, 55], [-110, 0], [-122.3, -34.7], [-152, -47], [-181.7, -34.7], [-194, -5], [-194, 50], [-200, 110], [-215, 155]];
 const SAVANNA = [[-170, 174.2], [-51, 174.2], [68, 174.2], [187, 154.7], [246.5, 85], [255, 0], [229.5, -93.5], [174.2, -136], [140.2, -153], [136, -187], [136, -221], [126.1, -245.1], [102, -255], [77.9, -245.1], [68, -221], [68, -170], [51, -127.5], [21.2, -93.5], [8.5, -51], [8.5, 17], [8.5, 51], [-1.4, 75.1], [-25.5, 85], [-49.6, 75.1], [-59.5, 51], [-59.5, 0], [-63.8, -76.5], [-93.5, -127.5], [-170, -146.2], [-229.5, -93.5], [-255, 0], [-242.2, 93.5], [-212.5, 153]];
+// Cloud islands: a figure eight in the sky – the high loop flies over the low one, two jumps across open air.
+const SKY = [[-200, 170, 0], [-70, 170, 0], [60, 170, 1], [160, 150, 3], [220, 90, 6], [230, 10, 9], [190, -60, 12], [110, -90, 14], [30, -60, 15], [-10, 10, 15],
+  [-80, 80, 14], [-160, 60, 12], [-230, -20, 9], [-220, -120, 6], [-140, -170, 4], [-40, -160, 2], [40, -120, 1], [70, -30, 1], [60, 40, 1], [0, 100, 0],
+  [-120, 115, 0], [-215, 108, 0], [-282, 122, 0], [-284, 163, 0]];
+const SAKURA = [[0, 170], [120, 175], [200, 140], [230, 70], [200, 10], [140, -10], [110, -60], [140, -120], [210, -150], [230, -210], [170, -250], [80, -235],
+  [30, -180], [-20, -120], [-90, -110], [-150, -160], [-220, -150], [-250, -80], [-210, -20], [-140, 18], [-185, 72], [-230, 130], [-150, 175]];
+// Moon base: rolling regolith on stilts, three long low-gravity jumps over craters.
+const MOON = [[-180, 160, 0], [-40, 165, 0], [100, 160, 2], [190, 120, 5], [230, 40, 8], [210, -50, 10], [150, -110, 10], [60, -120, 8], [0, -60, 6],
+  [-60, -10, 6], [-120, -50, 8], [-150, -130, 10], [-230, -150, 9], [-280, -80, 6], [-270, 30, 3], [-240, 120, 1]];
 const FOREST = [[-170, 175], [-40, 175], [90, 175], [180, 150], [225, 85], [215, 10], [170, -40], [100, -60], [62, -100], [70, -170], [20, -222], [-60, -218], [-112, -160], [-104, -95], [-130, -40], [-175, -12], [-200, -30], [-200, -80], [-200, -110], [-211.7, -138.3], [-240, -150], [-268.3, -138.3], [-280, -110], [-280, -40], [-282, 40], [-268, 118], [-228, 165]];
 
 export const MAPS = Object.freeze([
@@ -108,6 +117,34 @@ export const MAPS = Object.freeze([
     parTimes: { gold: 260, silver: 294, bronze: 336 },
     boostPads: [],
     sectors: [{ name: 'Fliegenpilz-Allee', t: 0 }, { name: 'Moosgrund', t: 0.35 }, { name: 'Lichtung', t: 0.7 }],
+  },
+  // ---- Season 2 ----
+  {
+    id: 'sky', index: 9, name: 'Wolkeninseln', subtitle: 'Schwebende Inseln · Brücke über die eigene Strecke · Sprünge durch die Wolken',
+    width: 10.8, theme: 'sky', unlockXP: 0, botScale: 1.16, deck: 'float',
+    nodes: SKY,
+    jumps: [{ at: [-226, -70], gap: 14 }, { at: [62, -60], gap: 12 }],
+    parTimes: { gold: 313, silver: 353, bronze: 404 },
+    boostPads: [],
+    sectors: [{ name: 'Himmelstor', t: 0 }, { name: 'Wolkenbrücke', t: 0.33 }, { name: 'Sturzflug', t: 0.66 }],
+  },
+  {
+    id: 'sakura', index: 10, name: 'Kirschblütental', subtitle: 'Torii-Tore · Pagode am See · Abkürzung durch den Bambushain',
+    width: 10.6, theme: 'sakura', unlockXP: 0, botScale: 1.14,
+    nodes: SAKURA,
+    shortcuts: [{ path: [[-118, -128], [-150, -112], [-182, -78], [-212, -30]], width: 8.5, surface: 'grass' }],
+    parTimes: { gold: 262, silver: 295, bronze: 337 },
+    boostPads: [],
+    sectors: [{ name: 'Blütenallee', t: 0 }, { name: 'Pagodenkurven', t: 0.36 }, { name: 'Bambushain', t: 0.66 }],
+  },
+  {
+    id: 'moon', index: 11, name: 'Mondbasis Luna', subtitle: 'Wenig Schwerkraft · Kratersprünge · Kuppeln und Erde am Horizont',
+    width: 10.8, theme: 'moon', unlockXP: 0, botScale: 1.18, deck: 'pillars', gravity: .55,
+    nodes: MOON,
+    jumps: [{ at: [5, 165], gap: 18 }, { at: [-5, -58], gap: 14 }, { at: [-279, -22], gap: 16 }],
+    parTimes: { gold: 214, silver: 241, bronze: 276 },
+    boostPads: [],
+    sectors: [{ name: 'Landeplatz', t: 0 }, { name: 'Kraterfeld', t: 0.35 }, { name: 'Dunkle Seite', t: 0.68 }],
   },
 ].map(map => Object.freeze({ ...map, deck: map.deck || 'flat', jumps: Object.freeze(map.jumps || []), shortcuts: Object.freeze(map.shortcuts || []),
   width: +(map.width * WIDTH_SCALE).toFixed(2),
