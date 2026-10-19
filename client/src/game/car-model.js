@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { carbon as carbonWeave, contactShadow } from './surfaces.js';
 let shadowGeo, shadowMat;
 
@@ -251,6 +252,11 @@ export function createCar(color = '#e34335', number = '07', kart = 'allround') {
     blob.position.y = .006; blob.renderOrder = -1; blob.userData.shared = true; blob.scale.set(L.body[0] * 1.05, 1, L.body[2]);
     car.add(blob);
   }
+  // ~130 parts per car would mean ~130 draw calls (twice with shadows). Fuse everything that never moves
+  // relative to its parent into one mesh per material; tyres and steering pivots stay separate so they can turn.
+  bakeStatic(body, true);
+  for (const tyre of wheels) bakeStatic(tyre, true);
+  bakeStatic(car, false);
   car.userData.wheels = wheels;
   car.userData.frontWheels = frontWheels;
   car.userData.exhaust = exhaust;
@@ -258,6 +264,46 @@ export function createCar(color = '#e34335', number = '07', kart = 'allround') {
   car.userData.kart = kart;
   car.userData.animationTime = Math.random()*10;
   return car;
+}
+
+// Merges the meshes below `root` (all descendants when `deep`, otherwise only its direct mesh children)
+// into one mesh per material, in root's local space. Shared meshes (the contact shadow) are left alone.
+const _rel = new THREE.Matrix4(), _inv = new THREE.Matrix4();
+function bakeStatic(root, deep) {
+  root.updateMatrixWorld(true);
+  _inv.copy(root.matrixWorld).invert();
+  const groups = new Map(), parts = [];
+  const visit = node => {
+    for (const child of node.children) {
+      if (!child.isMesh || child.userData.shared) continue;
+      parts.push(child);
+      if (deep) visit(child);
+    }
+  };
+  visit(root);
+  for (const mesh of parts) {
+    _rel.multiplyMatrices(_inv, mesh.matrixWorld);
+    let geo = mesh.geometry.index ? mesh.geometry.toNonIndexed() : mesh.geometry.clone();
+    for (const name of Object.keys(geo.attributes)) if (!['position', 'normal', 'uv'].includes(name)) geo.deleteAttribute(name);
+    if (!geo.attributes.uv) geo.setAttribute('uv', new THREE.Float32BufferAttribute(new Float32Array(geo.attributes.position.count * 2), 2));
+    geo.applyMatrix4(_rel);
+    // A mirrored transform flips the triangle winding; swap two corners so faces still point outward.
+    if (_rel.determinant() < 0) for (const attr of Object.values(geo.attributes)) {
+      const a = attr.array, n = attr.itemSize;
+      for (let i = 0; i < attr.count; i += 3) for (let k = 0; k < n; k++) { const t = a[(i + 1) * n + k]; a[(i + 1) * n + k] = a[(i + 2) * n + k]; a[(i + 2) * n + k] = t; }
+    }
+    geo.clearGroups();
+    const key = mesh.material.uuid + (mesh.castShadow ? '+' : '-');
+    if (!groups.has(key)) groups.set(key, { material: mesh.material, cast: mesh.castShadow, list: [] });
+    groups.get(key).list.push(geo);
+  }
+  for (const mesh of parts) { mesh.parent?.remove(mesh); mesh.geometry.dispose(); }
+  for (const { material, cast, list } of groups.values()) {
+    const merged = new THREE.Mesh(mergeGeometries(list), material);
+    merged.castShadow = cast; merged.receiveShadow = true;
+    root.add(merged);
+    list.forEach(g => g.dispose());
+  }
 }
 
 // Signature parts that make each kart class readable at a glance.

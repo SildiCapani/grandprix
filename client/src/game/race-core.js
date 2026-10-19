@@ -291,8 +291,25 @@ export class RaceCore {
           this.emit('go');
         }
       } else if (this.status === 'racing') this._step(step, controls);
-      else if (this.status === 'finished' && this.rivals.length) { this._stepRivals(step); this._stepItems(step); }
+      else if (this.status === 'finished') { this._coast(step); if (this.rivals.length) { this._stepRivals(step); this._stepItems(step); } }
     }
+  }
+
+  // After the flag the kart rolls out along its lane instead of stopping dead. No gates or progress any more.
+  _coast(dt) {
+    const p = this.player, L = this.track.length;
+    p.drift = 0; p.driftT = 0; p.drifting = false; p.turboT = 0; p.shroomT = 0; p.rocketT = 0; p.boosting = false;
+    p.speed *= Math.exp(-dt * .85);
+    if (Math.abs(p.speed) < .15) { p.speed = 0; p.vx = 0; p.vz = 0; p.steer = 0; return; }
+    const road = this.track.nearestNear(p.x, p.z, this._lastTrackT), lane = clamp(road.signedDistance, -(this.track.width / 2 - 1.2), this.track.width / 2 - 1.2);
+    const a = this.track.sample(road.t + (4 + Math.abs(p.speed) * .4) / L);
+    const diff = angleDiff(Math.atan2(a.x + a.nx * lane - p.x, a.z + a.nz * lane - p.z), p.angle);
+    p.angle += clamp(diff * 3, -1, 1) * Math.abs(p.speed) / turnRadius(p.speed, p.turn) * dt;
+    p.steer += (clamp(-diff * 2, -1, 1) - p.steer) * Math.min(1, dt * 8);
+    this._integrate(p, dt, false);
+    const { here } = this._bound(p, road.t), prevT = this._lastTrackT;
+    this._lastTrackT = here.t;
+    this._height(p, prevT, here.t, dt);
   }
 
   // Shared tyre model: velocity bends toward the heading; lost grip after hits/drifts.
@@ -424,8 +441,10 @@ export class RaceCore {
     let road, hit = 0;
     if (walls) ({ here: road, hit } = this._bound(p, hintT)); else road = this._locate(p, hintT);
     if (hit > 0) {
+      // Speed loss grows with the impact: brushing the barrier costs a few percent, a head-on hit up to a quarter.
       if (this._wallCooldown <= 0 && hit > 0.3) {
-        p.speed *= 0.76; p.driftT = Math.min(p.driftT, .2);
+        p.speed *= 1 - clamp(hit * .035, .015, .24);
+        if (hit > 3) p.driftT = Math.min(p.driftT, .2);
         this._wallCooldown = 0.35;
         this.stats.collisions++;
         this.emit('collision', { strength: hit, x: p.x, z: p.z, kind: 'wall' });
@@ -762,6 +781,8 @@ export class RaceCore {
       }
       const road = this._locate(bot, bot.t);
       const lookT = road.t;
+      // Pushed into a corridor by a bump: follow it to its end instead of steering at the road behind the corridor wall.
+      if (road.sc && !bot.route) bot.route = road.sc.index + 1;
       // --- shortcuts: offroad karts always, others only with a mushroom or star ---
       for (const sc of this.track.shortcuts) {
         const ds = (wrap(sc.tA - bot.t + .5) - .5) * L;
@@ -830,7 +851,9 @@ export class RaceCore {
         const sc = this.track.shortcuts[bot.route - 1], look = 4.5 + Math.abs(bot.speed) * .42;
         const u = road.sc === sc ? road.u + look / sc.len : (look - (wrap(sc.tA - bot.t + .5) - .5) * L) / sc.len;
         if (road.sc === sc && road.u > .97) bot.route = 0;
-        else if (road.sc !== sc && (wrap(bot.t - sc.tA + .5) - .5) * L > 14) bot.route = 0; // missed the entry
+        // Missed the entry: past the fork while still on the road. Aiming across the gap between road and corridor
+        // would pin the bot against the barrier wedge, so give up the shortcut early.
+        else if (road.sc !== sc && (wrap(bot.t - sc.tA + .5) - .5) * L > 4) bot.route = 0;
         else if (u > 0) { ahead = this.track.sampleShortcut(sc, Math.min(1.05, u)); aimLane = 0; }
       }
       const tx = ahead.x + ahead.nx * aimLane, tz = ahead.z + ahead.nz * aimLane;
@@ -861,7 +884,7 @@ export class RaceCore {
       this._pads(bot);
       // --- barriers, progress, recovery ---
       const bounded = this._bound(bot, lookT);
-      if (bounded.hit > 0.3) bot.speed *= 0.85;
+      if (bounded.hit > 0.3) bot.speed *= 1 - clamp(bounded.hit * .035, .015, .15);
       const r2 = bounded.here;
       let d = r2.t - bot.t;
       if (d > 0.5) d -= 1;
@@ -872,8 +895,15 @@ export class RaceCore {
       if (bot.slide > 0 || spinning) bot.lane += (r2.signedDistance - bot.lane) * Math.min(1, dt * 6);
       const facingWrong = Math.abs(angleDiff(r2.angle, bot.angle)) > 1.9;
       bot.stuck = (this.status === 'racing' && !spinning && (Math.abs(bot.speed) < 1.2 || facingWrong)) ? bot.stuck + dt : 0;
+      // Grinding along a barrier at walking pace never trips the speed check above: watch real progress as well.
+      if (this.status !== 'racing' || spinning || bot.progress - (bot.stallFrom ?? -1) > 2.5 / L) { bot.stallFrom = bot.progress; bot.stallT = 0; }
+      else if ((bot.stallT = (bot.stallT || 0) + dt) > 2.5) bot.stuck = 2;
       if (bot.stuck > 1.8) {
-        const s = this.track.sample(bot.t);
+        let rt = bot.t;
+        // Never park a bot in mid-air above a jump gap.
+        for (const j of this.track.jumps) if (j.gap && this.track.inGap(rt)) rt = wrap(j.t + (j.gap + 6) / L);
+        const s = this.track.sample(rt);
+        bot.t = rt; bot.stallFrom = bot.progress; bot.stallT = 0;
         Object.assign(bot, { x: s.x, z: s.z, angle: s.angle, speed: 4, vx: Math.sin(s.angle) * 4, vz: Math.cos(s.angle) * 4,
           spin: 0, slide: 0, ghost: 1.6, stuck: 0, lane: 0, laneTarget: 0, route: 0, offroad: false });
       }

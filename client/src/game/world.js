@@ -69,8 +69,14 @@ export function createWorld(map, track) {
 
   // --- instancing helpers ---
   const pools = new Map();
+  // Scenery often creates a fresh material per object (std(0x…) inside a loop). Identical-looking materials
+  // share one pool, so a forest is a handful of draw calls instead of hundreds. Materials that are animated
+  // later (userData.live) keep their own pool.
+  const hex = c => c ? c.getHexString() : '';
+  const matKey = m => m.userData.live ? m.uuid : [m.type, hex(m.color), hex(m.emissive), m.emissiveIntensity, m.roughness, m.metalness, m.flatShading,
+    m.side, m.transparent, m.opacity, m.toneMapped, m.depthWrite, m.vertexColors, m.fog, m.map?.uuid, m.emissiveMap?.uuid, m.alphaMap?.uuid, m.bumpMap?.uuid, m.roughnessMap?.uuid].join('|');
   function inst(geo, mat, matrix, opts = {}) {
-    const key = geo.uuid + mat.uuid;
+    const key = geo.uuid + '#' + matKey(mat) + '#' + (opts.cast !== false) + '#' + !!opts.color;
     if (!pools.has(key)) pools.set(key, { geo, mat, list: [], cast: opts.cast !== false, colors: [] });
     const pool = pools.get(key); pool.list.push(matrix); if (opts.color) pool.colors.push(opts.color);
   }
@@ -356,7 +362,7 @@ export function createWorld(map, track) {
     // texture repeat per building is fixed; scale windows to look plausible
     looks.forEach(t => t.repeat.set(2, 4));
     // blinking aircraft beacons
-    const beaconMat = new THREE.MeshBasicMaterial({ color: 0xff2a2a, toneMapped: false });
+    const beaconMat = new THREE.MeshBasicMaterial({ color: 0xff2a2a, toneMapped: false }); beaconMat.userData.live = true;
     beacons.forEach(([x, y, z]) => inst(G.sphere, beaconMat, M(x, y, z, .55, .55, .55), { cast: false }));
     updaters.push((dt, t) => { beaconMat.color.setScalar(0).r = (Math.sin(t * 3) > .2 ? 1 : .15); });
     // neon signs facing the road
