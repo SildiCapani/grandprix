@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#101b20">
 <title>Apex Rush</title>
-<meta name="description" content="Kart-Racer in neun Welten mit Items, Drifts, Offroad-Abkürzungen und Online-Räumen.">
+<meta name="description" content="Kart-Racer in zwölf Welten mit Items, Drifts, Offroad-Abkürzungen und Online-Räumen.">
 </head>
 <body>
 <div id="viewport" role="img" aria-label="3D-Rennstrecke"></div><div class="vignette"></div>
@@ -15,6 +15,7 @@
 <div class="sector" id="sector" hidden><span class="sector-dot"></span><div><small>DU BIST HIER</small><b id="sectorName">START</b></div></div>
 <div class="points-hud" id="pointsHud" hidden><span>STYLE-PUNKTE</span><strong id="styleScore">0</strong><div><b id="chipCount">0 / 36</b> CHIPS <i>·</i> <b id="driftCount">0.0s</b> DRIFT</div><small id="medalTarget">GOLD ≤ 00:48</small></div><div class="countdown" id="countdown" hidden><div class="start-lights"><i></i><i></i><i></i></div><b id="countText">3</b></div>
 <div class="toast" id="toast" role="status"></div>
+<div class="victory" id="victory" hidden><canvas id="confetti"></canvas><div class="victory-card"><svg class="victory-trophy" viewBox="0 0 64 64" aria-hidden="true"><path d="M18 6h28v14c0 9-6 16-14 16s-14-7-14-16z"/><path d="M18 11H8c0 9 5 14 11 14M46 11h10c0 9-5 14-11 14" fill="none" stroke-width="4"/><path d="M28 36h8v10h-8z"/><path d="M20 50h24v8H20z"/></svg><b class="victory-title">SIEG!</b><span class="victory-sub" id="victorySub"></span></div></div>
 <div class="speed-hud" id="speedHud" hidden><div class="gear" id="gear">N</div><div class="speed-value"><b id="speed">0</b><span>KM/H</span></div><div class="speed-bars" id="speedBars"></div></div>
 <div class="item-hud" id="itemHud" hidden><div class="item-slot" id="itemSlot"><span id="itemIcon"></span></div><div class="item-meta"><small>ITEM</small><b id="itemName">LEER</b><span><kbd>E</kbd> tippen · halten = hinten</span></div></div>
 <div class="place-hud" id="placeHud" hidden><b id="placeNum">1</b><span id="placeOf">/ 8</span><small id="placeNote"></small></div>

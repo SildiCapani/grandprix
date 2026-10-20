@@ -22,6 +22,15 @@ const STARS = [[-200, 180, 0], [-60, 180, 0], [80, 180, 0], [186, 160, 2], [244,
 
 const JUNGLE = [[-170, 180], [-40, 180], [80, 180], [170, 165], [215, 120], [222, 60], [222, 0], [209.7, -34.7], [180, -47], [150.3, -34.7], [138, -5], [138, 60], [118, 100], [60, 110], [-20, 105], [-80, 90], [-105, 55], [-110, 0], [-122.3, -34.7], [-152, -47], [-181.7, -34.7], [-194, -5], [-194, 50], [-200, 110], [-215, 155]];
 const SAVANNA = [[-170, 174.2], [-51, 174.2], [68, 174.2], [187, 154.7], [246.5, 85], [255, 0], [229.5, -93.5], [174.2, -136], [140.2, -153], [136, -187], [136, -221], [126.1, -245.1], [102, -255], [77.9, -245.1], [68, -221], [68, -170], [51, -127.5], [21.2, -93.5], [8.5, -51], [8.5, 17], [8.5, 51], [-1.4, 75.1], [-25.5, 85], [-49.6, 75.1], [-59.5, 51], [-59.5, 0], [-63.8, -76.5], [-93.5, -127.5], [-170, -146.2], [-229.5, -93.5], [-255, 0], [-242.2, 93.5], [-212.5, 153]];
+// Cloud islands: a figure eight in the sky – the high loop flies over the low one, two jumps across open air.
+const SKY = [[-200, 170, 0], [-70, 170, 0], [60, 170, 1], [160, 150, 3], [220, 90, 6], [230, 10, 9], [190, -60, 12], [110, -90, 14], [30, -60, 15], [-10, 10, 15],
+  [-80, 80, 14], [-160, 60, 12], [-230, -20, 9], [-220, -120, 6], [-140, -170, 4], [-40, -160, 2], [40, -120, 1], [70, -30, 1], [60, 40, 1], [0, 100, 0],
+  [-120, 115, 0], [-215, 108, 0], [-282, 122, 0], [-284, 163, 0]];
+const SAKURA = [[0, 170], [120, 175], [200, 140], [230, 70], [200, 10], [140, -10], [110, -60], [140, -120], [210, -150], [230, -210], [170, -250], [80, -235],
+  [30, -180], [-20, -120], [-90, -110], [-150, -160], [-220, -150], [-250, -80], [-210, -20], [-140, 18], [-185, 72], [-230, 130], [-150, 175]];
+// Moon base: rolling regolith on stilts, three long low-gravity jumps over craters.
+const MOON = [[-180, 160, 0], [-40, 165, 0], [100, 160, 2], [190, 120, 5], [230, 40, 8], [210, -50, 10], [150, -110, 10], [60, -120, 8], [0, -60, 6],
+  [-60, -10, 6], [-120, -50, 8], [-150, -130, 10], [-230, -150, 9], [-280, -80, 6], [-270, 30, 3], [-240, 120, 1]];
 const FOREST = [[-170, 175], [-40, 175], [90, 175], [180, 150], [225, 85], [215, 10], [170, -40], [100, -60], [62, -100], [70, -170], [20, -222], [-60, -218], [-112, -160], [-104, -95], [-130, -40], [-175, -12], [-200, -30], [-200, -80], [-200, -110], [-211.7, -138.3], [-240, -150], [-268.3, -138.3], [-280, -110], [-280, -40], [-282, 40], [-268, 118], [-228, 165]];
 
 export const MAPS = Object.freeze([
@@ -109,13 +118,45 @@ export const MAPS = Object.freeze([
     boostPads: [],
     sectors: [{ name: 'Fliegenpilz-Allee', t: 0 }, { name: 'Moosgrund', t: 0.35 }, { name: 'Lichtung', t: 0.7 }],
   },
-].map(map => Object.freeze({ ...map, deck: map.deck || 'flat', jumps: Object.freeze(map.jumps || []), shortcuts: Object.freeze(map.shortcuts || []),
-  width: +(map.width * WIDTH_SCALE).toFixed(2),
-  nodes: Object.freeze(map.nodes.map(node => Object.freeze([node[0] * WORLD_SCALE, node[1] * WORLD_SCALE, node[2] || 0]))),
-  boostPads: Object.freeze(map.boostPads),
-  sectors: Object.freeze(map.sectors.map(sector => Object.freeze(sector))),
-  parTimes: Object.freeze(map.parTimes),
-})));
+  // ---- Season 2 ----
+  {
+    id: 'sky', index: 9, name: 'Wolkeninseln', subtitle: 'Schwebende Inseln · Brücke über die eigene Strecke · Sprünge durch die Wolken',
+    width: 10.8, theme: 'sky', unlockXP: 0, botScale: 1.16, deck: 'float',
+    nodes: SKY,
+    jumps: [{ at: [-226, -70], gap: 14 }, { at: [62, -60], gap: 12 }],
+    parTimes: { gold: 313, silver: 353, bronze: 404 },
+    boostPads: [],
+    sectors: [{ name: 'Himmelstor', t: 0 }, { name: 'Wolkenbrücke', t: 0.33 }, { name: 'Sturzflug', t: 0.66 }],
+  },
+  {
+    id: 'sakura', index: 10, name: 'Kirschblütental', subtitle: 'Torii-Tore · Pagode am See · Abkürzung durch den Bambushain',
+    width: 10.6, theme: 'sakura', unlockXP: 0, botScale: 1.14,
+    nodes: SAKURA,
+    shortcuts: [{ path: [[-118, -128], [-150, -112], [-182, -78], [-212, -30]], width: 8.5, surface: 'grass' }],
+    parTimes: { gold: 262, silver: 295, bronze: 337 },
+    boostPads: [],
+    sectors: [{ name: 'Blütenallee', t: 0 }, { name: 'Pagodenkurven', t: 0.36 }, { name: 'Bambushain', t: 0.66 }],
+  },
+  {
+    id: 'moon', index: 11, name: 'Mondbasis Luna', subtitle: 'Wenig Schwerkraft · Kratersprünge · Kuppeln und Erde am Horizont',
+    width: 10.8, theme: 'moon', unlockXP: 0, botScale: 1.18, deck: 'pillars', gravity: .55,
+    nodes: MOON,
+    jumps: [{ at: [5, 165], gap: 18 }, { at: [-5, -58], gap: 14 }, { at: [-279, -22], gap: 16 }],
+    parTimes: { gold: 214, silver: 241, bronze: 276 },
+    boostPads: [],
+    sectors: [{ name: 'Landeplatz', t: 0 }, { name: 'Kraterfeld', t: 0.35 }, { name: 'Dunkle Seite', t: 0.68 }],
+  },
+].map(normalizeMap));
+
+function normalizeMap(map) {
+  return Object.freeze({ ...map, deck: map.deck || 'flat', jumps: Object.freeze(map.jumps || []), shortcuts: Object.freeze(map.shortcuts || []),
+    width: +(map.width * WIDTH_SCALE).toFixed(2),
+    nodes: Object.freeze(map.nodes.map(node => Object.freeze([node[0] * WORLD_SCALE, node[1] * WORLD_SCALE, node[2] || 0]))),
+    boostPads: Object.freeze(map.boostPads || []),
+    sectors: Object.freeze(map.sectors.map(sector => Object.freeze(sector))),
+    parTimes: Object.freeze(map.parTimes),
+  });
+}
 
 function catmull(nodes, i, u) {
   const n = nodes.length;
@@ -265,3 +306,74 @@ function buildTrack(map) {
 
 const TRACKS = new Map(MAPS.map(map => [map.id, buildTrack(map)]));
 export function getTrack(id = 'coast') { return TRACKS.get(id) || TRACKS.get('coast'); }
+
+// ---------- battle arena: a 44 m wide ring around a centre island, i.e. a round bowl with an island in the middle ----------
+const ARENA_R = 32, ARENA_W = 44;
+export const ARENA_MAP = normalizeMap({
+  id: 'arena', index: 98, name: 'Neon-Arena', subtitle: 'Ballon-Battle · 8 Fahrer · 3 Ballons · letzter Fahrer gewinnt',
+  width: ARENA_W, theme: 'arena', unlockXP: 0, botScale: 1.04,
+  nodes: Array.from({ length: 16 }, (_, i) => { const a = i / 16 * Math.PI * 2; return [+(Math.sin(a) * ARENA_R).toFixed(2), +(Math.cos(a) * ARENA_R).toFixed(2), 0]; }),
+  arena: { x: 0, z: 0, inner: ARENA_R - ARENA_W / 2, outer: ARENA_R + ARENA_W / 2 },
+  parTimes: { gold: 999, silver: 999, bronze: 999 }, boostPads: [], sectors: [{ name: 'Arena', t: 0 }],
+});
+TRACKS.set(ARENA_MAP.id, buildTrack(ARENA_MAP));
+
+// ---------- player-built tracks (editor) ----------
+export const CUSTOM_ID = 'custom';
+export const CUSTOM_THEMES = Object.freeze(['day', 'desert', 'night', 'volcano', 'snow', 'space', 'jungle', 'savanna', 'forest', 'sky', 'sakura', 'moon']);
+const r1 = v => Math.round(v * 10) / 10;
+// Editor definition → a full map entry. def = { name, theme, nodes: [[x, z, y]], jumps: [{ node, gap }] }
+export function customMapFromDef(def) {
+  const theme = CUSTOM_THEMES.includes(def.theme) ? def.theme : 'day';
+  const nodes = def.nodes.map(n => [r1(n[0]), r1(n[1]), Math.max(0, r1(n[2] || 0))]);
+  const lifted = nodes.some(n => n[2] > .3);
+  const deck = theme === 'space' || theme === 'sky' ? 'float' : !lifted ? 'flat' : theme === 'snow' ? 'terrain' : 'pillars';
+  const jumps = (def.jumps || []).filter(j => nodes[j.node]).map(j => ({ at: [nodes[j.node][0], nodes[j.node][1]], gap: Math.max(0, Math.min(18, Math.round(j.gap || 0))) }));
+  let len = 0; for (let i = 0; i < nodes.length; i++) { const a = nodes[i], b = nodes[(i + 1) % nodes.length]; len += Math.hypot(b[0] - a[0], b[1] - a[1]); }
+  const lap = len / 19.5 * 3;
+  return { id: CUSTOM_ID, index: 99, name: String(def.name || 'Eigene Strecke').slice(0, 40), subtitle: 'Eigene Strecke · gebaut im Editor',
+    width: 10.6, theme, unlockXP: 0, botScale: 1.1, deck, nodes, jumps, shortcuts: [], custom: true,
+    parTimes: { gold: Math.round(lap * 1.06), silver: Math.round(lap * 1.2), bronze: Math.round(lap * 1.38) },
+    boostPads: [], sectors: [{ name: 'Start', t: 0 }, { name: 'Mitte', t: .33 }, { name: 'Finale', t: .66 }] };
+}
+export function buildCustomTrack(def) { const map = normalizeMap(customMapFromDef(def)); return { map, track: buildTrack(map) }; }
+export function registerCustomTrack(def) { const built = buildCustomTrack(def); TRACKS.set(CUSTOM_ID, built.track); return built; }
+
+// Quality check used by the editor: overlaps, tight turns, steep slopes, length.
+export function analyzeTrack(T) {
+  const P = T.points, n = P.length, L = T.length, conflicts = [], tight = [];
+  let minR = Infinity, maxSlope = 0;
+  for (let i = 0; i < n; i += 2) {
+    const c = Math.abs(T.curvature(i / n, 6)), R = 6 / Math.max(c, 1e-6);
+    if (R < minR) minR = R;
+    if (R < 8) tight.push({ x: P[i].x, z: P[i].z });
+    maxSlope = Math.max(maxSlope, Math.abs(T.slopeAt(i / n)));
+  }
+  for (let i = 0; i < n; i += 3) for (let j = i + 3; j < n; j += 3) {
+    if (Math.min(j - i, n - (j - i)) * L / n < 40) continue;
+    const a = P[i], b = P[j];
+    if (Math.hypot(a.x - b.x, a.z - b.z) < T.width + 5 && Math.abs(a.y - b.y) < 6) conflicts.push({ x: (a.x + b.x) / 2, z: (a.z + b.z) / 2 });
+  }
+  const badJumps = T.jumps.filter(j => Math.abs(T.curvature(j.t - 15 / L, 30)) > .35).length;
+  return { length: L, minRadius: minR, maxSlope, conflicts, tight, badJumps };
+}
+
+// Share codes: "APX1-" + base64url(JSON). Unicode-safe for track names.
+export function encodeTrackCode(def) {
+  const data = { v: 1, n: def.name, t: def.theme, p: def.nodes.map(n => [r1(n[0]), r1(n[1]), r1(n[2] || 0)]), j: (def.jumps || []).map(j => [j.node, j.gap]) };
+  const bytes = new TextEncoder().encode(JSON.stringify(data));
+  let bin = ''; bytes.forEach(b => { bin += String.fromCharCode(b); });
+  return 'APX1-' + btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+export function decodeTrackCode(code) {
+  const m = String(code || '').trim().match(/^APX1-([A-Za-z0-9_-]+)$/);
+  if (!m) throw new Error('Kein gültiger Strecken-Code (er beginnt mit APX1-).');
+  const bin = atob(m[1].replace(/-/g, '+').replace(/_/g, '/'));
+  const data = JSON.parse(new TextDecoder().decode(Uint8Array.from(bin, c => c.charCodeAt(0))));
+  const nodes = Array.isArray(data.p) ? data.p.filter(p => Array.isArray(p) && p.slice(0, 3).every(Number.isFinite)).slice(0, 80) : [];
+  if (nodes.length < 4) throw new Error('Die Strecke braucht mindestens 4 Punkte.');
+  const clampXZ = v => Math.max(-600, Math.min(600, v));
+  return { name: String(data.n || 'Geteilte Strecke').slice(0, 40), theme: CUSTOM_THEMES.includes(data.t) ? data.t : 'day',
+    nodes: nodes.map(p => [clampXZ(p[0]), clampXZ(p[1]), Math.max(0, Math.min(40, p[2] || 0))]),
+    jumps: (Array.isArray(data.j) ? data.j : []).filter(j => Array.isArray(j) && Number.isInteger(j[0]) && j[0] >= 0 && j[0] < nodes.length).map(j => ({ node: j[0], gap: Math.max(0, Math.min(18, +j[1] || 0)) })) };
+}

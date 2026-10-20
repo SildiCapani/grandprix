@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { carbon as carbonWeave, contactShadow } from './surfaces.js';
 let shadowGeo, shadowMat;
 
@@ -80,7 +81,7 @@ const LAYOUT = {
   buggy:    { body: [1.02, 1.05, .95], zf: .5, zr: -.46, x: .5, wf: 1.42, wr: 1.48, lift: .14 },
 };
 
-export function createCar(color = '#e34335', number = '07', kart = 'allround') {
+export function createCar(color = '#e34335', number = '07', kart = 'allround', finish = 'standard') {
   const L = LAYOUT[kart] || LAYOUT.allround;
   const car = new THREE.Group();
   car.name = `Mini Formula ${number}`;
@@ -97,6 +98,11 @@ export function createCar(color = '#e34335', number = '07', kart = 'allround') {
   const driver = new THREE.MeshPhysicalMaterial({ color: '#f6cf42', roughness: .25, metalness: .1, clearcoat: 1, clearcoatRoughness: .04 });
   const visor = new THREE.MeshPhysicalMaterial({ color: '#0c1820', roughness: .03, metalness: .7, clearcoat: 1, envMapIntensity: 1.6 });
   const upholstery = material('#24313b', 0.9, 0.02);
+  // Career paint finishes on top of the chosen colour.
+  if (finish === 'gold') { paint.color.set('#d9a93c'); paint.metalness = .95; paint.roughness = .2; darkPaint.color.set('#8a6420'); darkPaint.metalness = .9; }
+  else if (finish === 'chrome') { paint.color.set('#e6edf3'); paint.metalness = 1; paint.roughness = .05; darkPaint.color.set('#9aa4ae'); darkPaint.metalness = 1; darkPaint.roughness = .1; }
+  else if (finish === 'neon') { paint.emissive.set(color); paint.emissiveIntensity = .65; darkPaint.emissive.set(color); darkPaint.emissiveIntensity = .25; }
+  paint.userData.baseEmissive = paint.emissive.getHex(); paint.userData.baseEI = paint.emissiveIntensity;
 
   // Black floor, tapered monocoque and broad sculpted sidepods.
   prism(body, [[-.25,-.65],[.25,-.65],[.32,-.3],[.29,.29],[.14,.57],[-.14,.57],[-.29,.29],[-.32,-.3]], .04, carbon, .075);
@@ -251,6 +257,11 @@ export function createCar(color = '#e34335', number = '07', kart = 'allround') {
     blob.position.y = .006; blob.renderOrder = -1; blob.userData.shared = true; blob.scale.set(L.body[0] * 1.05, 1, L.body[2]);
     car.add(blob);
   }
+  // ~130 parts per car would mean ~130 draw calls (twice with shadows). Fuse everything that never moves
+  // relative to its parent into one mesh per material; tyres and steering pivots stay separate so they can turn.
+  bakeStatic(body, true);
+  for (const tyre of wheels) bakeStatic(tyre, true);
+  bakeStatic(car, false);
   car.userData.wheels = wheels;
   car.userData.frontWheels = frontWheels;
   car.userData.exhaust = exhaust;
@@ -258,6 +269,46 @@ export function createCar(color = '#e34335', number = '07', kart = 'allround') {
   car.userData.kart = kart;
   car.userData.animationTime = Math.random()*10;
   return car;
+}
+
+// Merges the meshes below `root` (all descendants when `deep`, otherwise only its direct mesh children)
+// into one mesh per material, in root's local space. Shared meshes (the contact shadow) are left alone.
+const _rel = new THREE.Matrix4(), _inv = new THREE.Matrix4();
+function bakeStatic(root, deep) {
+  root.updateMatrixWorld(true);
+  _inv.copy(root.matrixWorld).invert();
+  const groups = new Map(), parts = [];
+  const visit = node => {
+    for (const child of node.children) {
+      if (!child.isMesh || child.userData.shared) continue;
+      parts.push(child);
+      if (deep) visit(child);
+    }
+  };
+  visit(root);
+  for (const mesh of parts) {
+    _rel.multiplyMatrices(_inv, mesh.matrixWorld);
+    let geo = mesh.geometry.index ? mesh.geometry.toNonIndexed() : mesh.geometry.clone();
+    for (const name of Object.keys(geo.attributes)) if (!['position', 'normal', 'uv'].includes(name)) geo.deleteAttribute(name);
+    if (!geo.attributes.uv) geo.setAttribute('uv', new THREE.Float32BufferAttribute(new Float32Array(geo.attributes.position.count * 2), 2));
+    geo.applyMatrix4(_rel);
+    // A mirrored transform flips the triangle winding; swap two corners so faces still point outward.
+    if (_rel.determinant() < 0) for (const attr of Object.values(geo.attributes)) {
+      const a = attr.array, n = attr.itemSize;
+      for (let i = 0; i < attr.count; i += 3) for (let k = 0; k < n; k++) { const t = a[(i + 1) * n + k]; a[(i + 1) * n + k] = a[(i + 2) * n + k]; a[(i + 2) * n + k] = t; }
+    }
+    geo.clearGroups();
+    const key = mesh.material.uuid + (mesh.castShadow ? '+' : '-');
+    if (!groups.has(key)) groups.set(key, { material: mesh.material, cast: mesh.castShadow, list: [] });
+    groups.get(key).list.push(geo);
+  }
+  for (const mesh of parts) { mesh.parent?.remove(mesh); mesh.geometry.dispose(); }
+  for (const { material, cast, list } of groups.values()) {
+    const merged = new THREE.Mesh(mergeGeometries(list), material);
+    merged.castShadow = cast; merged.receiveShadow = true;
+    root.add(merged);
+    list.forEach(g => g.dispose());
+  }
 }
 
 // Signature parts that make each kart class readable at a glance.

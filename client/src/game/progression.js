@@ -1,7 +1,8 @@
 // Career data stays local to this browser. No accounts, timers or daily streaks.
 export const STORAGE_KEY = 'apex-rush-career-v1';
 const LEGACY_KEY = 'apex-rush-legacy-record';
-const MAPS = [{ id: 'coast', xp: 0 }, { id: 'canyon', xp: 0 }, { id: 'neon', xp: 0 }, { id: 'volcano', xp: 0 }, { id: 'glacier', xp: 0 }, { id: 'stars', xp: 0 }, { id: 'jungle', xp: 0 }, { id: 'savanna', xp: 0 }, { id: 'forest', xp: 0 }];
+// With the career switched on, tracks open up with the driver level (the XP is the level threshold).
+const MAPS = [{ id: 'coast', xp: 0 }, { id: 'canyon', xp: 0 }, { id: 'neon', xp: 0 }, { id: 'volcano', xp: 1200 }, { id: 'glacier', xp: 2200 }, { id: 'stars', xp: 3600 }, { id: 'jungle', xp: 500 }, { id: 'savanna', xp: 1200 }, { id: 'forest', xp: 2200 }, { id: 'sky', xp: 5500 }, { id: 'sakura', xp: 3600 }, { id: 'moon', xp: 8000 }];
 const MEDALS = ['none', 'bronze', 'silver', 'gold'];
 const THRESHOLDS = [0, 500, 1200, 2200, 3600, 5500, 8000];
 const TITLES = ['Rookie', 'Kurven-Talent', 'Drift-Pilot', 'Rennprofi', 'Apex-Jäger', 'Grand-Prix-Champion', 'Legende'];
@@ -20,8 +21,89 @@ const normalizeMode = value => MODES.includes(value) ? value : 'race';
 const stringList = value => Array.isArray(value) ? [...new Set(value.filter(item => typeof item === 'string' && item.length > 0 && item.length <= 160))] : [];
 
 export function createProfile() {
-  return { version: 2, totalXP: 0, totalPoints: 0, races: 0, wins: 0, records: {}, achievements: [], recentRaceIds: [] };
+  return { version: 2, totalXP: 0, totalPoints: 0, races: 0, wins: 0, records: {}, achievements: [], recentRaceIds: [], missions: [], missionSeq: 0, missionMaps: [] };
 }
+
+// ---------- career rewards (only when the career switch is on) ----------
+export const MAP_XP = Object.freeze(Object.fromEntries(MAPS.map(map => [map.id, map.xp])));
+export const KART_LEVEL = Object.freeze({ allround: 1, flitzer: 2, drifter: 3, buggy: 4, bolide: 5, brummer: 6 });
+export const FINISHES = Object.freeze([
+  { id: 'standard', name: 'LACK', level: 1 },
+  { id: 'gold', name: 'GOLD', level: 3 },
+  { id: 'chrome', name: 'CHROM', level: 5 },
+  { id: 'neon', name: 'NEON', level: 7 },
+]);
+const levelOfXP = xp => THRESHOLDS.findIndex(t => t > xp) < 0 ? THRESHOLDS.length : THRESHOLDS.findIndex(t => t > xp);
+// Everything that opens up at exactly this level, for the "unlocked" banners.
+export function rewardsForLevel(level, names = {}) {
+  const out = [];
+  for (const [id, xp] of Object.entries(MAP_XP)) if (xp > 0 && levelOfXP(xp) === level) out.push({ kind: 'map', id, name: names[id] || id });
+  for (const [id, lv] of Object.entries(KART_LEVEL)) if (lv > 1 && lv === level) out.push({ kind: 'kart', id, name: names[id] || id });
+  for (const f of FINISHES) if (f.level > 1 && f.level === level) out.push({ kind: 'finish', id: f.id, name: 'Lack ' + f.name });
+  return out;
+}
+// The next level that brings something new (or null when everything is open).
+export function nextReward(level, names) {
+  for (let lv = level + 1; lv <= 8; lv++) { const list = rewardsForLevel(lv, names); if (list.length) return { level: lv, list }; }
+  return null;
+}
+
+// ---------- missions: three at a time, no timers; a finished one is replaced by the next ----------
+const MISSION_POOL = [
+  { id: 'wins', label: n => `Gewinne ${n} Grand Prix`, goal: 2, xp: 350 },
+  { id: 'overtakes', label: n => `Überhole ${n} Gegner`, goal: 25, xp: 250 },
+  { id: 'drift', label: n => `Drifte insgesamt ${n} Sekunden`, goal: 60, xp: 250 },
+  { id: 'hits', label: n => `Triff ${n} Gegner mit Items`, goal: 6, xp: 250 },
+  { id: 'podium', label: n => `Fahre ${n}× aufs Podium`, goal: 3, xp: 300 },
+  { id: 'jumps', label: n => `Lande ${n} Sprünge`, goal: 12, xp: 250 },
+  { id: 'coins', label: n => `Sammle ${n} Turbo-Chips`, goal: 30, xp: 250 },
+  { id: 'maps', label: n => `Fahre auf ${n} verschiedenen Strecken`, goal: 3, xp: 250 },
+  { id: 'clean', label: n => n > 1 ? `Beende ${n} Rennen ohne Wandkontakt` : 'Beende ein Rennen ohne Wandkontakt', goal: 1, xp: 300 },
+  { id: 'gold', label: n => n > 1 ? `Hol dir ${n} Gold-Medaillen` : 'Hol dir eine Gold-Medaille', goal: 1, xp: 350 },
+  { id: 'fast', label: n => n > 1 ? `Beende ${n} Rennen mit 120 km/h` : 'Beende ein Rennen mit 120 km/h', goal: 1, xp: 300 },
+  { id: 'finish', label: n => `Beende ${n} Rennen`, goal: 4, xp: 200 },
+];
+// Every pass through the pool makes the goals 50 % bigger.
+function makeMission(seq) {
+  const base = MISSION_POOL[seq % MISSION_POOL.length], tier = Math.floor(seq / MISSION_POOL.length);
+  return { id: base.id, seq, goal: Math.max(1, Math.round(base.goal * (1 + tier * .5))), progress: 0, xp: Math.round(base.xp * (1 + tier * .25)) };
+}
+function fillMissions(profile) {
+  while (profile.missions.length < 3) {
+    let m = makeMission(profile.missionSeq++);
+    while (profile.missions.some(o => o.id === m.id)) m = makeMission(profile.missionSeq++);
+    profile.missions.push(m);
+  }
+  return profile;
+}
+export function missionLabel(m) { return (MISSION_POOL.find(p => p.id === m.id)?.label || (() => m.id))(m.goal); }
+export function activeMissions(value) { return fillMissions(sanitizeProfile(value)).missions; }
+// Counts one finished race towards the missions. `race` = { position, mode, mapId, cc, medal, coins, collisions, resets,
+// overtakes, hitsDealt, jumps, driftSeconds }. Returns the updated profile, completed missions and the XP they paid.
+export function applyMissions(value, race) {
+  const profile = fillMissions(sanitizeProfile(value)), done = [];
+  const competitive = race.mode !== 'time';
+  if (race.mapId && !profile.missionMaps.includes(race.mapId)) profile.missionMaps.push(race.mapId);
+  const gain = {
+    wins: competitive && race.position === 1 ? 1 : 0, podium: competitive && race.position <= 3 ? 1 : 0,
+    overtakes: race.overtakes || 0, drift: race.driftSeconds || 0, hits: race.hitsDealt || 0, jumps: race.jumps || 0, coins: race.coins || 0,
+    clean: !race.collisions && !race.resets ? 1 : 0, gold: race.medal === 'gold' ? 1 : 0, fast: race.cc >= 120 ? 1 : 0, finish: 1,
+  };
+  for (const m of profile.missions) {
+    if (m.id === 'maps') m.progress = Math.min(m.goal, profile.missionMaps.length);
+    else m.progress = Math.min(m.goal, m.progress + (gain[m.id] || 0));
+  }
+  let xp = 0;
+  profile.missions = profile.missions.filter(m => {
+    if (m.progress < m.goal) return true;
+    done.push({ ...m, label: missionLabel(m) }); xp += m.xp; return false;
+  });
+  if (done.some(m => m.id === 'maps')) profile.missionMaps = [];
+  profile.totalXP = Math.min(Number.MAX_SAFE_INTEGER, profile.totalXP + xp);
+  return { profile: fillMissions(profile), done, xp };
+}
+const sanitizeMissions = value => Array.isArray(value) ? value.filter(m => object(m) && MISSION_POOL.some(p => p.id === m.id)).slice(0, 3)
+  .map(m => ({ id: m.id, seq: count(m.seq), goal: Math.max(1, count(m.goal)), progress: count(m.progress), xp: count(m.xp) })) : [];
 
 function sanitizeRecord(record) {
   if (!object(record)) return null;
@@ -44,6 +126,9 @@ export function sanitizeProfile(value) {
   profile.wins = Math.min(count(value.wins), profile.races);
   profile.achievements = stringList(value.achievements);
   profile.recentRaceIds = stringList(value.recentRaceIds).slice(-20);
+  profile.missions = sanitizeMissions(value.missions);
+  profile.missionSeq = count(value.missionSeq);
+  profile.missionMaps = stringList(value.missionMaps).filter(validMap);
   if (object(value.records)) for (const map of MAPS) {
     const modes = value.records[map.id];
     if (!object(modes)) continue;
@@ -234,6 +319,8 @@ function keepProgress(current, incoming) {
   for (const key of ['totalXP', 'totalPoints', 'races', 'wins']) incoming[key] = Math.max(current[key], incoming[key]);
   incoming.achievements = [...new Set([...current.achievements, ...incoming.achievements])];
   incoming.recentRaceIds = [...new Set([...current.recentRaceIds, ...incoming.recentRaceIds])].slice(-20);
+  // Missions move forward only: keep whichever side is further along the sequence.
+  if (current.missionSeq > incoming.missionSeq) { incoming.missions = current.missions; incoming.missionSeq = current.missionSeq; incoming.missionMaps = current.missionMaps; }
   for (const map of MAPS) for (const mode of MODES) {
     const old = current.records[map.id]?.[mode];
     if (!old) continue;

@@ -54,8 +54,15 @@ const isMushroom = item => typeof item === 'string' && item.startsWith('mushroom
 const TRAILABLE = new Set(['banana', 'green', 'red']);
 const TRAIL_BACK = 1.35;
 const STAR_TIME = 7, MUSHROOM_TIME = 1.3, SPIN_TIME = 1.15, ROULETTE_TIME = 1.1;
-const BOX_RESPAWN = 3, BOX_RADIUS = 1.5;
+const BOX_RESPAWN = 3, BOX_RADIUS = 1.5, RAMP_LEN_BOX = 8;
 const GREEN_SPEED = 40, RED_SPEED = 36, GREEN_BOUNCES = 3;
+// ---- battle: balloons instead of laps ----
+export const BATTLE_TIME = 150, BALLOONS = 3, MAX_BALLOONS = 5;
+function rollBattleItem(rnd = Math.random) {
+  const table = [['green', .3], ['red', .2], ['banana', .2], ['mushroom', .2], ['star', .1]];
+  let x = rnd(); for (const [item, w] of table) { if ((x -= w) <= 0) return item; }
+  return 'green';
+}
 // ---- power drift: hold longer for a stronger mini-turbo (blue → orange → purple) ----
 export const DRIFT_TIERS = [{ at: .75, time: .55, speed: 25.5 }, { at: 1.7, time: 1.0, speed: 27 }, { at: 2.8, time: 1.5, speed: 28.5 }];
 export const driftTier = t => t >= DRIFT_TIERS[2].at ? 3 : t >= DRIFT_TIERS[1].at ? 2 : t >= DRIFT_TIERS[0].at ? 1 : 0;
@@ -120,14 +127,17 @@ function makeBody(extra) {
   return { speed: 0, steer: 0, vx: 0, vz: 0, slide: 0, spin: 0, ghost: 0, y: 0, pitch: 0, airT: 0, airDur: 0, airY0: 0, airH: 0,
     trail: null, trailT: 0, top: 1, accel: 1, turn: 1, driftRate: 1, offroadF: .4, offroad: false, scY: 0, route: 0, scSeen: -1, kart: 'allround',
     item: null, pending: null, roulette: 0, starT: 0, shroomT: 0, spinT: 0, invuln: 0, spinAngle: 0, itemHold: 0,
-    drift: 0, driftT: 0, turboT: 0, turboSpeed: 0, padCool: 0, rocketT: 0, rocketLane: 0, ...extra };
+    drift: 0, driftT: 0, turboT: 0, turboSpeed: 0, padCool: 0, rocketT: 0, rocketLane: 0, balloons: BALLOONS, out: false, hits: 0, ...extra };
 }
 
 // Item box rows, evenly spread over the lap (never right on the start line).
 export function itemBoxLayout(track) {
   const rows = Math.max(4, Math.round(track.length / 330)), boxes = [];
   for (let r = 0; r < rows; r++) {
-    const t = wrap(.07 + r / rows), s = track.sample(t), half = track.width / 2 - 1.5;
+    let t = wrap(.07 + r / rows);
+    // Never float a row of boxes over a jump gap or on a ramp: slide it to just past the landing.
+    for (const j of track.jumps) { const ds = (wrap(t - j.t + .5) - .5) * track.length; if (ds > -RAMP_LEN_BOX && ds < j.gap + 8) t = wrap(j.t + (j.gap + 10) / track.length); }
+    const s = track.sample(t), half = track.width / 2 - 1.5;
     for (let k = 0; k < 5; k++) {
       const lane = -half + k * (half * 2 / 4);
       boxes.push({ x: s.x + s.nx * lane, z: s.z + s.nz * lane, y: s.y, t, active: true, respawn: 0 });
@@ -163,7 +173,7 @@ export class RaceCore {
     this.mode = 'race';
     this.countdown = 3;
     this.elapsed = 0;
-    this.stats = { collisions: 0, driftSeconds: 0, boostSeconds: 0, resets: 0, rams: 0, overtakes: 0, hitsDealt: 0, hitsTaken: 0 };
+    this.stats = { collisions: 0, driftSeconds: 0, boostSeconds: 0, resets: 0, rams: 0, overtakes: 0, hitsDealt: 0, hitsTaken: 0, jumps: 0 };
     this.lapsCompleted = 0;
     this.lap = 1;
     this.lapTimes = [];
@@ -205,7 +215,7 @@ export class RaceCore {
     if (kart) this.kartId = kartById(kart).id;
     this.track = getTrack(mapId);
     this.reset();
-    this.mode = mode === 'time' ? 'time' : 'race';
+    this.mode = mode === 'time' ? 'time' : mode === 'battle' ? 'battle' : 'race';
     this.itemsEnabled = items ?? this.mode === 'race';
     this.status = 'countdown';
     if (this.mode === 'race') {
@@ -226,8 +236,22 @@ export class RaceCore {
       // Lane starts where the car is parked, so nobody swerves at the green light.
       for (const b of this.rivals) b.lane = b.laneTarget = this.track.nearest(b.x, b.z).signedDistance;
       this._lastPosition = this._computePosition();
-    }
+    } else if (this.mode === 'battle') this._startBattle();
     return this;
+  }
+
+  // Battle: everybody spread around the arena ring, three balloons each, a clock instead of laps.
+  _startBattle() {
+    const T = this.track, n = RIVAL_ROSTER.length + 1, difficulty = 0.975 + (T.botScale - 1) * 0.6;
+    const spot = i => { const t = i / n, s = T.sample(t), lane = (i % 2 ? -1 : 1) * T.width * .18; return { x: s.x + s.nx * lane, z: s.z + s.nz * lane, y: s.y, angle: s.angle, t }; };
+    const p0 = spot(0);
+    Object.assign(this.player, { x: p0.x, z: p0.z, y: p0.y, angle: p0.angle });
+    this._lastTrackT = p0.t;
+    this.rivals = RIVAL_ROSTER.map((r, i) => { const p = spot(i + 1);
+      return makeBody({ ...r, ...kartFields(r.kart), pace: r.pace * difficulty * K * kartById(r.kart).top, index: i, x: p.x, z: p.z, y: p.y, angle: p.angle, t: p.t,
+        progress: 0, lane: 0, laneTarget: 0, boosting: false, stuck: 0, mood: Math.random() * TAU, finished: false, aim: null, aimT: 0 }); });
+    this.battleLeft = BATTLE_TIME; this._outOrder = [];
+    this.position = this._lastPosition = this._computePosition();
   }
 
   // Online fill-up: the host simulates AI drivers on the given grid slots.
@@ -314,8 +338,25 @@ export class RaceCore {
           this.emit('go');
         }
       } else if (this.status === 'racing') this._step(step, controls);
-      else if (this.status === 'finished' && this.rivals.length) { this._stepRivals(step); this._stepItems(step); }
+      else if (this.status === 'finished') { this._coast(step); if (this.rivals.length) { this._stepRivals(step); this._stepItems(step); } }
     }
+  }
+
+  // After the flag the kart rolls out along its lane instead of stopping dead. No gates or progress any more.
+  _coast(dt) {
+    const p = this.player, L = this.track.length;
+    p.drift = 0; p.driftT = 0; p.drifting = false; p.turboT = 0; p.shroomT = 0; p.rocketT = 0; p.boosting = false;
+    p.speed *= Math.exp(-dt * .85);
+    if (Math.abs(p.speed) < .15) { p.speed = 0; p.vx = 0; p.vz = 0; p.steer = 0; return; }
+    const road = this.track.nearestNear(p.x, p.z, this._lastTrackT), lane = clamp(road.signedDistance, -(this.track.width / 2 - 1.2), this.track.width / 2 - 1.2);
+    const a = this.track.sample(road.t + (4 + Math.abs(p.speed) * .4) / L);
+    const diff = angleDiff(Math.atan2(a.x + a.nx * lane - p.x, a.z + a.nz * lane - p.z), p.angle);
+    p.angle += clamp(diff * 3, -1, 1) * Math.abs(p.speed) / turnRadius(p.speed, p.turn) * dt;
+    p.steer += (clamp(-diff * 2, -1, 1) - p.steer) * Math.min(1, dt * 8);
+    this._integrate(p, dt, false);
+    const { here } = this._bound(p, road.t), prevT = this._lastTrackT;
+    this._lastTrackT = here.t;
+    this._height(p, prevT, here.t, dt);
   }
 
   // Shared tyre model: velocity bends toward the heading; lost grip after hits/drifts.
@@ -384,6 +425,7 @@ export class RaceCore {
 
   _step(dt, input) {
     this.elapsed += dt;
+    if (this.mode === 'battle') this.battleLeft = Math.max(0, this.battleLeft - dt);
     this._wallCooldown = Math.max(0, this._wallCooldown - dt);
     this._bumpCooldown = Math.max(0, this._bumpCooldown - dt);
     const p = this.player;
@@ -420,7 +462,7 @@ export class RaceCore {
       p.speed = Math.sign(p.speed) * Math.max(0, Math.abs(p.speed) - slowing);
     }
     if (spinning) p.speed *= Math.exp(-dt * 2.2);
-    const drafting = this.rivals.length > 0 && this._draftFor(p, this._playerTrackProgress, this.rivals.map(b => ({ c: b, prog: b.progress })));
+    const drafting = this.mode !== 'battle' && this.rivals.length > 0 && this._draftFor(p, this._playerTrackProgress, this.rivals.map(b => ({ c: b, prog: b.progress })));
     if (drafting && throttle > 0) p.speed += 2.5 * dt;
     p.drafting = drafting;
     p.speed = clamp(p.speed, -6, this._capFor(p, drafting));
@@ -436,7 +478,7 @@ export class RaceCore {
     const roadBefore = this._locate(p, this._lastTrackT);
     const alignment = angleDiff(roadBefore.angle, p.angle);
     // A gentle centering assist stabilizes a straight line without steering the route.
-    if (Math.abs(input.steer) < 0.08 && p.speed > 4 && Math.abs(alignment) < 0.6 && p.slide <= 0 && !spinning)
+    if (this.mode !== 'battle' && Math.abs(input.steer) < 0.08 && p.speed > 4 && Math.abs(alignment) < 0.6 && p.slide <= 0 && !spinning)
       p.angle += alignment * 0.22 * dt;
     this._integrate(p, dt, p.drifting);
     this._pads(p);
@@ -449,8 +491,10 @@ export class RaceCore {
     const wasOff = p.offroad;
     if (walls) ({ here: road, hit } = this._bound(p, hintT)); else road = this._locate(p, hintT);
     if (hit > 0) {
+      // Speed loss grows with the impact: brushing the barrier costs a few percent, a head-on hit up to a quarter.
       if (this._wallCooldown <= 0 && hit > 0.3) {
-        p.speed *= 0.76; p.driftT = Math.min(p.driftT, .2);
+        p.speed *= 1 - clamp(hit * .035, .015, .24);
+        if (hit > 3) p.driftT = Math.min(p.driftT, .2);
         this._wallCooldown = 0.35;
         this.stats.collisions++;
         this.emit('collision', { strength: hit, x: p.x, z: p.z, kind: 'wall' });
@@ -474,7 +518,7 @@ export class RaceCore {
       }
       const distanceToGate = wrap(this.nextCheckpoint / 8 - previousT);
       let from = previousT, left = delta;
-      while (left > 0 && this.status === 'racing') {
+      while (left > 0 && this.status === 'racing' && this.mode !== 'battle') {
         const gap = wrap(this.nextCheckpoint / 8 - from);
         if (!(gap > 1e-9 && gap <= left + 1e-9)) break;
         this._passGate(); from = wrap(from + gap); left -= gap;
@@ -486,6 +530,7 @@ export class RaceCore {
     if (this.externals.length) this._collideExternal();
     if (this.itemsEnabled) this._stepItems(dt);
 
+    if (this.mode === 'battle' && this.status === 'racing') this._checkBattleEnd();
     if (this.status === 'racing' && this.rivals.length) {
       const pos = this._computePosition();
       if (pos < this._lastPosition) { this.stats.overtakes += this._lastPosition - pos; this.emit('overtake', { position: pos }); }
@@ -550,8 +595,10 @@ export class RaceCore {
       if (!crossed || c.rocketT > 0) continue;
       const v = Math.max(c.speed, (TOP_SPEED * K) * (j.gap ? .95 : .7));
       c.speed = v; c.vx = Math.sin(c.angle) * v; c.vz = Math.cos(c.angle) * v;
-      c.airDur = clamp(((j.gap || 6) + 5) / v + .3, .55, 1.3); c.airT = c.airDur;
-      c.airY0 = T.heightAt(j.t) + RAMP_H; c.airH = 1.1 + (j.gap || 3) * .13; c.drift = 0; c.driftT = 0; c.drifting = false;
+      // Low gravity (moon): the same jump flies higher and hangs longer in the air.
+      const lg = 1 / (T.gravity || 1), hang = Math.sqrt(lg);
+      c.airDur = clamp((((j.gap || 6) + 5) / v + .3) * hang, .55, 1.3 * hang); c.airT = c.airDur;
+      c.airY0 = T.heightAt(j.t) + RAMP_H; c.airH = (1.1 + (j.gap || 3) * .13) * lg; c.drift = 0; c.driftT = 0; c.drifting = false;
       if (c === this.player) this.emit('jump', { gap: j.gap });
     }
     const ground = c.offroad ? c.scY : this._ground(t);
@@ -560,7 +607,7 @@ export class RaceCore {
       const u = 1 - c.airT / c.airDur, y = c.airY0 + (ground - c.airY0) * u + c.airH * 4 * u * (1 - u);
       const v = Math.max(4, Math.abs(c.speed)), dy = (ground - c.airY0) / c.airDur + c.airH * 4 * (1 - 2 * u) / c.airDur;
       c.pitch = Math.atan2(dy, v) * .8; c.y = y;
-      if (c.airT === 0) { c.y = ground; this._turbo(c, .5, DRIFT_TIERS[0].speed * K, 'trick'); if (c === this.player) this.emit('land', {}); }
+      if (c.airT === 0) { c.y = ground; this._turbo(c, .5, DRIFT_TIERS[0].speed * K, 'trick'); if (c === this.player) { if (this.status === 'racing') this.stats.jumps++; this.emit('land', {}); } }
       return;
     }
     // Hovering over a gap without air time (e.g. after a spin-out): float across.
@@ -583,7 +630,40 @@ export class RaceCore {
   }
 
   _computePosition() {
+    if (this.mode === 'battle') return this._battlePlace(this.player);
     return 1 + this.rivals.filter(bot => bot.progress > this._playerTrackProgress).length;
+  }
+
+  // ---------- battle rules ----------
+  // Alive cars rank by balloons, then hits; knocked-out cars behind them, the last one out first.
+  _battlePlace(c) {
+    const field = [this.player, ...this.rivals], alive = field.filter(o => !o.out);
+    if (!c.out) return 1 + alive.filter(o => o !== c && (o.balloons > c.balloons || (o.balloons === c.balloons && o.hits > c.hits))).length;
+    const order = this._outOrder || [];
+    return alive.length + (order.length - order.indexOf(c));
+  }
+  _battleStandings() { return [this.player, ...this.rivals].sort((a, b) => this._battlePlace(a) - this._battlePlace(b)); }
+  _popBalloon(c, by) {
+    c.balloons = Math.max(0, c.balloons - 1);
+    if (by && by !== c) by.hits = (by.hits || 0) + 1;
+    this.emit('balloon', { victim: c === this.player ? 'player' : c.name, by: by === this.player ? 'player' : by?.name || null, left: c.balloons, x: c.x, y: c.y, z: c.z, player: c === this.player || by === this.player });
+    if (c.balloons > 0) return;
+    c.out = true; c.ghost = 1e9; c.item = null; c.pending = null; c.roulette = 0; c.starT = 0; c.shroomT = 0;
+    (this._outOrder ||= []).push(c);
+    this.emit('out', { name: c === this.player ? 'DU' : c.name, player: c === this.player, by: by === this.player ? 'player' : by?.name || null });
+  }
+  _checkBattleEnd() {
+    const alive = [this.player, ...this.rivals].filter(o => !o.out);
+    if (!this.player.out && alive.length > 1 && this.battleLeft > 0) return;
+    this.status = 'finished'; this.finishedTime = this.elapsed; this.player.boosting = false;
+    this.position = this._battlePlace(this.player);
+    this.emit('finish', { time: this.elapsed, bestLap: null, position: this.position, battle: true,
+      reason: this.player.out ? 'out' : alive.length <= 1 ? 'last' : 'time', balloons: this.player.balloons, hits: this.player.hits });
+  }
+  _nearestFoe(c) {
+    let best = null, bd = Infinity;
+    for (const o of [this.player, ...this.rivals]) { if (o === c || o.out) continue; const d = Math.hypot(o.x - c.x, o.z - c.z); if (d < bd) { bd = d; best = o; } }
+    return best;
   }
 
   // Everyone in the race with their lap progress (player first).
@@ -629,7 +709,7 @@ export class RaceCore {
       const sp = item === 'green' ? (GREEN_SPEED * K) : (RED_SPEED * K), base = Math.max(0, c.speed);
       const shell = { id: this._uid++, type: item, x: c.x + hx * 1.6, z: c.z + hz * 1.6, y: c.y, vx: hx * (sp + base * .3), vz: hz * (sp + base * .3),
         owner: c, arm: 0.35, life: item === 'green' ? 9 : 12, bounces: 0, t: c === this.player ? this._lastTrackT : (c.t ?? 0), target: null };
-      if (item === 'red') { shell.target = this._carAhead(c); if (shell.target?.key) shell.targetKey = shell.target.key; }
+      if (item === 'red') { shell.target = this.mode === 'battle' ? this._nearestFoe(c) : this._carAhead(c); if (shell.target?.key) shell.targetKey = shell.target.key; }
       this.shells.push(shell);
     }
     this.emit('item', { item: isMushroom(item) ? 'mushroom' : item, by: c === this.player ? 'player' : 'bot', name: c.name, backward });
@@ -693,6 +773,7 @@ export class RaceCore {
     c.speed *= .2; c.vx *= .3; c.vz *= .3; c.shroomT = 0;
     if (c === this.player) this.stats.hitsTaken++;
     if (by === this.player && c !== this.player) this.stats.hitsDealt++;
+    if (this.mode === 'battle') this._popBalloon(c, by);
     this.emit('itemhit', { kind, victim: c === this.player ? 'player' : c.name, by: by === this.player ? 'player' : by?.name || null, x: c.x, z: c.z, player: c === this.player || by === this.player });
     return true;
   }
@@ -708,7 +789,7 @@ export class RaceCore {
         b.active = false; b.respawn = BOX_RESPAWN;
         if (!c.item && c.roulette <= 0) {
           const frac = this._rankFrac(c), n = c === this.player && this.rankFrac ? (this.onlineCount || 2) : this._field().length;
-          c.pending = rollItem(frac, n >= 3 && frac >= (n - 2.5) / (n - 1)); c.roulette = c === this.player ? ROULETTE_TIME : .6;
+          c.pending = this.mode === 'battle' ? rollBattleItem() : rollItem(frac, n >= 3 && frac >= (n - 2.5) / (n - 1)); c.roulette = c === this.player ? ROULETTE_TIME : .6;
           if (c.pending === 'blue') { if (this.blueCount >= BLUE_MAX || frac < .25) c.pending = 'red'; else this.blueCount++; }
           if (c === this.player) this.emit('itembox', {});
         }
@@ -725,7 +806,8 @@ export class RaceCore {
         const road = this.track.nearestNear(s.x, s.z, s.t); s.t = road.t;
         let tx, tz;
         const tgt = this._resolveTarget(s);
-        if (tgt && Math.hypot(tgt.x - s.x, tgt.z - s.z) < 26) { tx = tgt.x; tz = tgt.z; }
+        if (tgt && (this.mode === 'battle' ? !tgt.out : Math.hypot(tgt.x - s.x, tgt.z - s.z) < 26)) { tx = tgt.x; tz = tgt.z; }
+        else if (this.mode === 'battle') { tx = s.x + s.vx; tz = s.z + s.vz; }
         else { const a = this.track.sample(s.t + 9 / this.track.length); tx = a.x; tz = a.z; }
         const want = Math.atan2(tx - s.x, tz - s.z), cur = Math.atan2(s.vx, s.vz);
         const ang = cur + clamp(angleDiff(want, cur), -5 * dt, 5 * dt);
@@ -854,6 +936,7 @@ export class RaceCore {
 
   _stepRivals(dt) {
     if (!this.rivals.length) return;
+    if (this.mode === 'battle') return this._stepBattleBots(dt);
     const L = this.track.length, W = this.track.width, laneMax = W / 2 - 1.05;
     const p = this.player, playerProg = this._playerTrackProgress;
     const others = [{ c: p, prog: playerProg, isPlayer: true }, ...this.rivals.map(b => ({ c: b, prog: b.progress }))];
@@ -871,6 +954,8 @@ export class RaceCore {
       }
       const road = this._locate(bot, bot.t);
       const lookT = road.t;
+      // Pushed into a corridor by a bump: follow it to its end instead of steering at the road behind the corridor wall.
+      if (road.sc && !bot.route) bot.route = road.sc.index + 1;
       // --- shortcuts: offroad karts always, others only with a mushroom or star ---
       for (const sc of this.track.shortcuts) {
         const ds = (wrap(sc.tA - bot.t + .5) - .5) * L;
@@ -939,7 +1024,9 @@ export class RaceCore {
         const sc = this.track.shortcuts[bot.route - 1], look = 4.5 + Math.abs(bot.speed) * .42;
         const u = road.sc === sc ? road.u + look / sc.len : (look - (wrap(sc.tA - bot.t + .5) - .5) * L) / sc.len;
         if (road.sc === sc && road.u > .97) bot.route = 0;
-        else if (road.sc !== sc && (wrap(bot.t - sc.tA + .5) - .5) * L > 14) bot.route = 0; // missed the entry
+        // Missed the entry: past the fork while still on the road. Aiming across the gap between road and corridor
+        // would pin the bot against the barrier wedge, so give up the shortcut early.
+        else if (road.sc !== sc && (wrap(bot.t - sc.tA + .5) - .5) * L > 4) bot.route = 0;
         else if (u > 0) { ahead = this.track.sampleShortcut(sc, Math.min(1.05, u)); aimLane = 0; }
       }
       const tx = ahead.x + ahead.nx * aimLane, tz = ahead.z + ahead.nz * aimLane;
@@ -970,7 +1057,7 @@ export class RaceCore {
       this._pads(bot);
       // --- barriers, progress, recovery ---
       const botWasOff = bot.offroad, bounded = this._bound(bot, lookT);
-      if (bounded.hit > 0.3) bot.speed *= 0.85;
+      if (bounded.hit > 0.3) bot.speed *= 1 - clamp(bounded.hit * .035, .015, .15);
       const r2 = bounded.here;
       let d = r2.t - bot.t;
       if (d > 0.5) d -= 1;
@@ -982,10 +1069,95 @@ export class RaceCore {
       if (bot.slide > 0 || spinning) bot.lane += (r2.signedDistance - bot.lane) * Math.min(1, dt * 6);
       const facingWrong = Math.abs(angleDiff(r2.angle, bot.angle)) > 1.9;
       bot.stuck = (this.status === 'racing' && !spinning && (Math.abs(bot.speed) < 1.2 || facingWrong)) ? bot.stuck + dt : 0;
+      // Grinding along a barrier at walking pace never trips the speed check above: watch real progress as well.
+      if (this.status !== 'racing' || spinning || bot.progress - (bot.stallFrom ?? -1) > 2.5 / L) { bot.stallFrom = bot.progress; bot.stallT = 0; }
+      else if ((bot.stallT = (bot.stallT || 0) + dt) > 2.5) bot.stuck = 2;
       if (bot.stuck > 1.8) {
-        const s = this.track.sample(bot.t);
+        let rt = bot.t;
+        // Never park a bot in mid-air above a jump gap.
+        for (const j of this.track.jumps) if (j.gap && this.track.inGap(rt)) rt = wrap(j.t + (j.gap + 6) / L);
+        const s = this.track.sample(rt);
+        bot.t = rt; bot.stallFrom = bot.progress; bot.stallT = 0;
         Object.assign(bot, { x: s.x, z: s.z, angle: s.angle, speed: 4, vx: Math.sin(s.angle) * 4, vz: Math.cos(s.angle) * 4,
           spin: 0, slide: 0, ghost: 1.6, stuck: 0, lane: 0, laneTarget: 0, route: 0, offroad: false });
+      }
+    }
+  }
+
+  // ---------- battle AI ----------
+  // Arena bots hunt item boxes when empty-handed and the nearest rival otherwise. They steer around the centre island
+  // by moving in polar coordinates: a slice of the way round the ring at a time, straight at the target once it is in view.
+  _battleAim(bot) {
+    if (!bot.item && bot.roulette <= 0) {
+      let best = null, bd = Infinity;
+      for (const b of this.boxes) if (b.active) { const d = Math.hypot(b.x - bot.x, b.z - bot.z); if (d < bd) { bd = d; best = b; } }
+      if (best && bd < 70) return best;
+    }
+    let best = null, bd = Infinity;
+    for (const o of [this.player, ...this.rivals]) {
+      if (o === bot || o.out) continue;
+      let d = Math.hypot(o.x - bot.x, o.z - bot.z); if (o === this.player) d *= 1.35 - bot.aggr * .35;
+      if (d < bd) { bd = d; best = o; }
+    }
+    // a careful driver on its last balloon keeps its distance
+    if (best && bot.balloons === 1 && bot.aggr < .5 && bd < 18) return { x: -best.x, z: -best.z };
+    return best || { x: 0, z: 30 };
+  }
+  _battleItems(bot) {
+    if (!bot.item || bot.spinT > 0) return;
+    const hold = bot.itemHold, hx = Math.sin(bot.angle), hz = Math.cos(bot.angle);
+    const foes = [this.player, ...this.rivals].filter(o => o !== bot && !o.out && o.ghost <= 0);
+    const rel = o => { const dx = o.x - bot.x, dz = o.z - bot.z; return { along: dx * hx + dz * hz, lat: Math.abs(dx * hz - dz * hx), d: Math.hypot(dx, dz) }; };
+    const ahead = foes.some(o => { const r = rel(o); return r.along > 3 && r.along < 30 && r.lat < 1.6; });
+    const behind = foes.some(o => { const r = rel(o); return r.along < -2 && r.along > -14 && r.lat < 2; });
+    const near = foes.some(o => rel(o).d < 40);
+    let use = false;
+    switch (bot.item) {
+      case 'star': use = hold > .3; break;
+      case 'red': use = near && hold > .5; break;
+      case 'green': use = (ahead && hold > .3) || hold > 9; break;
+      case 'banana': use = (behind && hold > .4) || hold > 7; break;
+      case 'mushroom': use = (ahead && hold > .3) || hold > 6; break;
+    }
+    if (use && Math.random() < .25 + bot.itemIQ * .6) this._useItem(bot);
+  }
+  _stepBattleBots(dt) {
+    const T = this.track, c0 = T.arena || { x: 0, z: 0, inner: 10, outer: 54 };
+    for (const bot of this.rivals) {
+      this._tickItems(bot, dt);
+      if (bot.out) { bot.speed *= Math.exp(-dt * 3); this._integrate(bot, dt, false); bot.t = this._bound(bot, bot.t).here.t; continue; }
+      const spinning = bot.spinT > 0;
+      if ((bot.aimT -= dt) <= 0 || !bot.aim || bot.aim.out) { bot.aimT = .6 + Math.random() * .6; bot.aim = this._battleAim(bot); }
+      const tx = bot.aim.x - c0.x, tz = bot.aim.z - c0.z, bx = bot.x - c0.x, bz = bot.z - c0.z;
+      const th = Math.atan2(bz, bx), tht = Math.atan2(tz, tx), dth = angleDiff(tht, th);
+      let ax = bot.aim.x, az = bot.aim.z;
+      if (Math.abs(dth) > .5) {
+        const th2 = th + clamp(dth, -.55, .55), rr = clamp((Math.hypot(bx, bz) + Math.hypot(tx, tz)) / 2, c0.inner + 6, c0.outer - 5);
+        ax = c0.x + Math.cos(th2) * rr; az = c0.z + Math.sin(th2) * rr;
+      }
+      const diff = angleDiff(Math.atan2(ax - bot.x, az - bot.z), bot.angle);
+      const maxYaw = Math.max(0.6, Math.abs(bot.speed)) / turnRadius(bot.speed, bot.turn);
+      if (!spinning) { const yr = clamp(diff * 3.2, -1, 1) * maxYaw * (bot.airT > 0 ? .35 : 1); bot.angle += yr * dt; scrub(bot, yr, dt); }
+      bot.steer += (clamp(-diff * 2, -1, 1) - bot.steer) * Math.min(1, dt * 8);
+      let target = bot.pace * (Math.abs(diff) > 1.2 ? .45 : Math.abs(diff) > .6 ? .75 : 1);
+      if (bot.starT > 0) target = Math.max(target, (STAR_SPEED * K) * .97);
+      if (bot.shroomT > 0) target = MUSHROOM_SPEED * K;
+      if (bot.turboT > 0) target = Math.max(target, bot.turboSpeed);
+      if (spinning) bot.speed *= Math.exp(-dt * 2.2);
+      else if (bot.speed < target) bot.speed += (bot.shroomT > 0 || bot.turboT > 0 ? 40 : 16 * bot.accel) * K * dt;
+      else bot.speed = Math.max(target, bot.speed - 22 * K * dt);
+      bot.speed = clamp(bot.speed, -3, this._capFor(bot, false));
+      bot.drifting = false;
+      this._integrate(bot, dt, false);
+      const bounded = this._bound(bot, bot.t);
+      if (bounded.hit > 0.3) bot.speed *= 1 - clamp(bounded.hit * .035, .015, .15);
+      this._height(bot, bot.t, bounded.here.t, dt);
+      bot.t = bounded.here.t;
+      if (this.itemsEnabled && this.status === 'racing') this._battleItems(bot);
+      bot.stuck = (this.status === 'racing' && !spinning && Math.abs(bot.speed) < 1.2) ? bot.stuck + dt : 0;
+      if (bot.stuck > 1.6) {
+        const s = T.sample(bot.t), a = s.angle + (Math.random() < .5 ? Math.PI : 0);
+        Object.assign(bot, { x: s.x, z: s.z, angle: a, speed: 4, vx: Math.sin(a) * 4, vz: Math.cos(a) * 4, spin: 0, slide: 0, ghost: 1.2, stuck: 0, aim: null });
       }
     }
   }
@@ -1006,6 +1178,11 @@ export class RaceCore {
         if (pen > 0 && (!best || pen > best.pen)) best = { pen, d, dx, dz, cx: (ax + bx) / 2, cz: (az + bz) / 2 };
       }
       if (!best) continue;
+      // Battle: ramming someone with a mushroom boost steals one of their balloons.
+      if (this.mode === 'battle' && (a.shroomT > 0) !== (b.shroomT > 0)) {
+        const att = a.shroomT > 0 ? a : b, vic = att === a ? b : a;
+        if (this._hit(vic, 'ram', att) && att.balloons < MAX_BALLOONS) { att.balloons++; this.emit('steal', { by: att === this.player ? 'player' : att.name, victim: vic === this.player ? 'player' : vic.name, x: vic.x, z: vic.z }); }
+      }
       // Star power: whoever touches a starred car spins; the star car ploughs on.
       const pa = a.starT > 0 || a.rocketT > 0, pb = b.starT > 0 || b.rocketT > 0;
       if (pa !== pb) {

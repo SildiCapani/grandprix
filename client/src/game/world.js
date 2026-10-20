@@ -69,8 +69,14 @@ export function createWorld(map, track) {
 
   // --- instancing helpers ---
   const pools = new Map();
+  // Scenery often creates a fresh material per object (std(0x…) inside a loop). Identical-looking materials
+  // share one pool, so a forest is a handful of draw calls instead of hundreds. Materials that are animated
+  // later (userData.live) keep their own pool.
+  const hex = c => c ? c.getHexString() : '';
+  const matKey = m => m.userData.live ? m.uuid : [m.type, hex(m.color), hex(m.emissive), m.emissiveIntensity, m.roughness, m.metalness, m.flatShading,
+    m.side, m.transparent, m.opacity, m.toneMapped, m.depthWrite, m.vertexColors, m.fog, m.map?.uuid, m.emissiveMap?.uuid, m.alphaMap?.uuid, m.bumpMap?.uuid, m.roughnessMap?.uuid].join('|');
   function inst(geo, mat, matrix, opts = {}) {
-    const key = geo.uuid + mat.uuid;
+    const key = geo.uuid + '#' + matKey(mat) + '#' + (opts.cast !== false) + '#' + !!opts.color;
     if (!pools.has(key)) pools.set(key, { geo, mat, list: [], cast: opts.cast !== false, colors: [] });
     const pool = pools.get(key); pool.list.push(matrix); if (opts.color) pool.colors.push(opts.color);
   }
@@ -100,6 +106,10 @@ export function createWorld(map, track) {
     day: { color: 0x86a85e, base: '#7c9a55', dots: ['rgba(60,90,40,.45)', 'rgba(150,170,90,.4)', 'rgba(100,120,60,.4)'] },
     desert: { color: 0xe0a46b, base: '#d39a62', dots: ['rgba(170,110,60,.45)', 'rgba(240,190,140,.45)', 'rgba(150,90,50,.35)'] },
     night: { color: 0x3a3e46, base: '#3b3f46', dots: ['rgba(20,22,26,.5)', 'rgba(90,94,100,.4)'] },
+    sky: { color: 0xffffff, base: '#ffffff', dots: [] },
+    sakura: { color: 0x8fae68, base: '#88a862', dots: ['rgba(60,90,40,.45)', 'rgba(255,170,200,.55)', 'rgba(255,220,235,.5)', 'rgba(140,170,90,.4)'] },
+    moon: { color: 0x9a9ca2, base: '#97999f', dots: ['rgba(40,42,48,.45)', 'rgba(200,202,210,.4)', 'rgba(70,72,80,.35)'] },
+    arena: { color: 0x22252c, base: '#23262d', dots: ['rgba(10,10,14,.5)', 'rgba(90,60,140,.25)'] },
   }[theme];
   const groundTex = canvasTex(512, (g, s) => {
     g.fillStyle = groundSpec.base; g.fillRect(0, 0, s, s);
@@ -115,7 +125,7 @@ export function createWorld(map, track) {
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(groundSize, groundSize), std(0xffffff, { map: groundTex, roughness: theme === 'night' ? .7 : .95 }));
   ground.rotation.x = -Math.PI / 2; ground.position.y = -.09; ground.receiveShadow = true;
   if (theme === 'volcano') { ground.material.emissive = new THREE.Color(0xff5a10); ground.material.emissiveMap = groundTex; ground.material.emissiveIntensity = .14; }
-  if (theme !== 'space') group.add(ground);
+  if (theme !== 'space' && theme !== 'sky') group.add(ground);
 
   // --- run-off shoulders beside the road (grass verge / sand / sidewalk) ---
   function band(off0, off1, y, material) {
@@ -128,14 +138,14 @@ export function createWorld(map, track) {
     const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setIndex(idx); geo.computeVertexNormals();
     const mesh = new THREE.Mesh(geo, material); mesh.receiveShadow = true; group.add(mesh); return mesh;
   }
-  const shoulderMat = std({ day: 0x9b9886, desert: 0xc98f5b, night: 0x6b6f78, volcano: 0x3a3132, snow: 0xf4f8fc, space: 0x000000, jungle: 0x6a5a3a, savanna: 0xb88a52, forest: 0x7a6a4a }[theme], { side: THREE.DoubleSide, roughness: .9 });
-  if (theme !== 'space') for (const side of [-1, 1]) band(side * (W / 2 + .5), side * (W / 2 + (theme === 'night' ? 5 : 3.5)), theme === 'night' ? .03 : -.02, shoulderMat);
+  const shoulderMat = std({ day: 0x9b9886, desert: 0xc98f5b, night: 0x6b6f78, volcano: 0x3a3132, snow: 0xf4f8fc, space: 0x000000, jungle: 0x6a5a3a, savanna: 0xb88a52, forest: 0x7a6a4a, sky: 0xffffff, sakura: 0x9a8a72, moon: 0x7c7e84, arena: 0x3a3550 }[theme], { side: THREE.DoubleSide, roughness: .9 });
+  if (theme !== 'space' && theme !== 'sky') for (const side of [-1, 1]) band(side * (W / 2 + .5), side * (W / 2 + (theme === 'night' ? 5 : 3.5)), theme === 'night' ? .03 : -.02, shoulderMat);
 
   // --- start/finish area: grandstand with crowd and a pit building ---
   const s0 = track.sample(0), tx = Math.sin(s0.angle), tz = Math.cos(s0.angle);
   const at = (along, side) => [s0.x + tx * along + s0.nx * side, s0.z + tz * along + s0.nz * side];
-  {
-    const standMat = std(['night', 'volcano', 'space'].includes(theme) ? 0x3a3f4c : 0xd9dcdf, { roughness: .6 }), seatMat = std({ day: 0x2a7fd4, desert: 0xc8432b, night: 0x7a2bd1, volcano: 0xd8401a, snow: 0x1f6fd0, space: 0x9b5cff, jungle: 0x2f9a4a, savanna: 0xd8802a, forest: 0xd8342c }[theme] || 0x2a7fd4, { roughness: .5 });
+  if (!map.arena) { // the battle arena has its own stadium instead
+    const standMat = std(['night', 'volcano', 'space', 'moon'].includes(theme) ? 0x3a3f4c : 0xd9dcdf, { roughness: .6 }), seatMat = std({ day: 0x2a7fd4, desert: 0xc8432b, night: 0x7a2bd1, volcano: 0xd8401a, snow: 0x1f6fd0, space: 0x9b5cff, jungle: 0x2f9a4a, savanna: 0xd8802a, forest: 0xd8342c, sky: 0x39b8ff, sakura: 0xe8507a, moon: 0xd8d8e0 }[theme] || 0x2a7fd4, { roughness: .5 });
     const side = W / 2 + 9, len = 70, crowdMat = std(0xffffff, { roughness: .8 });
     for (let row = 0; row < 8; row++) {
       const [x, z] = at(0, side + row * 1.4);
@@ -171,7 +181,7 @@ export function createWorld(map, track) {
     emissive: theme === 'night' ? 0xffffff : 0x000000, emissiveIntensity: theme === 'night' ? .55 : 0, emissiveMap: null }));
   billboardMats.forEach(m => { if (theme === 'night') m.emissiveMap = m.map; });
   const poleMat = std(0x50555e, { metalness: .6, roughness: .4 });
-  const bbCount = Math.floor(track.length / 95);
+  const bbCount = map.arena ? 0 : Math.floor(track.length / 95);
   for (let i = 0; i < bbCount; i++) {
     const t = (i + .5) / bbCount, s = track.sample(t), bend = track.curvature(t - 10 / track.length, 30);
     const side = bend > 0 ? -1 : 1, off = W / 2 + 6;
@@ -184,7 +194,7 @@ export function createWorld(map, track) {
   }
 
   // ===================== THEMES =====================
-  const builders = { day: buildCoast, desert: buildDesert, volcano: buildVolcano, snow: buildSnow, space: buildSpace, jungle: buildJungle, savanna: buildSavanna, forest: buildForest, night: buildCity };
+  const builders = { day: buildCoast, desert: buildDesert, volcano: buildVolcano, snow: buildSnow, space: buildSpace, jungle: buildJungle, savanna: buildSavanna, forest: buildForest, night: buildCity, sky: buildSky, sakura: buildSakura, moon: buildMoon, arena: buildArena };
   (builders[theme] || buildCity)();
 
   function scatter(n, minD, maxR, place, tries = 6) {
@@ -356,7 +366,7 @@ export function createWorld(map, track) {
     // texture repeat per building is fixed; scale windows to look plausible
     looks.forEach(t => t.repeat.set(2, 4));
     // blinking aircraft beacons
-    const beaconMat = new THREE.MeshBasicMaterial({ color: 0xff2a2a, toneMapped: false });
+    const beaconMat = new THREE.MeshBasicMaterial({ color: 0xff2a2a, toneMapped: false }); beaconMat.userData.live = true;
     beacons.forEach(([x, y, z]) => inst(G.sphere, beaconMat, M(x, y, z, .55, .55, .55), { cast: false }));
     updaters.push((dt, t) => { beaconMat.color.setScalar(0).r = (Math.sin(t * 3) > .2 ? 1 : .15); });
     // neon signs facing the road
@@ -639,12 +649,15 @@ export function createWorld(map, track) {
     // --- asteroid belt around the course ---
     const astMat = std(0x5b5470, { roughness: 1, flatShading: true }), crystal = new THREE.MeshStandardMaterial({ color: 0x8ff3ff, emissive: 0x3ad8ff, emissiveIntensity: 1.2, roughness: .2, flatShading: true });
     const belt = new THREE.Group(); group.add(belt);
+    // One instanced mesh per material instead of ~300 separate rocks (they all turn with the belt group).
+    const rocks = [], gems = [];
     for (let i = 0; i < 260; i++) {
       const a = r() * Math.PI * 2, d = 330 + r() * 260, y = -60 + r() * 140, x = Math.cos(a) * d, z = Math.sin(a) * d;
-      const m = new THREE.Mesh(G.rock, i % 9 ? astMat : crystal); const sc = 2 + r() * (i % 9 ? 12 : 4); m.scale.set(sc, sc * (.6 + r() * .6), sc); m.position.set(x, y, z); m.rotation.set(r() * 6, r() * 6, r() * 6); belt.add(m);
+      const sc = 2 + r() * (i % 9 ? 12 : 4); (i % 9 ? rocks : gems).push(M(x, y, z, sc, sc * (.6 + r() * .6), sc, r() * 6, r() * 6, r() * 6));
     }
     // a few asteroids floating close under the track
-    scatter(40, 14, 300, (x, z) => { const m = new THREE.Mesh(G.rock, astMat); const sc = 3 + r() * 6; m.scale.set(sc, sc * .7, sc); m.position.set(x, -18 - r() * 40, z); m.rotation.set(r() * 6, r() * 6, 0); belt.add(m); });
+    scatter(40, 14, 300, (x, z) => { const sc = 3 + r() * 6; rocks.push(M(x, -18 - r() * 40, z, sc, sc * .7, sc, r() * 6, r() * 6)); });
+    for (const [list, mat] of [[rocks, astMat], [gems, crystal]]) { const im = new THREE.InstancedMesh(G.rock, mat, list.length); list.forEach((m, i) => im.setMatrixAt(i, m)); im.frustumCulled = false; belt.add(im); }
     updaters.push((dt, t) => { belt.rotation.y = t * .004; });
     // shooting stars
     const comets = [];
@@ -784,6 +797,185 @@ export function createWorld(map, track) {
     const hill = std(0x5a7a3a, { roughness: 1, flatShading: true });
     for (let i = 0; i < 24; i++) { const a = r() * Math.PI * 2, d = 520 + r() * 480; inst(G.ico, hill, M(Math.cos(a) * d, -12, Math.sin(a) * d, 120 + r() * 140, 40 + r() * 70, 120 + r() * 120, r() * 6), { cast: false }); }
     weather(220, 0xfff2a8, .2, -.2, 70, 16, 2.5); // pollen
+  }
+
+  // ---------- season 2 worlds ----------
+  // A tree on any height (leafyTree only stands on the ground).
+  function treeAt(x, y, z, h, trunkMat, leafMats, spread = 1) {
+    inst(G.cylLow, trunkMat, M(x, y + h * .45, z, .35 * spread, h * .9, .35 * spread));
+    for (let k = 0; k < 4; k++) inst(G.ico, leafMats[k % leafMats.length], M(x + (r() - .5) * 2.2 * spread, y + h * (.85 + r() * .25), z + (r() - .5) * 2.2 * spread, (1.8 + r() * 1.4) * spread, (1.3 + r() * .9) * spread, (1.8 + r() * 1.4) * spread, r() * 6));
+  }
+
+  function buildSky() {
+    // --- the start island: grass on top, rock tapering into the clouds ---
+    const grass = std(0x7cc35a, { roughness: .9 }), rock = std(0xb59a7a, { roughness: 1, flatShading: true }), dirt = std(0x8a6a4a, { roughness: 1, flatShading: true });
+    {
+      const [px, pz] = at(-6, 0);
+      const top = new THREE.Mesh(new THREE.CylinderGeometry(70, 66, 3, 48), grass); top.position.set(px, -1.6, pz); top.scale.set(1, 1, .62); top.rotation.y = s0.angle; top.receiveShadow = true; group.add(top);
+      const under = new THREE.Mesh(new THREE.ConeGeometry(66, 70, 24, 3), rock); under.rotation.x = Math.PI; under.position.set(px, -38, pz); under.scale.set(1, 1, .62); under.rotation.y = s0.angle; group.add(under);
+    }
+    // --- floating islands of every size, with trees, around and below the course ---
+    const leaves = [std(0x4f9a3a, { flatShading: true }), std(0x6ab84a, { flatShading: true }), std(0xf3a6c8, { flatShading: true })], trunk = std(0x6a4a30);
+    const island = (x, y, z, rad) => {
+      inst(G.cyl, grass, M(x, y, z, rad, 1.2, rad * (.8 + r() * .3), r() * 6), { cast: false });
+      inst(G.cone, r() < .5 ? rock : dirt, M(x, y - rad * .75, z, rad * .95, rad * 1.5, rad * .85, r() * 6, Math.PI));
+      const n = Math.floor(rad / 5); for (let k = 0; k < n; k++) { const a = r() * 6.28, d = r() * rad * .7; treeAt(x + Math.cos(a) * d, y + .5, z + Math.sin(a) * d, 4 + r() * 4, trunk, leaves); }
+    };
+    scatter(26, 32, 420, (x, z) => island(x, -12 - r() * 30, z, 10 + r() * 16));
+    scatter(16, 40, 700, (x, z) => { if (Math.hypot(x, z) < 380) return false; island(x, 10 + r() * 60, z, 18 + r() * 26); });
+    // --- sea of clouds below and puffs drifting between the islands ---
+    const seaTex = canvasTex(512, (g, s) => { g.fillStyle = '#f2f6fb'; g.fillRect(0, 0, s, s); clouds(g, s, r, 90, 'rgba(190,205,225,.35)', 20, 90); clouds(g, s, r, 70, 'rgba(255,255,255,.8)', 20, 70); }, 18);
+    const sea = new THREE.Mesh(new THREE.PlaneGeometry(4000, 4000), new THREE.MeshStandardMaterial({ map: seaTex, roughness: 1, emissive: 0xffffff, emissiveMap: seaTex, emissiveIntensity: .35 }));
+    sea.rotation.x = -Math.PI / 2; sea.position.y = -75; group.add(sea);
+    const puff = std(0xffffff, { roughness: 1, emissive: 0xe8f0ff, emissiveIntensity: .25 });
+    const cloud = (x, y, z, s) => { for (let k = 0; k < 5; k++) inst(G.sphere, puff, M(x + (k - 2) * s * .7, y + (r() - .3) * s * .4, z + (r() - .5) * s * .6, s * (.7 + r() * .5), s * (.45 + r() * .3), s * (.6 + r() * .4)), { cast: false }); };
+    for (let i = 0; i < 70; i++) { const a = r() * 6.28, d = 120 + r() * 700; cloud(Math.cos(a) * d, -66 + r() * 10, Math.sin(a) * d, 14 + r() * 22); }
+    scatter(22, 30, 500, (x, z) => cloud(x, -25 + r() * 15, z, 6 + r() * 8));
+    // --- hot-air balloons bobbing in the breeze ---
+    const balloons = [], basket = std(0x8a6038), rope = std(0x3a2a1a);
+    const stripes = ['#ff5a5a', '#ffd04a', '#39b8ff', '#7ad35a', '#bda0ff'].map((c, i) => canvasTex(128, (g, s) => { for (let k = 0; k < 8; k++) { g.fillStyle = k % 2 ? '#ffffff' : c; g.fillRect(k * s / 8, 0, s / 8, s); } }, 1));
+    for (let i = 0; i < 9; i++) {
+      const a = i / 9 * 6.28 + r(), d = 160 + r() * 260, b = new THREE.Group();
+      const env = new THREE.Mesh(new THREE.SphereGeometry(6, 20, 14), new THREE.MeshStandardMaterial({ map: stripes[i % stripes.length], roughness: .6 }));
+      env.scale.y = 1.2; env.position.y = 8; b.add(env);
+      const bk = new THREE.Mesh(G.box, basket); bk.scale.set(2, 1.4, 2); b.add(bk);
+      for (const [ox, oz] of [[-.9, -.9], [.9, -.9], [-.9, .9], [.9, .9]]) { const l = new THREE.Mesh(G.cylLow, rope); l.scale.set(.05, 3.6, .05); l.position.set(ox, 2.4, oz); b.add(l); }
+      b.position.set(Math.cos(a) * d, 25 + r() * 45, Math.sin(a) * d); b.userData.ph = r() * 6; group.add(b); balloons.push(b);
+    }
+    updaters.push((dt, t) => balloons.forEach(b => { b.position.y += Math.sin(t * .5 + b.userData.ph) * .012; b.rotation.y = t * .05 + b.userData.ph; }));
+    // --- a giant rainbow over the course ---
+    const rainbow = ['#ff4a4a', '#ff9a3a', '#ffe04a', '#5ad85a', '#3aa8ff', '#8a5aff'];
+    rainbow.forEach((c, i) => { const arc = new THREE.Mesh(new THREE.TorusGeometry(420 - i * 9, 4.5, 6, 80, Math.PI), new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: .45, depthWrite: false, fog: false, toneMapped: false })); arc.position.set(60, -60, -650); group.add(arc); });
+    // --- sparkles drifting around the road ---
+    weather(260, 0xfff6d8, .22, -.15, 80, 30, 2.4);
+  }
+
+  function buildSakura() {
+    const bark = std(0x4a3228), pinks = [std(0xffb7d0, { flatShading: true }), std(0xff9ec0, { flatShading: true }), std(0xffd6e4, { flatShading: true }), std(0xf58ab0, { flatShading: true })];
+    // cherry trees line the road, more in loose groves further out
+    for (let i = 0; i < 70; i++) { const s = track.sample(r()), side = r() < .5 ? -1 : 1, off = W / 2 + 6 + r() * 10, x = s.x + s.nx * side * off, z = s.z + s.nz * side * off; if (!free(x, z, W / 2 + 4)) continue; leafyTree(x, z, 5 + r() * 3, bark, pinks, 1.1 + r() * .4); }
+    scatter(320, 8, 460, (x, z) => leafyTree(x, z, 4 + r() * 4, bark, r() < .8 ? pinks : [std(0x5a8a3a, { flatShading: true })], .9 + r() * .5));
+    // --- torii gates over the track ---
+    const red = std(0xd8341f, { roughness: .5 }), black = std(0x1d1a1a, { roughness: .6 });
+    for (let k = 0; k < 7; k++) {
+      const s = track.sample(.05 + k / 7), half = W / 2 + 1.3, hw = W + 5.5;
+      for (const side of [-1, 1]) { const x = s.x + s.nx * half * side, z = s.z + s.nz * half * side; inst(G.cyl, red, M(x, 3.5, z, .38, 7, .38)); inst(G.cyl, black, M(x, .4, z, .5, .8, .5)); }
+      inst(G.box, red, M(s.x, 5.6, s.z, hw - 2, .45, .45, s.angle));
+      inst(G.box, black, M(s.x, 7.2, s.z, hw, .5, .9, s.angle));
+      inst(G.box, red, M(s.x, 6.8, s.z, hw - .6, .35, .7, s.angle));
+    }
+    // --- stone lanterns along the verges ---
+    const stone = std(0xb8b2a6, { roughness: 1 });
+    for (let i = 0; i < 60; i++) { const s = track.sample(i / 60), side = i % 2 ? 1 : -1, x = s.x + s.nx * side * (W / 2 + 3), z = s.z + s.nz * side * (W / 2 + 3); if (!free(x, z, W / 2 + 2.2)) continue;
+      inst(G.box, stone, M(x, .5, z, .7, 1, .7)); inst(G.box, stone, M(x, 1.25, z, .45, .5, .45)); inst(G.roof, stone, M(x, 1.75, z, 1, .5, 1)); }
+    // --- pagoda beside a lake, wherever the infield has room ---
+    let spot = null;
+    for (let i = 0; i < 400 && !spot; i++) { const x = (r() * 2 - 1) * 200, z = (r() * 2 - 1) * 200; if (free(x, z, 42)) spot = [x, z]; }
+    if (spot) {
+      const [px, pz] = spot, wall = std(0xf4ead8, { roughness: .8 }), roof = std(0x3a2a2a, { roughness: .6 });
+      for (let f = 0; f < 5; f++) { const w = 9 - f * 1.4, y = f * 4; inst(G.box, f % 2 ? red : wall, M(px, y + 1.6, pz, w, 3.2, w)); inst(G.roof, roof, M(px, y + 3.6, pz, w * 1.7, 1.6, w * 1.7)); }
+      inst(G.cyl, std(0xd8b04a, { metalness: .6, roughness: .3 }), M(px, 22, pz, .2, 4, .2));
+      const lake = new THREE.Mesh(new THREE.CircleGeometry(16, 40), new THREE.MeshStandardMaterial({ color: 0x5aa8c8, roughness: .05, metalness: .2 }));
+      lake.rotation.x = -Math.PI / 2; lake.position.set(px + 20, .02, pz + 6); group.add(lake);
+      const pad = std(0x4a8a3a); for (let i = 0; i < 12; i++) { const a = r() * 6.28, d = r() * 13; inst(G.cyl, pad, M(px + 20 + Math.cos(a) * d, .06, pz + 6 + Math.sin(a) * d, .7, .04, .7), { cast: false }); }
+    }
+    // --- bamboo grove around the shortcut ---
+    const bamboo = [std(0x7aa83a), std(0x5a8a2a), std(0x9ab84a)];
+    corridorEdges((x, z) => { for (let k = 0; k < 3; k++) { const h = 6 + r() * 6; inst(G.cylLow, bamboo[k], M(x + (r() - .5) * 2, h / 2, z + (r() - .5) * 2, .12, h, .12, 0, (r() - .5) * .12, (r() - .5) * .12)); } });
+    for (const sc of track.shortcuts) for (let i = 0; i < 160; i++) { const p = sc.pts[Math.floor(r() * sc.pts.length)], a = r() * 6.28, d = sc.width / 2 + 3 + r() * 16, x = p.x + Math.cos(a) * d, z = p.z + Math.sin(a) * d; if (!free(x, z, sc.width / 2 + 1.5) || roadNear(x, z).d < W / 2 + 3) continue; const h = 7 + r() * 7; inst(G.cylLow, bamboo[i % 3], M(x, h / 2, z, .13, h, .13)); }
+    // --- a snow-capped volcano on the horizon ---
+    inst(G.cone, std(0x6a7a9a, { roughness: 1 }), M(-260, 60, -900, 380, 260, 380), { cast: false });
+    inst(G.cone, std(0xf4f8ff, { roughness: .9 }), M(-260, 160, -900, 140, 64, 140), { cast: false });
+    const hill = std(0x7a9a5a, { roughness: 1, flatShading: true });
+    for (let i = 0; i < 20; i++) { const a = r() * Math.PI * 2, d = 540 + r() * 420; inst(G.ico, hill, M(Math.cos(a) * d, -14, Math.sin(a) * d, 120 + r() * 140, 40 + r() * 60, 120 + r() * 120, r() * 6), { cast: false }); }
+    // drifting petals
+    weather(520, 0xffb7d0, .3, .7, 80, 22, 3.2);
+  }
+
+  function buildMoon() {
+    // --- craters: raised rims and dark floors; one under every jump gap ---
+    const rimMat = std(0xa6a8ae, { roughness: 1, flatShading: true }), floorMat = std(0x5c5e64, { roughness: 1 });
+    const torus = new THREE.TorusGeometry(1, .18, 6, 28); torus.rotateX(Math.PI / 2);
+    const crater = (x, z, rad) => { inst(torus, rimMat, M(x, 0, z, rad, rad * 1.2, rad), { cast: false }); inst(G.cyl, floorMat, M(x, -.04, z, rad * .95, .05, rad * .95), { cast: false }); };
+    for (const j of track.jumps) { const s = track.sample(j.t + (j.gap / 2) / track.length); crater(s.x, s.z, Math.max(10, j.gap * .9)); }
+    scatter(70, 12, 520, (x, z) => crater(x, z, 4 + r() * 18));
+    // --- moon base: glass domes, modules, solar fields and antennas ---
+    const metal = std(0xe4e6ea, { roughness: .35, metalness: .6 }), glass = new THREE.MeshStandardMaterial({ color: 0x9adfff, roughness: .05, metalness: .1, transparent: true, opacity: .45, emissive: 0x2a6a8a, emissiveIntensity: .4 });
+    const domeGeo = new THREE.SphereGeometry(1, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2);
+    const panel = std(0x1a2a6a, { roughness: .25, metalness: .7 }), lamp = new THREE.MeshBasicMaterial({ color: 0xff3a3a, toneMapped: false }); lamp.userData.live = true;
+    let placed = 0;
+    for (let i = 0; i < 600 && placed < 7; i++) {
+      const x = (r() * 2 - 1) * 260, z = (r() * 2 - 1) * 220; if (!free(x, z, 26)) continue; placed++;
+      const d = 7 + r() * 7; inst(domeGeo, glass, M(x, 0, z, d, d * .8, d), { cast: false }); inst(G.cyl, metal, M(x, .4, z, d + .4, .8, d + .4));
+      for (let k = 0; k < 3; k++) { const a = r() * 6.28; inst(G.box, metal, M(x + Math.cos(a) * (d + 4), 1.4, z + Math.sin(a) * (d + 4), 5, 2.8, 3, -a)); }
+      const ax = x + d + 6, az = z; inst(G.cylLow, metal, M(ax, 6, az, .2, 12, .2)); inst(G.sphere, lamp, M(ax, 12.3, az, .45, .45, .45), { cast: false });
+      for (let k = 0; k < 4; k++) inst(G.box, panel, M(x - d - 6 - k * 4.4, 1.6, z, 3.8, .12, 6, 0, 0, .5));
+    }
+    updaters.push((dt, t) => { lamp.color.setRGB(Math.sin(t * 3) > .3 ? 1 : .2, .1, .1); });
+    // --- a lander parked next to the start ---
+    { const [lx, lz] = at(30, -(W / 2 + 26)), gold = std(0xd8a83a, { roughness: .35, metalness: .8 });
+      inst(G.box, gold, M(lx, 3.4, lz, 4, 2.6, 4, .4)); inst(G.box, metal, M(lx, 5.6, lz, 3, 2, 3, .4));
+      for (const [ox, oz] of [[-2.6, -2.6], [2.6, -2.6], [-2.6, 2.6], [2.6, 2.6]]) inst(G.cylLow, metal, M(lx + ox, 1.4, lz + oz, .12, 3.2, .12, 0, oz * .12, -ox * .12)); }
+    // --- boulders and distant ridges ---
+    const boulder = std(0x8a8c92, { roughness: 1, flatShading: true });
+    scatter(300, 6, 480, (x, z) => inst(G.rock, boulder, M(x, .2, z, .6 + r() * 2.6, .4 + r() * 1.6, .6 + r() * 2.4, r() * 6)));
+    const ridge = std(0x6a6c72, { roughness: 1, flatShading: true });
+    for (let i = 0; i < 26; i++) { const a = r() * Math.PI * 2, d = 600 + r() * 450; inst(G.ico, ridge, M(Math.cos(a) * d, -20, Math.sin(a) * d, 140 + r() * 160, 50 + r() * 90, 120 + r() * 140, r() * 6), { cast: false }); }
+    // --- Earth rising over the horizon ---
+    const earthTex = canvasTex(512, (g, s) => { g.fillStyle = '#1d5fb8'; g.fillRect(0, 0, s, s); g.fillStyle = '#3f9a4a'; for (let i = 0; i < 26; i++) { g.beginPath(); g.ellipse(r() * s, s * .2 + r() * s * .6, 20 + r() * 60, 12 + r() * 40, r() * 3, 0, 6.28); g.fill(); } clouds(g, s, r, 60, 'rgba(255,255,255,.55)', 10, 40); }, 1);
+    const earth = new THREE.Mesh(new THREE.SphereGeometry(110, 48, 32), new THREE.MeshStandardMaterial({ map: earthTex, roughness: .7, emissive: 0x16304a, emissiveIntensity: .5, fog: false }));
+    earth.position.set(-480, 210, -760); group.add(earth);
+    const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex('rgba(120,190,255,.6)', 'rgba(60,120,255,0)'), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false, toneMapped: false }));
+    halo.position.copy(earth.position); halo.scale.set(330, 330, 1); group.add(halo);
+    updaters.push((dt, t) => { earth.rotation.y = t * .01; });
+    // fine moon dust in the headlights
+    weather(240, 0xdfe4f0, .12, .08, 70, 14, 1.4);
+  }
+
+  function buildArena() {
+    const A = map.arena;
+    // --- centre island: neon-rimmed plinth with a giant balloon trio ---
+    const plinth = std(0x2c2f3a, { roughness: .5, metalness: .4 });
+    inst(G.cyl, plinth, M(A.x, .5, A.z, A.inner - .3, 1, A.inner - .3));
+    const neonRim = new THREE.Mesh(new THREE.TorusGeometry(A.inner - .2, .18, 8, 64), new THREE.MeshBasicMaterial({ color: 0xff4fd8, toneMapped: false }));
+    neonRim.rotation.x = Math.PI / 2; neonRim.position.set(A.x, 1.02, A.z); group.add(neonRim);
+    inst(G.cyl, std(0xd8dce4, { metalness: .8, roughness: .25 }), M(A.x, 3, A.z, 1.2, 4, 1.2));
+    const trio = new THREE.Group(); trio.position.set(A.x, 5, A.z); group.add(trio);
+    [['#ff4a4a', 0], ['#39b8ff', 2.1], ['#ffd04a', 4.2]].forEach(([c, a]) => {
+      const b = new THREE.Mesh(new THREE.SphereGeometry(2.2, 24, 16), new THREE.MeshStandardMaterial({ color: c, roughness: .25, metalness: .1, emissive: c, emissiveIntensity: .25 }));
+      b.scale.y = 1.2; b.position.set(Math.cos(a) * 1.9, 3 + Math.sin(a * 2) * .5, Math.sin(a) * 1.9); b.castShadow = true; trio.add(b);
+    });
+    updaters.push((dt, t) => { trio.rotation.y = t * .4; trio.position.y = 5 + Math.sin(t * 1.3) * .25; });
+    // --- stadium bowl: stepped tiers all around, full of cheering fans ---
+    const tierMat = std(0x3a3f4c, { roughness: .7 }), crowdMat = std(0xffffff, { roughness: .8 });
+    const fans = ['#ff4a4a', '#39b8ff', '#ffd04a', '#7ad35a', '#ff8adf', '#f5f5f0', '#bda0ff'].map(c => new THREE.Color(c));
+    for (let k = 0; k < 9; k++) {
+      const rad = A.outer + 7 + k * 3.4, h = 1.2 + k * 1.6, n = Math.round(rad * .9);
+      for (let i = 0; i < n; i++) {
+        const a = i / n * Math.PI * 2, x = A.x + Math.sin(a) * rad, z = A.z + Math.cos(a) * rad, seg = rad * Math.PI * 2 / n + .1;
+        inst(G.box, tierMat, M(x, h / 2, z, seg, h, 3.4, a + Math.PI / 2), { cast: false });
+        if (k > 0 && r() < .8) inst(G.box, crowdMat, M(x + (r() - .5) * 1.5, h + .45, z + (r() - .5) * .8, .5, .9, .4, a), { color: fans[Math.floor(r() * fans.length)], cast: false });
+      }
+    }
+    // --- neon banner wall around the arena floor ---
+    const bannerTex = canvasTex(1024, (g, s) => { g.fillStyle = '#120a24'; g.fillRect(0, 0, s, s); g.font = 'italic 900 120px Arial'; g.textBaseline = 'middle';
+      for (let i = 0; i < 3; i++) { g.fillStyle = ['#ff4fd8', '#39b8ff', '#ffd04a'][i]; g.fillText('APEX RUSH · BATTLE ·', i * 360 - 80, s / 2); } }, 1);
+    bannerTex.wrapS = THREE.RepeatWrapping; bannerTex.repeat.set(6, 1);
+    const banner = new THREE.Mesh(new THREE.CylinderGeometry(A.outer + 3.5, A.outer + 3.5, 2.4, 96, 1, true), new THREE.MeshStandardMaterial({ map: bannerTex, emissive: 0xffffff, emissiveMap: bannerTex, emissiveIntensity: .32, side: THREE.DoubleSide }));
+    banner.position.set(A.x, 1.4, A.z); group.add(banner);
+    updaters.push((dt, t) => { bannerTex.offset.x = (t * .02) % 1; });
+    // --- floodlight towers ---
+    const steel = std(0x8a8f96, { metalness: .7, roughness: .35 }), lampMat = new THREE.MeshBasicMaterial({ color: 0xd8d2c0 });
+    for (let i = 0; i < 4; i++) {
+      const a = Math.PI / 4 + i * Math.PI / 2, rad = A.outer + 42, x = A.x + Math.sin(a) * rad, z = A.z + Math.cos(a) * rad;
+      inst(G.cylLow, steel, M(x, 22, z, .9, 44, .9));
+      const head = new THREE.Mesh(G.box, lampMat); head.scale.set(9, 4, .5); head.position.set(x, 45, z); head.lookAt(A.x, 0, A.z); group.add(head);
+      const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex('rgba(255,250,230,.9)', 'rgba(255,240,200,0)'), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false }));
+      glow.position.copy(head.position); glow.scale.set(16, 16, 1); glow.material.opacity = .55; group.add(glow);
+    }
+    // --- city skyline beyond the stadium ---
+    const tower = std(0x1c1f2a, { roughness: .6, emissive: 0x2a1a5a, emissiveIntensity: .25 });
+    for (let i = 0; i < 60; i++) { const a = r() * Math.PI * 2, d = 230 + r() * 260, h = 30 + r() * 120; inst(G.box, tower, M(Math.sin(a) * d, h / 2, Math.cos(a) * d, 14 + r() * 20, h, 14 + r() * 20, r()), { cast: false }); }
   }
 
   // --- flush instanced pools ---
