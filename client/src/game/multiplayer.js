@@ -47,7 +47,9 @@ function cleanCar(state) {
     speed: clamp(state.speed, -40, 40), steer: finite(state.steer) ? clamp(state.steer, -1, 1) : 0,
     vx: finite(state.vx) ? clamp(state.vx, -30, 30) : 0, vz: finite(state.vz) ? clamp(state.vz, -30, 30) : 0,
     y: finite(state.y) ? clamp(state.y, -5, 80) : 0, pitch: finite(state.pitch) ? clamp(state.pitch, -1.2, 1.2) : 0,
-    kart: KART_IDS.has(state.kart) ? state.kart : 'allround', mass: finite(state.mass) ? clamp(state.mass, .5, 2) : 1,
+    kart: KART_IDS.has(state.kart) ? state.kart : 'allround',
+    skin: typeof state.skin === 'string' && /^[a-z]{2,12}$/.test(state.skin) ? state.skin : 'none',
+    finish: ['standard', 'gold', 'chrome', 'neon'].includes(state.finish) ? state.finish : 'standard', mass: finite(state.mass) ? clamp(state.mass, .5, 2) : 1,
     trail: ['banana', 'green', 'red'].includes(state.trail) ? state.trail : null,
     star: state.star === true, rocket: state.rocket === true, spinA: finite(state.spinA) ? clamp(state.spinA, 0, 40) : 0,
     items: Array.isArray(state.items) ? state.items.slice(0, 12).filter(it => it && ['green', 'red', 'banana', 'blue'].includes(it.type) && finite(it.x) && finite(it.z))

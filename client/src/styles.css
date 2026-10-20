@@ -327,3 +327,14 @@ header.in-garage .top-actions{display:none}
 .battle-card small{font-size:8px;color:#a9bfb2}
 .battle-card.theme-colosseum{border-top:3px solid #ffb347}.battle-card.theme-ice{border-top:3px solid #5ff4ff}.battle-card.theme-arena{border-top:3px solid #ff4fd8}
 #lap span{font-size:.5em;opacity:.7}
+/* ===== Skins in the garage ===== */
+.g-skins{margin:14px 0 4px}.g-skins>small{display:flex;justify-content:space-between;font-size:7.5px;letter-spacing:1.2px;color:#a9bfb2;font-weight:800;margin-bottom:8px}.g-skins>small b{color:var(--orange)}
+.g-skins>div{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;max-height:190px;overflow:auto;padding-right:2px}
+.g-skin{border:1px solid #ffffff22;border-radius:7px;background:#ffffff08;padding:5px;text-align:center;cursor:pointer;color:#e8eee2;min-width:0}
+.g-skin span{display:block;height:34px;border-radius:5px;background-size:cover;background-position:center;border:1px solid #0006}
+.g-skin b{display:block;font-size:8px;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.g-skin small{display:block;font-size:6px;letter-spacing:.5px;color:#94b0a1;margin-top:2px;line-height:1.25;text-transform:uppercase}
+.g-skin.selected{border-color:var(--orange);box-shadow:0 0 0 1px var(--orange) inset;background:#ff653d1c}
+.g-skin.locked span{filter:grayscale(1) brightness(.45)}.g-skin.locked{opacity:.75}
+.g-skin.r-selten small{color:#6ab8ff}.g-skin.r-episch small{color:#c49bff}.g-skin.r-legendr small{color:#ffb238}.g-skin.r-mythisch small{color:#ff5a8a}
+.g-panel{max-height:calc(100vh - 110px);overflow:auto}

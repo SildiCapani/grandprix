@@ -122,17 +122,37 @@ Im Menü auf die Karte **Eigene Strecke bauen** klicken.
 - **Teilen:** **Code kopieren** erzeugt einen Code wie `APX1-…`. Freunde laden ihn über **Code laden**.
 - **Einschränkungen:** Eigene Strecken zählen nicht für XP und Bestzeiten und gibt es bisher nur offline.
 
-## Karriere (optional)
-Im Menü unter **Karriere-Fortschritt** lässt sie sich AN- oder AUSschalten.
+## Karriere
+Mit Konto ist die Karriere immer an (Admins haben alles frei).
 
 - **AN:** Dein Fahrerlevel schaltet nach und nach frei:
-  - Strecken sind immer alle frei.
+  - Strecken: Küste und Canyon sofort; Neon + Dschungel ab Level 2, Savanne + Pilzwald ab 3, Vulkan + Kirschblüten ab 4, Gletscher + Wolkeninseln ab 5, Sternenbahn ab 6, Mond ab 7.
   - Karts: Flitzer ab Level 2, Drifter ab 3, Buggy ab 4, Bolide ab 5, Brummer ab 6.
   - Lack-Finishes: Gold ab Level 3, Chrom ab 5, Neon ab 7.
 - **Aufträge:** Es sind immer drei offen, z. B. „Überhole 25 Gegner“ oder „Lande 12 Sprünge“. Sie geben Bonus-XP und werden nach dem Abschluss ersetzt. Mit jeder Runde durch alle Aufträge werden sie etwas schwerer. Es gibt keine Timer und keine Tages-Aufgaben.
 - **AUS:** Alles ist sofort frei, und es gibt keine Aufträge.
 
-Mit `?alle` in der Adresse ist zum Testen auch alles frei.
+
+## Skins
+In der Garage unter **SKINS**. Muster für die Karosserie, die man mit der Zeit freischaltet (Admins haben alle):
+
+| Skin | Seltenheit | Freischalten |
+|---|---|---|
+| Rennstreifen | gewöhnlich | 1 Rennen |
+| Zielflagge | gewöhnlich | 5 Rennen |
+| Tarnmuster | gewöhnlich | Level 2 |
+| Flammen | selten | 1 Sieg |
+| Tiger | selten | Level 3 |
+| Retro-Pixel | selten | 15 Rennen |
+| Eiskristall | episch | Level 4 |
+| Zebra | episch | 3× Gold |
+| Blitzschlag | episch | 5 Siege |
+| Lava | legendär | Level 5 + 8 Siege |
+| Neon-Grid | legendär | 8 Strecken beendet |
+| Galaxie | legendär | Level 6 |
+| Gold-Drache | mythisch | Level 7 + 20 Siege |
+
+Die Skins stehen in `client/src/game/skins.js`. Online sehen alle deinen Skin.
 
 ## Projektstruktur
 ```
@@ -143,6 +163,7 @@ client/
   src/game/
     race-core.js      Physik, KI, Items, Drifts, Sprünge, Speed-Klassen
     karts.js          Fahrzeugwerte
+    skins.js          Skins (Muster, Freischaltung)
     garage.js         3D-Garage zur Fahrzeugwahl
     tracks.js         Streckendaten inkl. Höhen, Brücken, Sprungschanzen
     world.js          Prozedurale 3D-Welten (inkl. Vulkan, Berge, Weltall)

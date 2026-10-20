@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { applySkin } from './skins.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { carbon as carbonWeave, contactShadow } from './surfaces.js';
 let shadowGeo, shadowMat;
@@ -81,7 +82,7 @@ const LAYOUT = {
   buggy:    { body: [1.02, 1.05, .95], zf: .5, zr: -.46, x: .5, wf: 1.42, wr: 1.48, lift: .14 },
 };
 
-export function createCar(color = '#e34335', number = '07', kart = 'allround', finish = 'standard') {
+export function createCar(color = '#e34335', number = '07', kart = 'allround', finish = 'standard', skin = 'none') {
   const L = LAYOUT[kart] || LAYOUT.allround;
   const car = new THREE.Group();
   car.name = `Mini Formula ${number}`;
@@ -102,6 +103,8 @@ export function createCar(color = '#e34335', number = '07', kart = 'allround', f
   if (finish === 'gold') { paint.color.set('#d9a93c'); paint.metalness = .95; paint.roughness = .2; darkPaint.color.set('#8a6420'); darkPaint.metalness = .9; }
   else if (finish === 'chrome') { paint.color.set('#e6edf3'); paint.metalness = 1; paint.roughness = .05; darkPaint.color.set('#9aa4ae'); darkPaint.metalness = 1; darkPaint.roughness = .1; }
   else if (finish === 'neon') { paint.emissive.set(color); paint.emissiveIntensity = .65; darkPaint.emissive.set(color); darkPaint.emissiveIntensity = .25; }
+  // Skin pattern (unlocked over time) painted on top.
+  if (skin && skin !== 'none') applySkin({ paint, darkPaint }, skin, color);
   paint.userData.baseEmissive = paint.emissive.getHex(); paint.userData.baseEI = paint.emissiveIntensity;
 
   // Black floor, tapered monocoque and broad sculpted sidepods.
@@ -266,7 +269,7 @@ export function createCar(color = '#e34335', number = '07', kart = 'allround', f
   car.userData.frontWheels = frontWheels;
   car.userData.exhaust = exhaust;
   car.userData.materials = {paint, darkPaint, carbon, rubber, rim, cream};
-  car.userData.kart = kart;
+  car.userData.kart = kart; car.userData.skin = skin || 'none';
   car.userData.animationTime = Math.random()*10;
   return car;
 }
