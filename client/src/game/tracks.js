@@ -307,16 +307,22 @@ function buildTrack(map) {
 const TRACKS = new Map(MAPS.map(map => [map.id, buildTrack(map)]));
 export function getTrack(id = 'coast') { return TRACKS.get(id) || TRACKS.get('coast'); }
 
-// ---------- battle arena: a 44 m wide ring around a centre island, i.e. a round bowl with an island in the middle ----------
-const ARENA_R = 32, ARENA_W = 44;
-export const ARENA_MAP = normalizeMap({
-  id: 'arena', index: 98, name: 'Neon-Arena', subtitle: 'Ballon-Battle · 8 Fahrer · 3 Ballons · letzter Fahrer gewinnt',
-  width: ARENA_W, theme: 'arena', unlockXP: 0, botScale: 1.04,
-  nodes: Array.from({ length: 16 }, (_, i) => { const a = i / 16 * Math.PI * 2; return [+(Math.sin(a) * ARENA_R).toFixed(2), +(Math.cos(a) * ARENA_R).toFixed(2), 0]; }),
-  arena: { x: 0, z: 0, inner: ARENA_R - ARENA_W / 2, outer: ARENA_R + ARENA_W / 2 },
-  parTimes: { gold: 999, silver: 999, bronze: 999 }, boostPads: [], sectors: [{ name: 'Arena', t: 0 }],
-});
-TRACKS.set(ARENA_MAP.id, buildTrack(ARENA_MAP));
+// ---------- battle arenas: a wide ring around a centre island, i.e. a round bowl with an island in the middle ----------
+function makeArena({ id, name, subtitle, theme, R, W, grip, kickers = [], battle }) {
+  const nodes = Array.from({ length: 16 }, (_, i) => { const a = i / 16 * Math.PI * 2; return [+(Math.sin(a) * R).toFixed(2), +(Math.cos(a) * R).toFixed(2), 0]; });
+  return normalizeMap({ id, index: 98, name, subtitle, width: W, theme, unlockXP: 0, botScale: 1.04, nodes, grip, battle,
+    // kicker ramps (no gap) at the given angles around the ring
+    jumps: kickers.map(a => ({ at: [+(Math.sin(a) * R).toFixed(2), +(Math.cos(a) * R).toFixed(2)], gap: 0 })),
+    arena: { x: 0, z: 0, inner: R - W / 2, outer: R + W / 2 },
+    parTimes: { gold: 999, silver: 999, bronze: 999 }, boostPads: [], sectors: [{ name: 'Arena', t: 0 }] });
+}
+export const ARENAS = Object.freeze([
+  makeArena({ id: 'arena', name: 'Neon-Arena', subtitle: 'Ballon-Battle · 3 Ballons · der Letzte gewinnt', theme: 'arena', R: 32, W: 44, battle: 'balloons' }),
+  makeArena({ id: 'colosseum', name: 'Wüsten-Kolosseum', subtitle: 'Münzjagd · Münzen sammeln · Treffer kosten Münzen', theme: 'colosseum', R: 36, W: 48, kickers: [Math.PI / 2, Math.PI * 1.5], battle: 'coins' }),
+  makeArena({ id: 'icering', name: 'Eis-Arena', subtitle: 'Kronenjagd · 20 Sekunden Krone halten · spiegelglattes Eis', theme: 'ice', R: 30, W: 42, grip: .3, battle: 'crown' }),
+]);
+export const ARENA_MAP = ARENAS[0];
+for (const arena of ARENAS) TRACKS.set(arena.id, buildTrack(arena));
 
 // ---------- player-built tracks (editor) ----------
 export const CUSTOM_ID = 'custom';

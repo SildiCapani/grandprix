@@ -58,6 +58,9 @@ const BOX_RESPAWN = 3, BOX_RADIUS = 1.5, RAMP_LEN_BOX = 8;
 const GREEN_SPEED = 40, RED_SPEED = 36, GREEN_BOUNCES = 3;
 // ---- battle: balloons instead of laps ----
 export const BATTLE_TIME = 150, BALLOONS = 3, MAX_BALLOONS = 5;
+// Coin hunt: most coins after two minutes. Crown hunt: first to hold the crown for 20 s in total.
+export const BATTLE_TYPES = ['balloons', 'coins', 'crown'];
+export const COIN_TIME = 120, COIN_COUNT = 36, CROWN_GOAL = 20;
 function rollBattleItem(rnd = Math.random) {
   const table = [['green', .3], ['red', .2], ['banana', .2], ['mushroom', .2], ['star', .1]];
   let x = rnd(); for (const [item, w] of table) { if ((x -= w) <= 0) return item; }
@@ -210,7 +213,8 @@ export class RaceCore {
 
   setKart(id) { this.kartId = kartById(id).id; Object.assign(this.player, kartFields(this.kartId)); return this; }
 
-  start(mode = 'race', mapId = this.track.id, { items, cc, kart } = {}) {
+  start(mode = 'race', mapId = this.track.id, { items, cc, kart, battle } = {}) {
+    this.battleType = BATTLE_TYPES.includes(battle) ? battle : 'balloons';
     K = SPEED_CLASSES.includes(cc) ? cc / 80 : 1; this.cc = Math.round(K * 80);
     if (kart) this.kartId = kartById(kart).id;
     this.track = getTrack(mapId);
@@ -250,8 +254,21 @@ export class RaceCore {
     this.rivals = RIVAL_ROSTER.map((r, i) => { const p = spot(i + 1);
       return makeBody({ ...r, ...kartFields(r.kart), pace: r.pace * difficulty * K * kartById(r.kart).top, index: i, x: p.x, z: p.z, y: p.y, angle: p.angle, t: p.t,
         progress: 0, lane: 0, laneTarget: 0, boosting: false, stuck: 0, mood: Math.random() * TAU, finished: false, aim: null, aimT: 0 }); });
-    this.battleLeft = BATTLE_TIME; this._outOrder = [];
+    this.battleLeft = this.battleType === 'coins' ? COIN_TIME : BATTLE_TIME; this._outOrder = [];
+    for (const c of [this.player, ...this.rivals]) Object.assign(c, { coins: 0, crownT: 0, balloons: this.battleType === 'balloons' ? BALLOONS : 0 });
+    this.battleCoins = []; this.crown = null;
+    if (this.battleType === 'coins') for (let i = 0; i < COIN_COUNT; i++) { const p = this._arenaSpot(); this.battleCoins.push({ id: this._uid++, x: p.x, z: p.z, y: 0, active: true, respawn: 0, loose: false }); }
+    if (this.battleType === 'crown') { const s = this.track.sample(.5); this.crown = { x: s.x, z: s.z, y: s.y, holder: null, cool: 0, blocked: null }; }
     this.position = this._lastPosition = this._computePosition();
+  }
+  // A random free spot on the arena floor (between the island and the outer wall).
+  _arenaSpot(minR = 3) {
+    const A = this.track.arena || { x: 0, z: 0, inner: 10, outer: 54 }, a = Math.random() * TAU, r = A.inner + minR + Math.random() * (A.outer - A.inner - minR * 2);
+    return { x: A.x + Math.cos(a) * r, z: A.z + Math.sin(a) * r };
+  }
+  _clampArena(x, z, m = 2) {
+    const A = this.track.arena || { x: 0, z: 0, inner: 10, outer: 54 }, dx = x - A.x, dz = z - A.z, r = Math.hypot(dx, dz) || 1, rr = clamp(r, A.inner + m, A.outer - m);
+    return { x: A.x + dx / r * rr, z: A.z + dz / r * rr };
   }
 
   // Online fill-up: the host simulates AI drivers on the given grid slots.
@@ -365,7 +382,7 @@ export class RaceCore {
     c.spin *= Math.exp(-dt * 3.2);
     c.slide = Math.max(0, c.slide - dt);
     c.ghost = Math.max(0, c.ghost - dt);
-    const grip = 1 - Math.exp(-dt * (drifting ? 9 : c.slide > 0 ? 2.6 : 15));
+    const grip = 1 - Math.exp(-dt * (drifting ? 9 : c.slide > 0 ? 2.6 : 15) * (this.track.grip || 1));
     c.vx += (Math.sin(c.angle) * c.speed - c.vx) * grip;
     c.vz += (Math.cos(c.angle) * c.speed - c.vz) * grip;
     c.x += c.vx * dt;
@@ -404,7 +421,8 @@ export class RaceCore {
     if (c.shroomT > 0) return (MUSHROOM_SPEED * K);
     if (c.turboT > 0) return Math.max(c.turboSpeed, c.starT > 0 ? (STAR_SPEED * K) : 0);
     if (c.starT > 0) return (STAR_SPEED * K);
-    return (TOP_SPEED * K) * (c.top || 1) + (drafting ? (DRAFT_BONUS * K) : 0);
+    // Crown hunt: the crown is heavy, its holder is a little slower so the others can catch up.
+    return (TOP_SPEED * K) * (c.top || 1) * (this.crown?.holder === c ? .92 : 1) + (drafting ? (DRAFT_BONUS * K) : 0);
   }
 
   // Keeps a car inside the barriers; returns how hard it hit (0 if no contact).
@@ -530,6 +548,7 @@ export class RaceCore {
     if (this.externals.length) this._collideExternal();
     if (this.itemsEnabled) this._stepItems(dt);
 
+    if (this.mode === 'battle') this._battleTick(dt);
     if (this.mode === 'battle' && this.status === 'racing') this._checkBattleEnd();
     if (this.status === 'racing' && this.rivals.length) {
       const pos = this._computePosition();
@@ -638,6 +657,8 @@ export class RaceCore {
   // Alive cars rank by balloons, then hits; knocked-out cars behind them, the last one out first.
   _battlePlace(c) {
     const field = [this.player, ...this.rivals], alive = field.filter(o => !o.out);
+    if (this.battleType === 'coins') return 1 + field.filter(o => o !== c && (o.coins > c.coins || (o.coins === c.coins && o.hits > c.hits))).length;
+    if (this.battleType === 'crown') return 1 + field.filter(o => o !== c && (o.crownT > c.crownT + 1e-6 || (Math.abs(o.crownT - c.crownT) < 1e-6 && o.hits > c.hits))).length;
     if (!c.out) return 1 + alive.filter(o => o !== c && (o.balloons > c.balloons || (o.balloons === c.balloons && o.hits > c.hits))).length;
     const order = this._outOrder || [];
     return alive.length + (order.length - order.indexOf(c));
@@ -652,8 +673,68 @@ export class RaceCore {
     (this._outOrder ||= []).push(c);
     this.emit('out', { name: c === this.player ? 'DU' : c.name, player: c === this.player, by: by === this.player ? 'player' : by?.name || null });
   }
+  // A hit in battle: what it costs depends on the variant.
+  _battleHit(c, by) {
+    if (this.battleType === 'balloons') return this._popBalloon(c, by);
+    if (by && by !== c) by.hits = (by.hits || 0) + 1;
+    if (this.battleType === 'coins') this._dropCoins(c, by);
+    if (this.battleType === 'crown' && this.crown?.holder === c) this._dropCrown(c);
+  }
+  _dropCoins(c, by) {
+    const n = Math.min(3, c.coins); if (!n) return;
+    c.coins -= n;
+    for (let i = 0; i < n; i++) { const a = Math.random() * TAU, d = 2.5 + Math.random() * 2, p = this._clampArena(c.x + Math.cos(a) * d, c.z + Math.sin(a) * d);
+      this.battleCoins.push({ id: this._uid++, x: p.x, z: p.z, y: c.y, active: true, respawn: 0, loose: true, owner: c, arm: .8 }); }
+    this.emit('coinloss', { victim: c === this.player ? 'player' : c.name, by: by === this.player ? 'player' : by?.name || null, n, x: c.x, y: c.y, z: c.z });
+  }
+  _dropCrown(c) {
+    const cr = this.crown, a = c.angle + Math.PI + (Math.random() - .5), p = this._clampArena(c.x + Math.sin(a) * 4, c.z + Math.cos(a) * 4);
+    Object.assign(cr, { holder: null, x: p.x, z: p.z, y: c.y, cool: 1, blocked: c });
+    this.emit('crowndrop', { victim: c === this.player ? 'player' : c.name, x: c.x, y: c.y, z: c.z });
+  }
+  _takeCrown(c, stolen = false) {
+    Object.assign(this.crown, { holder: c, cool: 0, blocked: null });
+    this.emit('crown', { by: c === this.player ? 'player' : c.name, stolen });
+  }
+  _battleTick(dt) {
+    const cars = [this.player, ...this.rivals];
+    if (this.battleType === 'coins') {
+      for (let i = this.battleCoins.length - 1; i >= 0; i--) {
+        const k = this.battleCoins[i];
+        if (k.arm > 0) k.arm -= dt;
+        if (!k.active) { if ((k.respawn -= dt) <= 0) { const p = this._arenaSpot(); Object.assign(k, { x: p.x, z: p.z, active: true }); } continue; }
+        for (const c of cars) {
+          if (k.arm > 0 && c === k.owner) continue;
+          if (Math.abs(c.x - k.x) > 1.5 || Math.abs(c.z - k.z) > 1.5 || Math.hypot(c.x - k.x, c.z - k.z) > 1.4 || Math.abs(c.y - k.y) > 2.2) continue;
+          c.coins++;
+          if (c === this.player) this.emit('coin', { total: c.coins });
+          if (k.loose) this.battleCoins.splice(i, 1); else { k.active = false; k.respawn = 6; }
+          break;
+        }
+      }
+    }
+    if (this.battleType === 'crown' && this.crown) {
+      const cr = this.crown;
+      if (cr.holder) { cr.holder.crownT += dt; cr.x = cr.holder.x; cr.z = cr.holder.z; cr.y = cr.holder.y; }
+      else {
+        cr.cool = Math.max(0, cr.cool - dt);
+        for (const c of cars) {
+          if (c.out || c.spinT > 0 || (cr.cool > 0 && c === cr.blocked)) continue;
+          if (Math.hypot(c.x - cr.x, c.z - cr.z) < 1.7 && Math.abs(c.y - cr.y) < 2.2) { this._takeCrown(c); break; }
+        }
+      }
+    }
+  }
   _checkBattleEnd() {
     const alive = [this.player, ...this.rivals].filter(o => !o.out);
+    if (this.battleType !== 'balloons') {
+      const crowned = this.battleType === 'crown' && [this.player, ...this.rivals].some(o => o.crownT >= CROWN_GOAL);
+      if (!crowned && this.battleLeft > 0) return;
+      this.status = 'finished'; this.finishedTime = this.elapsed; this.player.boosting = false;
+      this.position = this._battlePlace(this.player);
+      this.emit('finish', { time: this.elapsed, bestLap: null, position: this.position, battle: true, reason: crowned ? 'crown' : 'time', coins: this.player.coins, crownT: this.player.crownT, hits: this.player.hits });
+      return;
+    }
     if (!this.player.out && alive.length > 1 && this.battleLeft > 0) return;
     this.status = 'finished'; this.finishedTime = this.elapsed; this.player.boosting = false;
     this.position = this._battlePlace(this.player);
@@ -661,6 +742,7 @@ export class RaceCore {
       reason: this.player.out ? 'out' : alive.length <= 1 ? 'last' : 'time', balloons: this.player.balloons, hits: this.player.hits });
   }
   _nearestFoe(c) {
+    if (this.battleType === 'crown' && this.crown?.holder && this.crown.holder !== c) return this.crown.holder;
     let best = null, bd = Infinity;
     for (const o of [this.player, ...this.rivals]) { if (o === c || o.out) continue; const d = Math.hypot(o.x - c.x, o.z - c.z); if (d < bd) { bd = d; best = o; } }
     return best;
@@ -773,7 +855,7 @@ export class RaceCore {
     c.speed *= .2; c.vx *= .3; c.vz *= .3; c.shroomT = 0;
     if (c === this.player) this.stats.hitsTaken++;
     if (by === this.player && c !== this.player) this.stats.hitsDealt++;
-    if (this.mode === 'battle') this._popBalloon(c, by);
+    if (this.mode === 'battle') this._battleHit(c, by);
     this.emit('itemhit', { kind, victim: c === this.player ? 'player' : c.name, by: by === this.player ? 'player' : by?.name || null, x: c.x, z: c.z, player: c === this.player || by === this.player });
     return true;
   }
@@ -1088,6 +1170,23 @@ export class RaceCore {
   // Arena bots hunt item boxes when empty-handed and the nearest rival otherwise. They steer around the centre island
   // by moving in polar coordinates: a slice of the way round the ring at a time, straight at the target once it is in view.
   _battleAim(bot) {
+    const foes = [this.player, ...this.rivals].filter(o => o !== bot && !o.out), dist = o => Math.hypot(o.x - bot.x, o.z - bot.z);
+    const nearestFoe = () => foes.reduce((b, o) => !b || dist(o) < dist(b) ? o : b, null);
+    if (this.battleType === 'crown' && this.crown) {
+      const h = this.crown.holder;
+      if (h === bot) { const f = nearestFoe(); return f ? this._clampArena(2 * bot.x - f.x, 2 * bot.z - f.z, 5) : { x: -bot.x, z: -bot.z }; } // run away
+      if (!h) return this.crown;
+      if (!bot.item && bot.roulette <= 0) { const box = this.boxes.filter(b => b.active).reduce((b, o) => !b || dist(o) < dist(b) ? o : b, null); if (box && dist(box) < 14) return box; }
+      return h;
+    }
+    if (this.battleType === 'coins') {
+      const leader = foes.reduce((b, o) => !b || o.coins > b.coins ? o : b, null);
+      if (bot.item && leader && leader.coins > bot.coins && dist(leader) < 25) return leader;
+      let best = null, bd = Infinity;
+      for (const k of this.battleCoins) if (k.active && !(k.arm > 0 && k.owner === bot)) { const d = dist(k) * (k.loose ? .6 : 1); if (d < bd) { bd = d; best = k; } }
+      if (!bot.item && bot.roulette <= 0) { const box = this.boxes.filter(b => b.active).reduce((b, o) => !b || dist(o) < dist(b) ? o : b, null); if (box && dist(box) < bd * .5) return box; }
+      return best || nearestFoe() || { x: 0, z: 30 };
+    }
     if (!bot.item && bot.roulette <= 0) {
       let best = null, bd = Infinity;
       for (const b of this.boxes) if (b.active) { const d = Math.hypot(b.x - bot.x, b.z - bot.z); if (d < bd) { bd = d; best = b; } }
@@ -1127,7 +1226,7 @@ export class RaceCore {
       this._tickItems(bot, dt);
       if (bot.out) { bot.speed *= Math.exp(-dt * 3); this._integrate(bot, dt, false); bot.t = this._bound(bot, bot.t).here.t; continue; }
       const spinning = bot.spinT > 0;
-      if ((bot.aimT -= dt) <= 0 || !bot.aim || bot.aim.out) { bot.aimT = .6 + Math.random() * .6; bot.aim = this._battleAim(bot); }
+      if ((bot.aimT -= dt) <= 0 || !bot.aim || bot.aim.out || bot.aim.active === false || (this.battleType === 'coins' && bot.aim.loose && !this.battleCoins.includes(bot.aim))) { bot.aimT = .6 + Math.random() * .6; bot.aim = this._battleAim(bot); }
       const tx = bot.aim.x - c0.x, tz = bot.aim.z - c0.z, bx = bot.x - c0.x, bz = bot.z - c0.z;
       const th = Math.atan2(bz, bx), tht = Math.atan2(tz, tx), dth = angleDiff(tht, th);
       let ax = bot.aim.x, az = bot.aim.z;
@@ -1181,7 +1280,11 @@ export class RaceCore {
       // Battle: ramming someone with a mushroom boost steals one of their balloons.
       if (this.mode === 'battle' && (a.shroomT > 0) !== (b.shroomT > 0)) {
         const att = a.shroomT > 0 ? a : b, vic = att === a ? b : a;
-        if (this._hit(vic, 'ram', att) && att.balloons < MAX_BALLOONS) { att.balloons++; this.emit('steal', { by: att === this.player ? 'player' : att.name, victim: vic === this.player ? 'player' : vic.name, x: vic.x, z: vic.z }); }
+        const hadCrown = this.crown?.holder === vic;
+        if (this._hit(vic, 'ram', att)) {
+          if (this.battleType === 'balloons' && att.balloons < MAX_BALLOONS) { att.balloons++; this.emit('steal', { by: att === this.player ? 'player' : att.name, victim: vic === this.player ? 'player' : vic.name, x: vic.x, z: vic.z }); }
+          if (this.battleType === 'crown' && hadCrown) this._takeCrown(att, true);
+        }
       }
       // Star power: whoever touches a starred car spins; the star car ploughs on.
       const pa = a.starT > 0 || a.rocketT > 0, pb = b.starT > 0 || b.rocketT > 0;

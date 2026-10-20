@@ -1,8 +1,8 @@
 // Career data stays local to this browser. No accounts, timers or daily streaks.
 export const STORAGE_KEY = 'apex-rush-career-v1';
 const LEGACY_KEY = 'apex-rush-legacy-record';
-// With the career switched on, tracks open up with the driver level (the XP is the level threshold).
-const MAPS = [{ id: 'coast', xp: 0 }, { id: 'canyon', xp: 0 }, { id: 'neon', xp: 0 }, { id: 'volcano', xp: 1200 }, { id: 'glacier', xp: 2200 }, { id: 'stars', xp: 3600 }, { id: 'jungle', xp: 500 }, { id: 'savanna', xp: 1200 }, { id: 'forest', xp: 2200 }, { id: 'sky', xp: 5500 }, { id: 'sakura', xp: 3600 }, { id: 'moon', xp: 8000 }];
+// All tracks are open from the start; the career only unlocks karts and paint finishes.
+const MAPS = [{ id: 'coast', xp: 0 }, { id: 'canyon', xp: 0 }, { id: 'neon', xp: 0 }, { id: 'volcano', xp: 0 }, { id: 'glacier', xp: 0 }, { id: 'stars', xp: 0 }, { id: 'jungle', xp: 0 }, { id: 'savanna', xp: 0 }, { id: 'forest', xp: 0 }, { id: 'sky', xp: 0 }, { id: 'sakura', xp: 0 }, { id: 'moon', xp: 0 }];
 const MEDALS = ['none', 'bronze', 'silver', 'gold'];
 const THRESHOLDS = [0, 500, 1200, 2200, 3600, 5500, 8000];
 const TITLES = ['Rookie', 'Kurven-Talent', 'Drift-Pilot', 'Rennprofi', 'Apex-Jäger', 'Grand-Prix-Champion', 'Legende'];

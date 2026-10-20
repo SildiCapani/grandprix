@@ -92,7 +92,7 @@ Die Werte stehen in `client/src/game/karts.js`.
 |---|---|
 | Grand Prix | 3 Runden gegen 7 Gegner |
 | Cups | 3 Rennen am Stück mit Punkten (15 · 12 · 10 · 8 · 6 · 4 · 2 · 1). Die Top 3 stehen am Ende auf dem 3D-Podest. Pokale werden pro Speed-Klasse gespeichert. |
-| Battle | Ballon-Battle in der Neon-Arena (siehe unten) |
+| Battle | Ballon-Battle, Münzjagd oder Kronenjagd (siehe unten) |
 | Zeitfahren | allein auf Bestzeit |
 | Online | Raumcode, bis 8 Fahrer |
 
@@ -104,11 +104,12 @@ Die Werte stehen in `client/src/game/karts.js`.
 
 Pokal-Bonus: Gold 300 XP, Silber 200 XP, Bronze 100 XP.
 
-### Ballon-Battle
-- 8 Fahrer, jeder mit 3 Ballons.
-- Panzer, Bananen und Sterne lassen einen Ballon platzen.
-- Wer mit Pilz-Turbo jemanden rammt, klaut ihm einen Ballon (höchstens 5).
-- Ohne Ballons bist du raus. Der Letzte gewinnt, nach 2:30 Minuten entscheiden die Ballons.
+### Battles (8 Fahrer, je eigene Arena)
+| Battle | Arena | Regeln |
+|---|---|---|
+| 🎈 Ballon-Battle | Neon-Arena | 3 Ballons; Treffer lassen einen platzen; Pilz-Rammer klauen einen (max. 5). Ohne Ballons bist du raus, der Letzte gewinnt. Nach 2:30 entscheiden die Ballons. |
+| 🪙 Münzjagd | Wüsten-Kolosseum | Münzen sammeln; ein Treffer kostet 3 Münzen, die die anderen aufsammeln können. Zwei Sprungschanzen. Nach 2:00 gewinnt, wer die meisten hat. |
+| 👑 Kronenjagd | Eis-Arena | Die Krone berühren und halten (ihr Träger ist etwas langsamer). Ein Treffer lässt sie fallen, ein Pilz-Rammer klaut sie. Wer sie insgesamt 20 Sekunden hält, gewinnt. Das Eis ist spiegelglatt. |
 
 ### Strecken-Editor
 Im Menü auf die Karte **Eigene Strecke bauen** klicken.
@@ -125,7 +126,7 @@ Im Menü auf die Karte **Eigene Strecke bauen** klicken.
 Im Menü unter **Karriere-Fortschritt** lässt sie sich AN- oder AUSschalten.
 
 - **AN:** Dein Fahrerlevel schaltet nach und nach frei:
-  - Strecken: Start mit Küste, Canyon und Neon.
+  - Strecken sind immer alle frei.
   - Karts: Flitzer ab Level 2, Drifter ab 3, Buggy ab 4, Bolide ab 5, Brummer ab 6.
   - Lack-Finishes: Gold ab Level 3, Chrom ab 5, Neon ab 7.
 - **Aufträge:** Es sind immer drei offen, z. B. „Überhole 25 Gegner“ oder „Lande 12 Sprünge“. Sie geben Bonus-XP und werden nach dem Abschluss ersetzt. Mit jeder Runde durch alle Aufträge werden sie etwas schwerer. Es gibt keine Timer und keine Tages-Aufgaben.
