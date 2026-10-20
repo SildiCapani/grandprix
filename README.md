@@ -152,6 +152,7 @@ server/server.js      Statische Auslieferung + WebSocket-Relay /ws
 |---|---|
 | WASD / Pfeiltasten | fahren |
 | Leertaste | driften (Blau → Orange → Lila) |
-| E | Item benutzen |
+| E (tippen) | Item benutzen |
+| E (halten) | Banane/Panzer hinten ans Kart hängen: blockt Panzer von hinten. Loslassen wirft nach hinten |
 | R | zurücksetzen |
 | C | Kamera wechseln |

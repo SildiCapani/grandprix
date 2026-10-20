@@ -46,7 +46,13 @@ const CIRCLE_OFFSETS = [0.42, -0.34];
 const RESTITUTION = 0.32;
 
 // ---- items ----
-export const ITEM_TYPES = ['mushroom', 'banana', 'green', 'red', 'star', 'rocket'];
+export const ITEM_TYPES = ['mushroom', 'mushroom2', 'mushroom3', 'banana', 'green', 'red', 'blue', 'star', 'rocket'];
+// Blue shell: flies over everyone to the leader and explodes there. At most this many per race.
+const BLUE_MAX = 2, BLUE_SPEED = 52, BLUE_RADIUS = 5, BLUE_HEIGHT = 3.4;
+const isMushroom = item => typeof item === 'string' && item.startsWith('mushroom');
+// These can be held behind the kart as a shield (hold E) and thrown backward (release).
+const TRAILABLE = new Set(['banana', 'green', 'red']);
+const TRAIL_BACK = 1.35;
 const STAR_TIME = 7, MUSHROOM_TIME = 1.3, SPIN_TIME = 1.15, ROULETTE_TIME = 1.1;
 const BOX_RESPAWN = 3, BOX_RADIUS = 1.5, RAMP_LEN_BOX = 8;
 const GREEN_SPEED = 40, RED_SPEED = 36, GREEN_BOUNCES = 3;
@@ -81,11 +87,11 @@ export function boostPadLayout(track) {
 }
 // Kart-style luck: the further back you are, the better the item.
 function rollItem(frac, lastTwo = false, rnd = Math.random) {
-  const table = lastTwo ? [['rocket', .3], ['star', .25], ['red', .2], ['mushroom', .25]]
+  const table = lastTwo ? [['rocket', .25], ['star', .2], ['red', .15], ['mushroom3', .25], ['blue', .15]]
     : frac < .2 ? [['banana', .45], ['green', .4], ['mushroom', .15]]
-    : frac < .5 ? [['banana', .2], ['green', .3], ['red', .25], ['mushroom', .25]]
-    : frac < .8 ? [['green', .15], ['red', .35], ['mushroom', .35], ['star', .15]]
-    : [['red', .3], ['mushroom', .35], ['star', .35]];
+    : frac < .5 ? [['banana', .2], ['green', .3], ['red', .25], ['mushroom', .15], ['mushroom3', .1]]
+    : frac < .8 ? [['green', .1], ['red', .3], ['mushroom', .2], ['mushroom3', .2], ['star', .1], ['blue', .1]]
+    : [['red', .25], ['mushroom3', .35], ['star', .3], ['blue', .1]];
   let x = rnd();
   for (const [item, w] of table) { if ((x -= w) <= 0) return item; }
   return table[table.length - 1][0];
@@ -122,7 +128,7 @@ export function gridPlacement(track, slot) {
 const kartFields = id => { const k = kartById(id); return { kart: k.id, top: k.top, accel: k.accel, turn: k.turn, mass: k.mass, driftRate: k.drift, offroadF: k.offroad }; };
 function makeBody(extra) {
   return { speed: 0, steer: 0, vx: 0, vz: 0, slide: 0, spin: 0, ghost: 0, y: 0, pitch: 0, airT: 0, airDur: 0, airY0: 0, airH: 0,
-    top: 1, accel: 1, turn: 1, driftRate: 1, offroadF: .4, offroad: false, scY: 0, route: 0, scSeen: -1, kart: 'allround',
+    trail: null, trailT: 0, top: 1, accel: 1, turn: 1, driftRate: 1, offroadF: .4, offroad: false, scY: 0, route: 0, scSeen: -1, kart: 'allround',
     item: null, pending: null, roulette: 0, starT: 0, shroomT: 0, spinT: 0, invuln: 0, spinAngle: 0, itemHold: 0,
     drift: 0, driftT: 0, turboT: 0, turboSpeed: 0, padCool: 0, rocketT: 0, rocketLane: 0, balloons: BALLOONS, out: false, hits: 0, ...extra };
 }
@@ -191,6 +197,7 @@ export class RaceCore {
     this.pads = boostPadLayout(this.track);
     this.shells = [];
     this.bananas = [];
+    this.blueCount = 0;
     this._uid = 1;
     this.rankFrac = null; // optional override (online): () => 0 … 1
     this._lastTrackT = 0;
@@ -278,7 +285,7 @@ export class RaceCore {
   // Compact bot snapshot for the network.
   botsForNet() {
     return this.rivals.map(b => ({ n: b.index, x: +b.x.toFixed(2), z: +b.z.toFixed(2), y: +b.y.toFixed(2), pi: +b.pitch.toFixed(3), a: +b.angle.toFixed(3), s: +b.speed.toFixed(2), vx: +b.vx.toFixed(2), vz: +b.vz.toFixed(2),
-      sp: +(b.spinAngle || 0).toFixed(2), p: +b.progress.toFixed(4), st: b.starT > 0, rk: b.rocketT > 0, b: !!b.boosting, dt: b.drift ? driftTier(b.driftT) : 0, dr: b.drift || 0 }));
+      sp: +(b.spinAngle || 0).toFixed(2), p: +b.progress.toFixed(4), tr: b.trail || undefined, st: b.starT > 0, rk: b.rocketT > 0, b: !!b.boosting, dt: b.drift ? driftTier(b.driftT) : 0, dr: b.drift || 0 }));
   }
   // A guest reported that its item hit one of our bots.
   remoteBotHit(index, kind) { const b = this.rivals.find(r => r.index === index); if (b) this._hit(b, kind, null); }
@@ -312,6 +319,22 @@ export class RaceCore {
 
   // Player presses E.
   useItem() { if (this.status === 'racing') return this._useItem(this.player); return false; }
+  // E pressed: shells and bananas go behind the kart first (shield). Other items fire at once.
+  itemPress() {
+    const p = this.player;
+    if (this.status !== 'racing' || !p.item || p.spinT > 0 || p.roulette > 0) return false;
+    if (TRAILABLE.has(p.item)) { p.trail = p.item; p.trailT = 0; this.emit('trail', { item: p.item }); return 'trail'; }
+    return this._useItem(p);
+  }
+  // E released: a quick tap uses the item normally, after holding it is thrown backward.
+  itemRelease() {
+    const p = this.player;
+    if (!p.trail) return false;
+    const back = p.trailT > .3; p.trail = null;
+    if (this.status !== 'racing' || !p.item) return false;
+    return this._useItem(p, back);
+  }
+  trailPoint(c) { return { x: c.x - Math.sin(c.angle) * TRAIL_BACK, z: c.z - Math.cos(c.angle) * TRAIL_BACK }; }
 
   update(dt, input = {}) {
     if (!Number.isFinite(dt) || dt <= 0) return;
@@ -374,6 +397,7 @@ export class RaceCore {
     if (c.spinT > 0) { c.spinT = Math.max(0, c.spinT - dt); c.spinAngle += dt * TAU / SPIN_TIME * 1.5; if (c.spinT === 0) c.spinAngle = 0; }
     if (c.roulette > 0) { c.roulette -= dt; if (c.roulette <= 0) { c.roulette = 0; c.item = c.pending; c.pending = null; c.itemHold = 0; if (c === this.player) this.emit('itemready', { item: c.item }); } }
     if (c.item) c.itemHold += dt;
+    if (c.trail) { c.trailT += dt; if (!c.item) c.trail = null; }
     if (c.rocketT > 0) { c.rocketT = Math.max(0, c.rocketT - dt); if (c.rocketT === 0) { this._turbo(c, .9, 30 * K, 'rocketend'); if (c === this.player) this.emit('rocketend', {}); } }
     c.turboT = Math.max(0, c.turboT - dt);
     c.padCool = Math.max(0, c.padCool - dt);
@@ -482,6 +506,7 @@ export class RaceCore {
 
   _afterMove(dt, p, hintT = this._lastTrackT, walls = false) {
     let road, hit = 0;
+    const wasOff = p.offroad;
     if (walls) ({ here: road, hit } = this._bound(p, hintT)); else road = this._locate(p, hintT);
     if (hit > 0) {
       // Speed loss grows with the impact: brushing the barrier costs a few percent, a head-on hit up to a quarter.
@@ -501,15 +526,21 @@ export class RaceCore {
     this._lastTrackT = road.t;
     this._height(p, previousT, road.t, dt);
     // Reject teleports. Small jumps happen where the nearest point skips across a tight hairpin.
-    if (Math.abs(delta) * this.track.length < 12.0) {
+    // Entering or leaving a shortcut legitimately jumps the progress (distance-to-exit measure).
+    const maxJump = wasOff !== p.offroad && this.track.shortcuts.length ? Math.max(...this.track.shortcuts.map(sc => sc.span * this.track.length)) + 15 : 12;
+    if (Math.abs(delta) * this.track.length < maxJump) {
       this._playerTrackProgress += delta;
       if (delta * this.track.length > dt * 2 && p.speed > 2) {
         if (p.drifting && p.speed > 4) this.stats.driftSeconds += dt;
         if (p.boosting) this.stats.boostSeconds += dt;
       }
       const distanceToGate = wrap(this.nextCheckpoint / 8 - previousT);
-      if (this.mode !== 'battle' && delta > 0 && distanceToGate > 1e-9 && distanceToGate <= delta + 1e-9)
-        this._passGate();
+      let from = previousT, left = delta;
+      while (left > 0 && this.status === 'racing' && this.mode !== 'battle') {
+        const gap = wrap(this.nextCheckpoint / 8 - from);
+        if (!(gap > 1e-9 && gap <= left + 1e-9)) break;
+        this._passGate(); from = wrap(from + gap); left -= gap;
+      }
     }
 
     this._stepRivals(dt);
@@ -730,11 +761,18 @@ export class RaceCore {
   }
 
   // ---------- items ----------
-  _useItem(c) {
+  _useItem(c, backward = false) {
     if (!c.item || c.spinT > 0) return false;
-    const item = c.item; c.item = null; c.itemHold = 0;
+    const item = c.item; c.item = null; c.itemHold = 0; c.trail = null;
     const hx = Math.sin(c.angle), hz = Math.cos(c.angle);
-    if (item === 'mushroom') { c.shroomT = MUSHROOM_TIME; c.speed = Math.max(c.speed, (MUSHROOM_SPEED * K) * .97); }
+    if (isMushroom(item)) {
+      c.shroomT = MUSHROOM_TIME; c.speed = Math.max(c.speed, (MUSHROOM_SPEED * K) * .97);
+      if (item === 'mushroom3') c.item = 'mushroom2'; else if (item === 'mushroom2') c.item = 'mushroom';
+    }
+    else if (item === 'blue') {
+      const prog = c === this.player ? this._playerTrackProgress : c.progress;
+      this.shells.push({ id: this._uid++, type: 'blue', owner: c, prog, x: c.x, z: c.z, y: c.y + 1.5, vx: 0, vz: 0, arm: 0, life: 40, t: wrap(prog), target: null, boom: 0 });
+    }
     else if (item === 'star') { c.starT = STAR_TIME; c.spinT = 0; c.spinAngle = 0; }
     else if (item === 'rocket') {
       const road = this.track.nearestNear(c.x, c.z, c === this.player ? this._lastTrackT : c.t);
@@ -743,29 +781,77 @@ export class RaceCore {
     else if (item === 'banana') {
       if (this.bananas.length > 40) this.bananas.shift();
       const bt = c === this.player ? this._lastTrackT : (c.t ?? 0);
-      this.bananas.push({ id: this._uid++, x: c.x - hx * 2.2, z: c.z - hz * 2.2, y: this.track.heightAt(bt), owner: c, arm: 0.6 });
+      this.bananas.push({ id: this._uid++, x: c.x - hx * 2.2, z: c.z - hz * 2.2, y: c.offroad ? c.scY : this.track.heightAt(bt), owner: c, arm: 0.6 });
+    } else if ((item === 'green' || item === 'red') && backward) {
+      // thrown backward: flies straight back (a red shell does not home in this direction)
+      const sp = GREEN_SPEED * K * .75;
+      this.shells.push({ id: this._uid++, type: item, straight: true, x: c.x - hx * 2, z: c.z - hz * 2, y: c.y, vx: -hx * sp + hx * Math.max(0, c.speed) * .2, vz: -hz * sp + hz * Math.max(0, c.speed) * .2,
+        owner: c, arm: 0.35, life: 9, bounces: 0, t: c === this.player ? this._lastTrackT : (c.t ?? 0), target: null });
     } else if (item === 'green' || item === 'red') {
       const sp = item === 'green' ? (GREEN_SPEED * K) : (RED_SPEED * K), base = Math.max(0, c.speed);
       const shell = { id: this._uid++, type: item, x: c.x + hx * 1.6, z: c.z + hz * 1.6, y: c.y, vx: hx * (sp + base * .3), vz: hz * (sp + base * .3),
         owner: c, arm: 0.35, life: item === 'green' ? 9 : 12, bounces: 0, t: c === this.player ? this._lastTrackT : (c.t ?? 0), target: null };
-      if (item === 'red') shell.target = this.mode === 'battle' ? this._nearestFoe(c) : this._carAhead(c);
+      if (item === 'red') { shell.target = this.mode === 'battle' ? this._nearestFoe(c) : this._carAhead(c); if (shell.target?.key) shell.targetKey = shell.target.key; }
       this.shells.push(shell);
     }
-    this.emit('item', { item, by: c === this.player ? 'player' : 'bot', name: c.name });
+    this.emit('item', { item: isMushroom(item) ? 'mushroom' : item, by: c === this.player ? 'player' : 'bot', name: c.name, backward });
     return item;
   }
+  // Blue shell: follows the racing line high above the field, dives onto the leader and explodes.
+  _blueStep(s, dt, cars) {
+    const T = this.track, L = T.length;
+    if (s.boom > 0) { s.boom -= dt; return s.boom <= 0; }
+    s.life -= dt; if (s.life <= 0) return true;
+    // current leader: everyone in the race, online players included
+    let lead = null, lp = -Infinity;
+    for (const f of this._field()) if (f.prog > lp) { lp = f.prog; lead = f.c; }
+    for (const e of this.externals) if (Number.isFinite(e.progress) && e.progress > lp) { lp = e.progress; lead = e; }
+    s.target = lead;
+    if (!lead) return true;
+    const sp = BLUE_SPEED * K;
+    if (lp - s.prog > 22 / L) {
+      s.prog += sp * dt / L; s.t = wrap(s.prog);
+      const p = T.sample(s.t); s.x = p.x; s.z = p.z; s.y += (T.heightAt(s.t) + BLUE_HEIGHT - s.y) * Math.min(1, dt * 4);
+      return false;
+    }
+    // dive
+    const dx = lead.x - s.x, dz = lead.z - s.z, d = Math.hypot(dx, dz), ly = lead.y ?? s.y;
+    const step = Math.min(d, (sp + Math.abs(lead.speed || 0)) * dt);
+    if (d > 1e-6) { s.x += dx / d * step; s.z += dz / d * step; }
+    s.y += (ly + .3 - s.y) * Math.min(1, dt * (d < 8 ? 9 : 3));
+    s.prog = Math.max(s.prog, lp - d / L);
+    if (d > 1.3) return false;
+    // explosion: everyone close to the leader spins
+    s.boom = .6; s.y = ly;
+    for (const c of cars) if (Math.hypot(c.x - s.x, c.z - s.z) < BLUE_RADIUS && Math.abs(c.y - ly) < 3) this._hit(c, 'blue', s.owner);
+    for (const e of this.externals) if (Math.hypot(e.x - s.x, e.z - s.z) < BLUE_RADIUS && !e.star) this.emit('remotehit', { kind: 'blue', target: e });
+    this.emit('blueboom', { x: s.x, z: s.z, y: ly, player: Math.hypot(this.player.x - s.x, this.player.z - s.z) < BLUE_RADIUS + 10 });
+    return false;
+  }
+  _shieldBreak(c, x, z) {
+    c.item = null; c.trail = null;
+    this.emit('shieldblock', { x, z, player: c === this.player, name: c.name });
+  }
   // Next car ahead in the standings (the one a red shell chases).
+  // Online players (and AI simulated by the host) count too: they arrive as `externals` with a progress value.
   _carAhead(c) {
     const field = this._field(), me = field.find(f => f.c === c);
     if (!me) return null;
+    for (const e of this.externals) if (Number.isFinite(e.progress)) field.push({ c: e, prog: e.progress });
     let best = null;
     for (const f of field) if (f.c !== c && f.prog > me.prog && (!best || f.prog < best.prog)) best = f;
     return best ? best.c : null;
+  }
+  // Externals are rebuilt every frame: follow them by key, not by object.
+  _resolveTarget(s) {
+    if (s.targetKey) return this.externals.find(e => e.key === s.targetKey) || null;
+    return s.target;
   }
   // A car gets hit: spin on the spot, lose speed. Stars and fresh spins are immune.
   _hit(c, kind, by) {
     if (c.starT > 0 || c.rocketT > 0 || c.invuln > 0 || c.ghost > 0) return false;
     c.spinT = SPIN_TIME; c.invuln = SPIN_TIME + 1.0; c.spinAngle = 0;
+    if (c.trail) { c.item = null; c.trail = null; }
     c.speed *= .2; c.vx *= .3; c.vz *= .3; c.shroomT = 0;
     if (c === this.player) this.stats.hitsTaken++;
     if (by === this.player && c !== this.player) this.stats.hitsDealt++;
@@ -786,6 +872,7 @@ export class RaceCore {
         if (!c.item && c.roulette <= 0) {
           const frac = this._rankFrac(c), n = c === this.player && this.rankFrac ? (this.onlineCount || 2) : this._field().length;
           c.pending = this.mode === 'battle' ? rollBattleItem() : rollItem(frac, n >= 3 && frac >= (n - 2.5) / (n - 1)); c.roulette = c === this.player ? ROULETTE_TIME : .6;
+          if (c.pending === 'blue') { if (this.blueCount >= BLUE_MAX || frac < .25) c.pending = 'red'; else this.blueCount++; }
           if (c === this.player) this.emit('itembox', {});
         }
         break;
@@ -795,11 +882,12 @@ export class RaceCore {
     // shells
     for (let i = this.shells.length - 1; i >= 0; i--) {
       const s = this.shells[i];
+      if (s.type === 'blue') { if (this._blueStep(s, dt, cars)) this.shells.splice(i, 1); continue; }
       s.life -= dt; s.arm -= dt;
-      if (s.type === 'red') {
+      if (s.type === 'red' && !s.straight) {
         const road = this.track.nearestNear(s.x, s.z, s.t); s.t = road.t;
         let tx, tz;
-        const tgt = s.target;
+        const tgt = this._resolveTarget(s);
         if (tgt && (this.mode === 'battle' ? !tgt.out : Math.hypot(tgt.x - s.x, tgt.z - s.z) < 26)) { tx = tgt.x; tz = tgt.z; }
         else if (this.mode === 'battle') { tx = s.x + s.vx; tz = s.z + s.vz; }
         else { const a = this.track.sample(s.t + 9 / this.track.length); tx = a.x; tz = a.z; }
@@ -812,7 +900,7 @@ export class RaceCore {
       s.y += (this.track.heightAt(s.t) - s.y) * Math.min(1, dt * 12);
       const limit = W / 2 - 0.35;
       if (road.distance > limit && !this._inCorridor(s.x, s.z)) {
-        if (s.type === 'red' && !s.target) { this.shells.splice(i, 1); this.emit('shellbreak', { x: s.x, z: s.z }); continue; }
+        if (s.type === 'red' && !s.target && !s.straight) { this.shells.splice(i, 1); this.emit('shellbreak', { x: s.x, z: s.z }); continue; }
         const side = Math.sign(road.signedDistance) || 1;
         s.x = road.x + road.nx * side * limit; s.z = road.z + road.nz * side * limit;
         const vn = s.vx * road.nx * side + s.vz * road.nz * side;
@@ -823,7 +911,13 @@ export class RaceCore {
       }
       if (s.life <= 0) { this.shells.splice(i, 1); continue; }
       let gone = false;
+      // a kart holding an item behind it blocks shells coming from behind
       for (const c of cars) {
+        if (!c.trail || (c === s.owner && s.arm > 0) || Math.abs(c.y - s.y) > 1.3) continue;
+        const tp = this.trailPoint(c);
+        if (Math.hypot(tp.x - s.x, tp.z - s.z) < 1.05) { this._shieldBreak(c, s.x, s.z); gone = true; break; }
+      }
+      if (!gone) for (const c of cars) {
         if (c === s.owner && s.arm > 0) continue;
         if (c.ghost > 0) continue;
         if (Math.abs(c.x - s.x) > 1.2 || Math.abs(c.z - s.z) > 1.2 || Math.abs(c.y - s.y) > 1.3) continue;
@@ -831,13 +925,14 @@ export class RaceCore {
       }
       if (!gone) for (const e of this.externals) {
         if (Math.hypot(e.x - s.x, e.z - s.z) < 1.05 && Math.abs((e.y ?? s.y) - s.y) < 1.3) { gone = true; if (!e.star) this.emit('remotehit', { kind: s.type, target: e }); break; }
+        if (e.trail) { const a = e.angle || 0, tx = e.x - Math.sin(a) * TRAIL_BACK, tz = e.z - Math.cos(a) * TRAIL_BACK; if (Math.hypot(tx - s.x, tz - s.z) < 1.05) { gone = true; this.emit('shieldblock', { x: s.x, z: s.z, player: false }); break; } }
       }
       if (!gone) for (let j = this.bananas.length - 1; j >= 0; j--) {
         const b = this.bananas[j];
         if (Math.hypot(b.x - s.x, b.z - s.z) < .9) { this.bananas.splice(j, 1); gone = true; break; }
       }
       if (!gone) for (let j = this.shells.length - 1; j >= 0; j--) {
-        const o = this.shells[j]; if (o === s) continue;
+        const o = this.shells[j]; if (o === s || o.type === 'blue') continue;
         if (Math.hypot(o.x - s.x, o.z - s.z) < .8) { this.shells.splice(Math.max(i, j), 1); this.shells.splice(Math.min(i, j), 1); i--; gone = 'both'; break; }
       }
       if (gone === true) { this.shells.splice(i, 1); }
@@ -851,9 +946,20 @@ export class RaceCore {
         if (Math.hypot(c.x - b.x, c.z - b.z) < .95) { if (this._hit(c, 'banana', b.owner) || c.starT > 0) { this.bananas.splice(j, 1); } break; }
       }
     }
-    // items thrown by online players hit me and (on the host) the AI drivers
+    // items thrown by online players hit me and (on the host) the AI drivers – unless a held item blocks them
     for (const it of this.externalItems) {
-      for (const c of cars) if (Math.hypot(c.x - it.x, c.z - it.z) < (it.type === 'banana' ? .95 : 1.05) && Math.abs(c.y - (it.y ?? c.y)) < 1.3) this._hit(c, it.type, null);
+      if (it.type === 'blue') { if (it.b) for (const c of cars) if (Math.hypot(c.x - it.x, c.z - it.z) < BLUE_RADIUS && Math.abs(c.y - (it.y ?? c.y)) < 3) this._hit(c, 'blue', null); continue; }
+      for (const c of cars) {
+        if (Math.abs(c.y - (it.y ?? c.y)) > 1.3) continue;
+        if (c.trail && it.type !== 'banana') { const tp = this.trailPoint(c); if (Math.hypot(tp.x - it.x, tp.z - it.z) < 1.05) { if (!it._blocked) { it._blocked = true; this._shieldBreak(c, it.x, it.z); } continue; } }
+        if (!it._blocked && Math.hypot(c.x - it.x, c.z - it.z) < (it.type === 'banana' ? .95 : 1.05)) this._hit(c, it.type, null);
+      }
+    }
+    for (const c of cars) {
+      if (!c.trail) continue;
+      const tp = this.trailPoint(c);
+      for (const o of cars) if (o !== c && o.ghost <= 0 && Math.abs(o.y - c.y) < 1.3 && Math.hypot(o.x - tp.x, o.z - tp.z) < .95) { const kind = c.trail; c.item = null; c.trail = null; this._hit(o, kind, c); break; }
+      if (c === this.player && c.trail) for (const e of this.externals) if (!e.ghost && Math.hypot(e.x - tp.x, e.z - tp.z) < .95 && Math.abs((e.y ?? c.y) - c.y) < 1.3) { const kind = c.trail; c.item = null; c.trail = null; if (!e.star) this.emit('remotehit', { kind, target: e }); break; }
     }
     // my bananas vs online players / remote AI drivers
     for (let j = this.bananas.length - 1; j >= 0; j--) {
@@ -876,7 +982,7 @@ export class RaceCore {
   ownItemsForNet() {
     const mine = [];
     const ours = o => o === this.player || this.rivals.includes(o);
-    for (const s of this.shells) if (ours(s.owner)) mine.push({ type: s.type, x: +s.x.toFixed(2), z: +s.z.toFixed(2), y: +s.y.toFixed(2) });
+    for (const s of this.shells) if (ours(s.owner)) mine.push({ type: s.type, x: +s.x.toFixed(2), z: +s.z.toFixed(2), y: +s.y.toFixed(2), b: s.boom > 0 ? 1 : undefined });
     for (const b of this.bananas) if (ours(b.owner) && b.arm <= 0) mine.push({ type: 'banana', x: +b.x.toFixed(2), z: +b.z.toFixed(2), y: +b.y.toFixed(2) });
     return mine.slice(0, 12);
   }
@@ -889,8 +995,11 @@ export class RaceCore {
     const ahead = field.filter(f => f.c !== bot && f.prog > bot.progress && (f.prog - bot.progress) * L < 30);
     const behind = field.filter(f => f.c !== bot && f.prog < bot.progress && (bot.progress - f.prog) * L < 16);
     let use = false;
+    if (TRAILABLE.has(bot.item) && !bot.trail && iq >= .45 && hold > .6 && behind.length) bot.trail = bot.item;
     switch (bot.item) {
       case 'star': case 'rocket': use = hold > .3; break;
+      case 'blue': use = hold > 1; break;
+      case 'mushroom3': case 'mushroom2':
       case 'mushroom': {
         // Save mushrooms for an upcoming shortcut, then fire them on the rough ground.
         const saving = !bot.route && hold < 14 && this.track.shortcuts.some(sc => wrap(sc.tA - bot.t) * L < 260);
@@ -933,7 +1042,7 @@ export class RaceCore {
       for (const sc of this.track.shortcuts) {
         const ds = (wrap(sc.tA - bot.t + .5) - .5) * L;
         if (ds > 3 && ds < 40) { if (bot.scSeen !== sc.index && !bot.route) { bot.scSeen = sc.index;
-          const boosted = bot.shroomT > .25 || bot.starT > 1, mush = this.itemsEnabled && bot.item === 'mushroom';
+          const boosted = bot.shroomT > .25 || bot.starT > 1, mush = this.itemsEnabled && isMushroom(bot.item);
           if (bot.offroadF >= .8 || boosted || (mush && Math.random() < .25 + bot.itemIQ * .7)) bot.route = sc.index + 1; } }
         else if (bot.scSeen === sc.index && (ds < -20 || ds > 60)) bot.scSeen = -1;
       }
@@ -1029,13 +1138,14 @@ export class RaceCore {
       this._integrate(bot, dt, false);
       this._pads(bot);
       // --- barriers, progress, recovery ---
-      const bounded = this._bound(bot, lookT);
+      const botWasOff = bot.offroad, bounded = this._bound(bot, lookT);
       if (bounded.hit > 0.3) bot.speed *= 1 - clamp(bounded.hit * .035, .015, .15);
       const r2 = bounded.here;
       let d = r2.t - bot.t;
       if (d > 0.5) d -= 1;
       if (d < -0.5) d += 1;
-      if (Math.abs(d) * L < 12.0) bot.progress += d;
+      const botMax = botWasOff !== bot.offroad && this.track.shortcuts.length ? Math.max(...this.track.shortcuts.map(sc => sc.span * L)) + 15 : 12;
+      if (Math.abs(d) * L < botMax) bot.progress += d;
       this._height(bot, bot.t, r2.t, dt);
       bot.t = r2.t;
       if (bot.slide > 0 || spinning) bot.lane += (r2.signedDistance - bot.lane) * Math.min(1, dt * 6);
