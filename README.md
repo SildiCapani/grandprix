@@ -115,7 +115,7 @@ Im Menü auf die Karte **Eigene Strecke bauen** klicken.
 Im Menü unter **Karriere-Fortschritt** lässt sie sich AN- oder AUSschalten.
 
 - **AN:** Dein Fahrerlevel schaltet nach und nach frei:
-  - Strecken: Start mit Küste, Canyon und Neon.
+  - Strecken sind immer alle frei.
   - Karts: Flitzer ab Level 2, Drifter ab 3, Buggy ab 4, Bolide ab 5, Brummer ab 6.
   - Lack-Finishes: Gold ab Level 3, Chrom ab 5, Neon ab 7.
 - **Aufträge:** Es sind immer drei offen, z. B. „Überhole 25 Gegner“ oder „Lande 12 Sprünge“. Sie geben Bonus-XP und werden nach dem Abschluss ersetzt. Mit jeder Runde durch alle Aufträge werden sie etwas schwerer. Es gibt keine Timer und keine Tages-Aufgaben.
