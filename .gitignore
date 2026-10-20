@@ -2,3 +2,6 @@ node_modules/
 dist/
 .DS_Store
 .merge-tmp/
+# Konten-Daten und Admin-Passwörter nie hochladen
+server/data/
+server/admins.json

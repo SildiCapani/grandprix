@@ -1,18 +1,21 @@
 // Apex Rush game server
 //  • serves the built game (folder dist/) over HTTP
 //  • /ws: tiny publish/subscribe relay for online rooms (works through eduroam, port 80/443)
+//  • /api: player accounts (login, saved career) – see accounts.js
 // Start: npm start   (port from env PORT, default 3001)
 import http from 'node:http';
 import { readFile, stat } from 'node:fs/promises';
 import { extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { WebSocketServer } from 'ws';
+import { loadAccounts, handleApi } from './accounts.js';
 
 const PORT = Number(process.env.PORT) || 3001;
 const DIST = fileURLToPath(new URL('../dist/', import.meta.url));
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.ico': 'image/x-icon', '.woff2': 'font/woff2' };
 
 const server = http.createServer(async (req, res) => {
+  if (await handleApi(req, res)) return;
   if (req.url === '/health') { res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify({ ok: true, rooms: topics.size, clients: wss.clients.size })); return; }
   try {
     const path = decodeURIComponent(new URL(req.url, 'http://x').pathname);
@@ -52,6 +55,7 @@ wss.on('connection', ws => {
 setInterval(() => { for (const ws of wss.clients) { if (!ws.isAlive) { ws.terminate(); continue; } ws.isAlive = false; ws.ping(); } }, 15000);
 setInterval(() => { for (const ws of wss.clients) ws.budget = 400; }, 1000);
 
+await loadAccounts();
 server.listen(PORT, () => {
   console.log(`Apex Rush Server läuft: http://localhost:${PORT}`);
   console.log(`Online-Relay:           ws://localhost:${PORT}/ws`);

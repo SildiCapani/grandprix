@@ -49,6 +49,17 @@ Hinweis: Der Gratis-Plan schläft nach 15 Minuten ohne Besucher ein. Der erste A
 
 Alternativ läuft das `Dockerfile` auf Fly.io, Railway o. Ä. Wähle dort die Region Frankfurt, dann ist die Latenz gering.
 
+## Konten & Admins
+
+Beim Start meldet man sich an oder erstellt ein Konto. Level, XP, Rekorde und alles Freigeschaltete werden **pro Konto auf dem Server** gespeichert
+(`server/data/accounts.json`, Passwörter nur als scrypt-Hash). Strecken, Karts und Lacke werden mit dem Level freigeschaltet.
+
+**Admin-Konten** haben alles frei. Sie stehen in `server/admins.json` (wird nicht hochgeladen, Vorlage: `server/admins.example.json`).
+Nach einer Änderung den Server neu starten: das Admin-Konto wird angelegt bzw. das Passwort übernommen.
+
+Hinweis Render (Gratis-Plan): Die Festplatte wird bei jedem Neustart zurückgesetzt, Konten gingen dort verloren.
+Für dauerhafte Konten den Server auf deinem Rechner laufen lassen (Tunnel) oder bei Render eine Disk nutzen und `DATA_DIR` darauf setzen.
+
 ## Fahrzeuge
 
 | Kart | Stärke | Schwäche |

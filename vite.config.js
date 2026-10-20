@@ -6,6 +6,6 @@ export default defineConfig({
   server: {
     port: 5173,
     host: true, // auch im LAN erreichbar (z. B. Handy/zweiter Laptop)
-    proxy: { '/ws': { target: 'ws://localhost:3001', ws: true } },
+    proxy: { '/ws': { target: 'ws://localhost:3001', ws: true }, '/api': { target: 'http://localhost:3001' } },
   },
 });
