@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { buildAdventure, ADVENTURE_THEMES } from './world-adventure.js';
 
 // Three complete outdoor worlds, generated procedurally around the track:
 //   day    → Riviera coast: sea, beach, palms, villas, lighthouse
@@ -112,7 +113,7 @@ export function createWorld(map, track) {
     arena: { color: 0x22252c, base: '#23262d', dots: ['rgba(10,10,14,.5)', 'rgba(90,60,140,.25)'] },
     colosseum: { color: 0xd8b07a, base: '#d4ab74', dots: ['rgba(160,110,60,.45)', 'rgba(240,200,150,.45)'] },
     ice: { color: 0xeef4fa, base: '#e8f0f8', dots: ['rgba(180,200,225,.45)', 'rgba(255,255,255,.6)'] },
-  }[theme];
+  }[theme] || { color: 0x888888, base: '#888888', dots: [] };
   const groundTex = canvasTex(512, (g, s) => {
     g.fillStyle = groundSpec.base; g.fillRect(0, 0, s, s);
     clouds(g, s, r, 70, 'rgba(0,0,0,.08)', 20, 90); clouds(g, s, r, 50, 'rgba(255,255,255,.07)', 20, 80);
@@ -127,7 +128,7 @@ export function createWorld(map, track) {
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(groundSize, groundSize), std(0xffffff, { map: groundTex, roughness: theme === 'night' ? .7 : .95 }));
   ground.rotation.x = -Math.PI / 2; ground.position.y = -.09; ground.receiveShadow = true;
   if (theme === 'volcano') { ground.material.emissive = new THREE.Color(0xff5a10); ground.material.emissiveMap = groundTex; ground.material.emissiveIntensity = .14; }
-  if (theme !== 'space' && theme !== 'sky') group.add(ground);
+  if (theme !== 'space' && theme !== 'sky' && !ADVENTURE_THEMES.includes(theme)) group.add(ground);
 
   // --- run-off shoulders beside the road (grass verge / sand / sidewalk) ---
   function band(off0, off1, y, material) {
@@ -140,8 +141,8 @@ export function createWorld(map, track) {
     const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setIndex(idx); geo.computeVertexNormals();
     const mesh = new THREE.Mesh(geo, material); mesh.receiveShadow = true; group.add(mesh); return mesh;
   }
-  const shoulderMat = std({ day: 0x9b9886, desert: 0xc98f5b, night: 0x6b6f78, volcano: 0x3a3132, snow: 0xf4f8fc, space: 0x000000, jungle: 0x6a5a3a, savanna: 0xb88a52, forest: 0x7a6a4a, sky: 0xffffff, sakura: 0x9a8a72, moon: 0x7c7e84, arena: 0x3a3550, colosseum: 0xb08850, ice: 0xbcd8ee }[theme], { side: THREE.DoubleSide, roughness: .9 });
-  if (theme !== 'space' && theme !== 'sky') for (const side of [-1, 1]) band(side * (W / 2 + .5), side * (W / 2 + (theme === 'night' ? 5 : 3.5)), theme === 'night' ? .03 : -.02, shoulderMat);
+  const shoulderMat = std({ day: 0x9b9886, desert: 0xc98f5b, night: 0x6b6f78, volcano: 0x3a3132, snow: 0xf4f8fc, space: 0x000000, jungle: 0x6a5a3a, savanna: 0xb88a52, forest: 0x7a6a4a, sky: 0xffffff, sakura: 0x9a8a72, moon: 0x7c7e84, arena: 0x3a3550, colosseum: 0xb08850, ice: 0xbcd8ee }[theme] ?? 0x888888, { side: THREE.DoubleSide, roughness: .9 });
+  if (theme !== 'space' && theme !== 'sky' && !ADVENTURE_THEMES.includes(theme)) for (const side of [-1, 1]) band(side * (W / 2 + .5), side * (W / 2 + (theme === 'night' ? 5 : 3.5)), theme === 'night' ? .03 : -.02, shoulderMat);
 
   // --- start/finish area: grandstand with crowd and a pit building ---
   const s0 = track.sample(0), tx = Math.sin(s0.angle), tz = Math.cos(s0.angle);
@@ -188,7 +189,7 @@ export function createWorld(map, track) {
     const t = (i + .5) / bbCount, s = track.sample(t), bend = track.curvature(t - 10 / track.length, 30);
     const side = bend > 0 ? -1 : 1, off = W / 2 + 6;
     const x = s.x + s.nx * off * side, z = s.z + s.nz * off * side;
-    if (!free(x, z, off - 1) || s.y > 1 || track.inGap(t)) continue;
+    if (!free(x, z, off - 1) || s.y > 1 || track.inGap(t) || track.inVoid?.(t)) continue;
     const panel = new THREE.Mesh(new THREE.PlaneGeometry(12, 3), billboardMats[i % billboardMats.length]);
     panel.position.set(x, 4.2, z); panel.lookAt(s.x, 4.2, s.z); panel.castShadow = true; group.add(panel);
     const back = new THREE.Mesh(G.box, poleMat); back.scale.set(12.2, 3.2, .15); back.position.copy(panel.position); back.quaternion.copy(panel.quaternion); back.translateZ(-.1); back.castShadow = true; group.add(back);
@@ -196,7 +197,8 @@ export function createWorld(map, track) {
   }
 
   // ===================== THEMES =====================
-  const builders = { day: buildCoast, desert: buildDesert, volcano: buildVolcano, snow: buildSnow, space: buildSpace, jungle: buildJungle, savanna: buildSavanna, forest: buildForest, night: buildCity, sky: buildSky, sakura: buildSakura, moon: buildMoon, arena: buildArena, colosseum: buildArena, ice: buildArena };
+  const builders = { day: buildCoast, desert: buildDesert, volcano: buildVolcano, snow: buildSnow, space: buildSpace, jungle: buildJungle, savanna: buildSavanna, forest: buildForest, night: buildCity, sky: buildSky, sakura: buildSakura, moon: buildMoon, pirate: adventure, candy: adventure, castle: adventure, arctic: adventure, rooftops: adventure, galaxy: adventure, arena: buildArena, colosseum: buildArena, ice: buildArena };
+  function adventure() { buildAdventure({ group, track, W, r, inst, M, G, std, free, updaters, canvasTex, clouds, speckle, textPanel, glowTex, weather, theme, at }); }
   (builders[theme] || buildCity)();
 
   function scatter(n, minD, maxR, place, tries = 6) {

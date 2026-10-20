@@ -31,6 +31,30 @@ const SAKURA = [[0, 170], [120, 175], [200, 140], [230, 70], [200, 10], [140, -1
 // Moon base: rolling regolith on stilts, three long low-gravity jumps over craters.
 const MOON = [[-180, 160, 0], [-40, 165, 0], [100, 160, 2], [190, 120, 5], [230, 40, 8], [210, -50, 10], [150, -110, 10], [60, -120, 8], [0, -60, 6],
   [-60, -10, 6], [-120, -50, 8], [-150, -130, 10], [-230, -150, 9], [-280, -80, 6], [-270, 30, 3], [-240, 120, 1]];
+// ---- Season 3: open edges (fall off → rescue drone), shortcuts and living worlds ----
+// Pirate bay: beach start, a long pier over the sea with a jump, Skull Island with a cave shortcut, a rope bridge.
+const PIRATE = [[-160, 165, .5], [-40, 170, .5], [70, 165, .5], [140, 150, 2.5], [205, 118, 3], [232, 60, 3], [232, 0, 3], [210, -50, 3], [165, -78, 2.5],
+  [168, -135, 2], [212, -192, 3], [175, -252, 5], [95, -266, 7], [30, -232, 8], [-40, -226, 8.5], [-110, -206, 8.5], [-165, -166, 7],
+  [-202, -106, 4], [-245, -45, 2], [-250, 25, 1], [-226, 90, .5], [-212, 142, .5]];
+// Candy land: a chocolate river cuts the map in two, the course crosses it four times (one broken wafer bridge to jump).
+const CANDY = [[-150, 170, 0], [-30, 175, 0], [90, 170, 0], [180, 140, 0], [222, 82, 0], [226, 32, 2], [226, -32, 2], [215, -105, 0], [170, -168, 0],
+  [100, -170, 0], [68, -110, 0], [60, -45, 2], [60, 38, 2], [42, 100, 0], [-10, 122, 0], [-62, 100, 0], [-76, 40, 2.5], [-76, -40, 2.5],
+  [-92, -110, 0], [-140, -185, 0], [-225, -188, 0], [-264, -112, 0], [-248, -40, 2], [-244, 36, 2], [-240, 110, 0]];
+// Dragon castle: castle plateau, a cliff road with an open drop, a long arch bridge, the dragon rock and a drawbridge jump.
+const CASTLE = [[-150, 160, 1], [-30, 168, 1], [90, 160, 1.5], [175, 128, 3], [228, 65, 5], [238, 0, 7], [218, -62, 8], [165, -92, 9],
+  [90, -112, 10], [10, -120, 10], [-45, -95, 11], [-60, -35, 12], [-30, 25, 13], [-80, 62, 14], [-140, 30, 14], [-152, -40, 14],
+  [-172, -112, 14], [-222, -146, 15], [-258, -92, 15], [-252, -20, 14], [-244, 45, 11], [-238, 100, 7], [-210, 146, 3.5]];
+// Galaxy: a glowing road through a spiral galaxy. No barriers anywhere – leave the road and you drift into space.
+const GALAXY = [[-190, 185, 10], [-50, 190, 10], [90, 182, 11], [185, 150, 14], [242, 82, 18], [252, 0, 21],
+  ...helix(150, -90, 62, 21, -9, 0.2, Math.PI * 2.3, Math.PI / 4),
+  [110, -210, 8], [20, -222, 6], [-70, -205, 6], [-150, -150, 9], [-160, -70, 13], [-90, -20, 17], [-40, 50, 20], [-90, 110, 19],
+  [-180, 105, 15], [-255, 120, 12], [-270, 165, 10]];
+// Polar fjord: ice shelf, bridges between ice floes, an ice cave shortcut and a jump over a crack.
+const ARCTIC = [[-160, 170, 1], [-30, 176, 1], [90, 168, 1], [175, 130, 2], [215, 60, 3], [212, -20, 3], [170, -80, 3], [100, -95, 2.5],
+  [40, -60, 2], [-10, -110, 2], [-20, -190, 3], [-90, -232, 4], [-185, -222, 4], [-248, -150, 3], [-215, -60, 2], [-250, 30, 1.5], [-235, 110, 1]];
+// Neon rooftops: the road runs over the roofs of a night city, bridges and jumps between the towers.
+const ROOFTOPS = [[-170, 175, 30], [-40, 180, 30], [80, 172, 31], [170, 140, 33], [220, 70, 36], [224, -20, 38], [190, -100, 38], [120, -140, 36],
+  [40, -120, 34], [-20, -170, 32], [-100, -200, 32], [-190, -182, 31], [-255, -115, 30], [-195, -40, 30], [-125, 15, 31], [-150, 80, 31], [-240, 110, 30], [-240, 160, 30]];
 const FOREST = [[-170, 175], [-40, 175], [90, 175], [180, 150], [225, 85], [215, 10], [170, -40], [100, -60], [62, -100], [70, -170], [20, -222], [-60, -218], [-112, -160], [-104, -95], [-130, -40], [-175, -12], [-200, -30], [-200, -80], [-200, -110], [-211.7, -138.3], [-240, -150], [-268.3, -138.3], [-280, -110], [-280, -40], [-282, 40], [-268, 118], [-228, 165]];
 
 export const MAPS = Object.freeze([
@@ -146,10 +170,80 @@ export const MAPS = Object.freeze([
     boostPads: [],
     sectors: [{ name: 'Landeplatz', t: 0 }, { name: 'Kraterfeld', t: 0.35 }, { name: 'Dunkle Seite', t: 0.68 }],
   },
+  {
+    id: 'pirate', index: 12, name: 'Piratenbucht', subtitle: 'Steg übers Meer · Totenkopf-Insel · Hängebrücke ohne Geländer',
+    width: 10.6, theme: 'pirate', unlockXP: 0, botScale: 1.14, deck: 'pillars', fallY: -3,
+    nodes: PIRATE,
+    jumps: [{ at: [232, 40], gap: 12 }],
+    voids: [{ from: [80, 164], to: [168, -90] }, { from: [10, -230], to: [-176, -155] }],
+    open: [{ from: [196, 124], to: [231, 72], side: 0 }, { from: [231, 10], to: [180, -70], side: 'out' }, { from: [-2, -229], to: [-160, -172], side: 0 }],
+    shortcuts: [{ path: [[166, -100], [135, -160], [90, -212], [36, -230]], width: 8.5, surface: 'sand' }],
+    parTimes: { gold: 232, silver: 262, bronze: 299 },
+    boostPads: [],
+    sectors: [{ name: 'Strandbar', t: 0 }, { name: 'Langer Steg', t: 0.22 }, { name: 'Totenkopf-Insel', t: 0.5 }],
+  },
+  {
+    id: 'candy', index: 13, name: 'Zuckerland', subtitle: 'Schokofluss · zerbrochene Waffelbrücke · Keks-Abkürzung',
+    width: 10.6, theme: 'candy', unlockXP: 0, botScale: 1.14, deck: 'pillars', fallY: -2.5,
+    nodes: CANDY,
+    jumps: [{ at: [60, -6], gap: 13 }],
+    voids: [{ from: [224, 50], to: [222, -50] }, { from: [61, -30], to: [60, 40] }, { from: [-76, 27], to: [-77, -42] }, { from: [-246, -36], to: [-244, 32] }],
+    open: [{ from: [224, 44], to: [222, -44], side: 0 }, { from: [-76, 20], to: [-77, -36], side: 0 }, { from: [-246, -28], to: [-244, 24], side: 'out' }],
+    shortcuts: [{ path: [[-100, -126], [-150, -118], [-205, -104], [-256, -84]], width: 8.5, surface: 'cookie' }],
+    parTimes: { gold: 291, silver: 329, bronze: 375 },
+    boostPads: [],
+    sectors: [{ name: 'Lolli-Allee', t: 0 }, { name: 'Schokofluss', t: 0.3 }, { name: 'Gummibärchen-Wald', t: 0.66 }],
+  },
+  {
+    id: 'castle', index: 14, name: 'Drachenburg', subtitle: 'Klippenstraße über dem Abgrund · Bogenbrücke · Zugbrücken-Sprung',
+    width: 10.6, theme: 'castle', unlockXP: 0, botScale: 1.16, deck: 'pillars', fallY: -30,
+    nodes: CASTLE,
+    jumps: [{ at: [-254, -58], gap: 14 }],
+    voids: [{ from: [205, 100], to: [228, -40] }, { from: [118, -106], to: [-20, -112] }, { from: [-255, -70], to: [-252, -32] }],
+    open: [{ from: [210, 94], to: [230, -34], side: 'out' }, { from: [100, -110], to: [-6, -116], side: 0 }],
+    shortcuts: [{ path: [[-58, -40], [-84, -8], [-118, -14], [-132, -46], [-160, -64]], width: 8.5, surface: 'grass' }],
+    parTimes: { gold: 246, silver: 278, bronze: 317 },
+    boostPads: [],
+    sectors: [{ name: 'Burghof', t: 0 }, { name: 'Klippenstraße', t: 0.2 }, { name: 'Drachenfels', t: 0.55 }],
+  },
+  {
+    id: 'arctic', index: 15, name: 'Polarlicht-Fjord', subtitle: 'Eisschollen-Brücken · Eishöhle · Polarlicht und Wale',
+    width: 10.6, theme: 'arctic', unlockXP: 0, botScale: 1.14, deck: 'pillars', fallY: -3,
+    nodes: ARCTIC,
+    jumps: [{ at: [214, 20], gap: 13 }],
+    voids: [{ from: [200, 92], to: [210, -45] }, { from: [60, -75], to: [-16, -150] }, { from: [-55, -225], to: [-118, -228] }],
+    open: [{ from: [205, 84], to: [214, 30], side: 0 }, { from: [214, 6], to: [206, -40], side: 'out' }, { from: [52, -70], to: [-14, -140], side: 0 }, { from: [-60, -226], to: [-112, -228], side: 0 }],
+    shortcuts: [{ path: [[-125, -224], [-160, -180], [-190, -128], [-216, -78]], width: 8.5, surface: 'snow' }],
+    parTimes: { gold: 226, silver: 255, bronze: 292 },
+    boostPads: [],
+    sectors: [{ name: 'Eisschelf', t: 0 }, { name: 'Schollenbrücken', t: 0.3 }, { name: 'Walbucht', t: 0.62 }],
+  },
+  {
+    id: 'rooftops', index: 16, name: 'Neon-Dächer', subtitle: 'Über den Dächern der Stadt · Sprünge zwischen Hochhäusern · fliegende Autos',
+    width: 10.6, theme: 'rooftops', unlockXP: 0, botScale: 1.16, deck: 'pillars', fallY: 0,
+    nodes: ROOFTOPS,
+    jumps: [{ at: [223, 30], gap: 14 }, { at: [-60, -190], gap: 13 }],
+    voids: [{ from: [215, 55], to: [223, 10] }, { from: [150, -128], to: [70, -128] }, { from: [-50, -185], to: [-80, -196] }, { from: [-128, 24], to: [-145, 68] }],
+    open: [{ from: [150, -128], to: [70, -128], side: 0 }, { from: [-130, 28], to: [-143, 64], side: 0 }],
+    shortcuts: [{ path: [[-112, -198], [-160, -150], [-190, -100], [-206, -55]], width: 8.5, surface: 'roof' }],
+    parTimes: { gold: 236, silver: 267, bronze: 304 },
+    boostPads: [],
+    sectors: [{ name: 'Skyline', t: 0 }, { name: 'Hochhaussprung', t: 0.25 }, { name: 'Neonviertel', t: 0.62 }],
+  },
+  {
+    id: 'galaxy', index: 17, name: 'Galaxie', subtitle: 'Leuchtstraße durchs All · keine einzige Leitplanke · Spirale um die Sonne',
+    width: 11.2, theme: 'galaxy', unlockXP: 0, botScale: 1.18, deck: 'float', fallY: -40, gravity: .8,
+    nodes: GALAXY,
+    jumps: [{ at: [60, -218], gap: 15 }, { at: [-160, -95], gap: 13 }],
+    voids: 'all', open: [{ from: [-40, 190], to: [-266, 155], side: 0 }],
+    parTimes: { gold: 309, silver: 349, bronze: 399 },
+    boostPads: [],
+    sectors: [{ name: 'Sternentor', t: 0 }, { name: 'Sonnenspirale', t: 0.22 }, { name: 'Nebelsprung', t: 0.6 }],
+  },
 ].map(normalizeMap));
 
 function normalizeMap(map) {
-  return Object.freeze({ ...map, deck: map.deck || 'flat', jumps: Object.freeze(map.jumps || []), shortcuts: Object.freeze(map.shortcuts || []),
+  return Object.freeze({ ...map, deck: map.deck || 'flat', jumps: Object.freeze(map.jumps || []), shortcuts: Object.freeze(map.shortcuts || []), open: map.open === 'all' ? 'all' : Object.freeze(map.open || []), voids: map.voids === 'all' ? 'all' : Object.freeze(map.voids || []),
     width: +(map.width * WIDTH_SCALE).toFixed(2),
     nodes: Object.freeze(map.nodes.map(node => Object.freeze([node[0] * WORLD_SCALE, node[1] * WORLD_SCALE, node[2] || 0]))),
     boostPads: Object.freeze(map.boostPads || []),
@@ -301,7 +395,29 @@ function buildTrack(map) {
     let k = i; while (k > 0 && sc.pts[k].u > u) k--; while (k < sc.pts.length - 2 && sc.pts[k + 1].u < u) k++;
     const a = sc.pts[k], b = sc.pts[k + 1], f = (u - a.u) / Math.max(1e-6, b.u - a.u), angle = Math.atan2(b.x - a.x, b.z - a.z);
     return { x: a.x + (b.x - a.x) * f, z: a.z + (b.z - a.z) * f, y: a.y + (b.y - a.y) * f, angle, nx: Math.cos(angle), nz: -Math.sin(angle) }; };
-  return Object.freeze({ ...map, points, length, sample, nearest, nearestNear, curvature, heightAt, slopeAt, jumps, rampLift, inGap, shortcuts, shortcutAt, sampleShortcut });
+  // Open edges: stretches without a barrier on one or both sides. Leave the road there and you fall
+  // (into water, chocolate or the abyss) until the rescue drone brings you back.
+  //   side: 0 = both, 1 / -1 = one side (sign of the signed distance), 'out' / 'in' = away from / toward the course centre.
+  let cx = 0, cz = 0; for (const p of points) { cx += p.x; cz += p.z; } cx /= points.length; cz /= points.length;
+  const drops = (map.open === 'all' ? [{ all: true }] : map.open || []).map(o => {
+    if (o.all) return Object.freeze({ tA: 0, tB: 1, span: 1, side: 0 });
+    const a = nearest(o.from[0], o.from[1]), b = nearest(o.to[0], o.to[1]);
+    return Object.freeze({ tA: a.t, tB: b.t, span: wrap(b.t - a.t), side: o.side ?? 0 });
+  });
+  function openAt(t, sd) {
+    for (const d of drops) {
+      if (wrap(t - d.tA) > d.span) continue;
+      if (d.side === 0) return true;
+      let side = d.side;
+      if (side === 'out' || side === 'in') { const s = sample(t), out = Math.sign((s.x - cx) * s.nx + (s.z - cz) * s.nz) || 1; side = side === 'out' ? out : -out; }
+      if (Math.sign(sd) === side) return true;
+    }
+    return false;
+  }
+  // Sections over water / the abyss (bridges, piers): no ground below, the world draws a deck and supports there.
+  const voids = (map.voids === 'all' ? [{ all: true }] : map.voids || []).map(o => { if (o.all) return Object.freeze({ tA: 0, span: 1 }); const a = nearest(o.from[0], o.from[1]), b = nearest(o.to[0], o.to[1]); return Object.freeze({ tA: a.t, span: wrap(b.t - a.t) }); });
+  const inVoid = t => voids.some(v => wrap(t - v.tA) <= v.span);
+  return Object.freeze({ ...map, points, length, sample, nearest, nearestNear, curvature, heightAt, slopeAt, jumps, rampLift, inGap, shortcuts, shortcutAt, sampleShortcut, drops, openAt, voids, inVoid, centre: { x: cx, z: cz } });
 }
 
 const TRACKS = new Map(MAPS.map(map => [map.id, buildTrack(map)]));
@@ -326,7 +442,7 @@ for (const arena of ARENAS) TRACKS.set(arena.id, buildTrack(arena));
 
 // ---------- player-built tracks (editor) ----------
 export const CUSTOM_ID = 'custom';
-export const CUSTOM_THEMES = Object.freeze(['day', 'desert', 'night', 'volcano', 'snow', 'space', 'jungle', 'savanna', 'forest', 'sky', 'sakura', 'moon']);
+export const CUSTOM_THEMES = Object.freeze(['day', 'desert', 'night', 'volcano', 'snow', 'space', 'jungle', 'savanna', 'forest', 'sky', 'sakura', 'moon', 'pirate', 'candy', 'castle', 'arctic', 'rooftops', 'galaxy']);
 const r1 = v => Math.round(v * 10) / 10;
 // Editor definition → a full map entry. def = { name, theme, nodes: [[x, z, y]], jumps: [{ node, gap }] }
 export function customMapFromDef(def) {

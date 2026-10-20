@@ -1,4 +1,4 @@
-import { getTrack, RAMP_H } from './tracks.js';
+import { getTrack, RAMP_H, RAMP_LEN } from './tracks.js';
 import { kartById } from './karts.js';
 
 // Compact, dependency-free arcade physics. Units are metres and seconds.
@@ -70,6 +70,8 @@ function rollBattleItem(rnd = Math.random) {
 export const DRIFT_TIERS = [{ at: .75, time: .55, speed: 25.5 }, { at: 1.7, time: 1.0, speed: 27 }, { at: 2.8, time: 1.5, speed: 28.5 }];
 export const driftTier = t => t >= DRIFT_TIERS[2].at ? 3 : t >= DRIFT_TIERS[1].at ? 2 : t >= DRIFT_TIERS[0].at ? 1 : 0;
 // ---- boost pads ----
+// Falling off an open edge: a short drop, then the rescue drone lowers the kart back onto the road.
+export const FALL_TIME = 1.05, CARRY_TIME = 1.45;
 const PAD_TIME = .8, PAD_SPEED = 26.2, PAD_LEN = 4.2, PAD_W = 3.2;
 export function boostPadLayout(track) {
   const pads = [], L = track.length, rows = itemBoxLayout(track).map(b => b.t);
@@ -130,7 +132,7 @@ function makeBody(extra) {
   return { speed: 0, steer: 0, vx: 0, vz: 0, slide: 0, spin: 0, ghost: 0, y: 0, pitch: 0, airT: 0, airDur: 0, airY0: 0, airH: 0,
     trail: null, trailT: 0, top: 1, accel: 1, turn: 1, driftRate: 1, offroadF: .4, offroad: false, scY: 0, route: 0, scSeen: -1, kart: 'allround',
     item: null, pending: null, roulette: 0, starT: 0, shroomT: 0, spinT: 0, invuln: 0, spinAngle: 0, itemHold: 0,
-    drift: 0, driftT: 0, turboT: 0, turboSpeed: 0, padCool: 0, rocketT: 0, rocketLane: 0, balloons: BALLOONS, out: false, hits: 0, ...extra };
+    drift: 0, driftT: 0, turboT: 0, turboSpeed: 0, padCool: 0, rocketT: 0, rocketLane: 0, fallT: 0, fallVy: 0, rescueT: 0, balloons: BALLOONS, out: false, hits: 0, ...extra };
 }
 
 // Item box rows, evenly spread over the lap (never right on the start line).
@@ -285,7 +287,7 @@ export class RaceCore {
   // Compact bot snapshot for the network.
   botsForNet() {
     return this.rivals.map(b => ({ n: b.index, x: +b.x.toFixed(2), z: +b.z.toFixed(2), y: +b.y.toFixed(2), pi: +b.pitch.toFixed(3), a: +b.angle.toFixed(3), s: +b.speed.toFixed(2), vx: +b.vx.toFixed(2), vz: +b.vz.toFixed(2),
-      sp: +(b.spinAngle || 0).toFixed(2), p: +b.progress.toFixed(4), tr: b.trail || undefined, st: b.starT > 0, rk: b.rocketT > 0, b: !!b.boosting, dt: b.drift ? driftTier(b.driftT) : 0, dr: b.drift || 0 }));
+      sp: +(b.spinAngle || 0).toFixed(2), p: +b.progress.toFixed(4), fa: b.fallT > 0 ? +b.fallT.toFixed(2) : undefined, tr: b.trail || undefined, st: b.starT > 0, rk: b.rocketT > 0, b: !!b.boosting, dt: b.drift ? driftTier(b.driftT) : 0, dr: b.drift || 0 }));
   }
   // A guest reported that its item hit one of our bots.
   remoteBotHit(index, kind) { const b = this.rivals.find(r => r.index === index); if (b) this._hit(b, kind, null); }
@@ -304,6 +306,7 @@ export class RaceCore {
   }
 
   respawn() {
+    if (this.player.fallT > 0) return this;
     let n = this.track.nearestNear(this.player.x, this.player.z, this._lastTrackT);
     // In a shortcut: straighten up inside the corridor instead of teleporting back to the road.
     if (this.player.offroad) { const sc = this.track.shortcutAt(this.player.x, this.player.z); if (sc) n = { ...sc }; }
@@ -322,7 +325,7 @@ export class RaceCore {
   // E pressed: shells and bananas go behind the kart first (shield). Other items fire at once.
   itemPress() {
     const p = this.player;
-    if (this.status !== 'racing' || !p.item || p.spinT > 0 || p.roulette > 0) return false;
+    if (this.status !== 'racing' || !p.item || p.spinT > 0 || p.roulette > 0 || p.fallT > 0) return false;
     if (TRAILABLE.has(p.item)) { p.trail = p.item; p.trailT = 0; this.emit('trail', { item: p.item }); return 'trail'; }
     return this._useItem(p);
   }
@@ -362,6 +365,7 @@ export class RaceCore {
   // After the flag the kart rolls out along its lane instead of stopping dead. No gates or progress any more.
   _coast(dt) {
     const p = this.player, L = this.track.length;
+    if (p.fallT > 0) { this._fallStep(p, dt); return; }
     p.drift = 0; p.driftT = 0; p.drifting = false; p.turboT = 0; p.shroomT = 0; p.rocketT = 0; p.boosting = false;
     p.speed *= Math.exp(-dt * .85);
     if (Math.abs(p.speed) < .15) { p.speed = 0; p.vx = 0; p.vz = 0; p.steer = 0; return; }
@@ -448,6 +452,7 @@ export class RaceCore {
     this._bumpCooldown = Math.max(0, this._bumpCooldown - dt);
     const p = this.player;
     this._tickItems(p, dt);
+    if (p.fallT > 0) { this._fallStep(p, dt); return this._afterMove(dt, p, this._lastTrackT, false, true); }
     if (p.rocketT > 0) { this._rocketStep(p, dt, this._lastTrackT); return this._afterMove(dt, p); }
     const spinning = p.spinT > 0;
     const steerIn = spinning ? 0 : input.steer, throttle = spinning ? 0 : input.throttle, brake = spinning ? false : input.brake;
@@ -504,7 +509,24 @@ export class RaceCore {
     this._afterMove(dt, p, roadBefore.t, true);
   }
 
-  _afterMove(dt, p, hintT = this._lastTrackT, walls = false) {
+  _afterMove(dt, p, hintT = this._lastTrackT, walls = false, frozen = false) {
+    if (!frozen) this._track(dt, p, hintT, walls);
+    this._stepRivals(dt);
+    if (this.rivals.length) this._collideCars();
+    if (this.externals.length) this._collideExternal();
+    if (this.itemsEnabled) this._stepItems(dt);
+
+    if (this.mode === 'battle') this._battleTick(dt);
+    if (this.mode === 'battle' && this.status === 'racing') this._checkBattleEnd();
+    if (this.status === 'racing' && this.rivals.length) {
+      const pos = this._computePosition();
+      if (pos < this._lastPosition) { this.stats.overtakes += this._lastPosition - pos; this.emit('overtake', { position: pos }); }
+      this._lastPosition = pos;
+      this.position = pos;
+    }
+  }
+  // Road tracking of the player: barriers, falling off open edges, height, progress and gates.
+  _track(dt, p, hintT, walls) {
     let road, hit = 0;
     const wasOff = p.offroad;
     if (walls) ({ here: road, hit } = this._bound(p, hintT)); else road = this._locate(p, hintT);
@@ -524,7 +546,7 @@ export class RaceCore {
     if (delta > 0.5) delta -= 1;
     if (delta < -0.5) delta += 1;
     this._lastTrackT = road.t;
-    this._height(p, previousT, road.t, dt);
+    if (!(p.fallT > 0)) this._height(p, previousT, road.t, dt);
     // Reject teleports. Small jumps happen where the nearest point skips across a tight hairpin.
     // Entering or leaving a shortcut legitimately jumps the progress (distance-to-exit measure).
     const maxJump = wasOff !== p.offroad && this.track.shortcuts.length ? Math.max(...this.track.shortcuts.map(sc => sc.span * this.track.length)) + 15 : 12;
@@ -542,22 +564,7 @@ export class RaceCore {
         this._passGate(); from = wrap(from + gap); left -= gap;
       }
     }
-
-    this._stepRivals(dt);
-    if (this.rivals.length) this._collideCars();
-    if (this.externals.length) this._collideExternal();
-    if (this.itemsEnabled) this._stepItems(dt);
-
-    if (this.mode === 'battle') this._battleTick(dt);
-    if (this.mode === 'battle' && this.status === 'racing') this._checkBattleEnd();
-    if (this.status === 'racing' && this.rivals.length) {
-      const pos = this._computePosition();
-      if (pos < this._lastPosition) { this.stats.overtakes += this._lastPosition - pos; this.emit('overtake', { position: pos }); }
-      this._lastPosition = pos;
-      this.position = pos;
-    }
   }
-
   // ---------- road, shortcut corridors and barriers ----------
   // Where is the car: on the road, or out in an offroad shortcut? Returns a road-like reference (x, z, t, angle, nx, nz, distance).
   _locate(c, hintT) {
@@ -593,8 +600,49 @@ export class RaceCore {
         return { here: r2, hit };
       }
     }
+    // Open edge (no barrier): the kart can leave the road there and falls once it is clear of the deck.
+    if (T.drops.length && T.openAt(road.t, road.signedDistance)) {
+      if (road.distance > T.width / 2 + .85 && c.airT <= 0 && !(c.rocketT > 0) && !(c.fallT > 0)) this._startFall(c, road);
+      return { here: road, hit: 0 };
+    }
     const hit = this._push(c, road, lim);
     return { here: hit ? T.nearestNear(c.x, c.z, road.t) : road, hit };
+  }
+  // ---------- falling off and the rescue drone ----------
+  _startFall(c, road) {
+    const T = this.track, L = T.length;
+    let t = road.t;
+    // Put it back a little before the spot, never above a jump gap or on a ramp.
+    t = wrap(t - 3 / L);
+    for (const j of T.jumps) { const ds = (wrap(t - j.t + .5) - .5) * L; if ((j.gap && T.inGap(t)) || (ds > -RAMP_LEN - 2 && ds < (j.gap || 0) + 2)) t = wrap(j.t + ((j.gap || 0) + 6) / L); }
+    c.fallT = 1e-4; c.fallVy = 0; c.rescueT = t; c.drift = 0; c.driftT = 0; c.drifting = false; c.turboT = 0; c.shroomT = 0; c.boosting = false;
+    c.trail = null; c.ghost = 99; c.spinT = 0; c.spinAngle = 0;
+    if (c === this.player && this.status === 'racing') this.stats.falls = (this.stats.falls || 0) + 1;
+    this.emit('fall', { x: c.x, z: c.z, y: c.y, player: c === this.player, car: c });
+  }
+  // Phase 1 (FALL_TIME): tumble down with gravity. Phase 2 (CARRY_TIME): hanging from the drone, lowered onto the road.
+  _fallStep(c, dt) {
+    const T = this.track;
+    c.fallT += dt; c.speed *= Math.exp(-dt * 1.5); c.steer *= Math.exp(-dt * 4);
+    if (c.fallT < FALL_TIME) {
+      c.fallVy -= 26 * (T.gravity || 1) * dt;
+      const floor = (T.fallY ?? -8) - 2.5, before = c.y;
+      c.vx *= Math.exp(-dt * .9); c.vz *= Math.exp(-dt * .9);
+      c.x += c.vx * dt; c.z += c.vz * dt; c.y = Math.max(floor, c.y + c.fallVy * dt);
+      if (before > (T.fallY ?? -8) && c.y <= (T.fallY ?? -8)) this.emit('splash', { x: c.x, z: c.z, y: T.fallY ?? -8, player: c === this.player });
+      c.pitch += (-.9 - c.pitch) * Math.min(1, dt * 2.5); c.angle += dt * 1.6;
+      return;
+    }
+    const s = T.sample(c.rescueT), u = Math.min(1, (c.fallT - FALL_TIME) / CARRY_TIME), ease = 1 - (1 - u) * (1 - u);
+    const ground = T.heightAt(c.rescueT);
+    c.x = s.x; c.z = s.z; c.angle = s.angle; c.pitch = 0; c.vx = 0; c.vz = 0; c.speed = 0;
+    c.y = ground + 7 * (1 - ease);
+    if (u >= 1) {
+      c.fallT = 0; c.y = ground; c.ghost = 1.3; c.airT = 0; c.offroad = false;
+      // Back a few metres: take that distance off the progress so nothing is counted twice.
+      const back = (wrap((c === this.player ? this._lastTrackT : c.t) - c.rescueT + .5) - .5);
+      if (c === this.player) { this._playerTrackProgress -= back; this._lastTrackT = c.rescueT; this.emit('rescued', {}); } else { c.progress -= back; c.t = c.rescueT; }
+    }
   }
   // Rough ground: without a mushroom, star or turbo the kart sinks to its offroad speed.
   _offroadDrag(c, dt) {
@@ -606,6 +654,7 @@ export class RaceCore {
   // ---------- height, ramps and jumps ----------
   _ground(t) { return this.track.heightAt(t) + this.track.rampLift(t); }
   _height(c, prevT, t, dt) {
+    if (c.fallT > 0) return;
     const T = this.track, L = T.length;
     let d = t - prevT; if (d > .5) d -= 1; if (d < -.5) d += 1;
     // Crossing a ramp lip launches the kart. Ramps also kick slow karts up to jump speed.
@@ -1024,6 +1073,7 @@ export class RaceCore {
     const others = [{ c: p, prog: playerProg, isPlayer: true }, ...this.rivals.map(b => ({ c: b, prog: b.progress }))];
     for (const bot of this.rivals) {
       this._tickItems(bot, dt);
+      if (bot.fallT > 0) { this._fallStep(bot, dt); bot.stuck = 0; bot.stallFrom = bot.progress; bot.stallT = 0; continue; }
       if (bot.rocketT > 0) {
         this._rocketStep(bot, dt, bot.t);
         const rr = this.track.nearestNear(bot.x, bot.z, bot.t);

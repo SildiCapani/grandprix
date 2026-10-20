@@ -4,6 +4,8 @@ export const CUPS = Object.freeze([
   { id: 'wildnis', name: 'Wildnis-Cup', maps: ['jungle', 'savanna', 'forest'], color: '#7ad35a' },
   { id: 'gipfel', name: 'Gipfel-Cup', maps: ['volcano', 'glacier', 'sakura'], color: '#ffd04a' },
   { id: 'sterne', name: 'Sternen-Cup', maps: ['stars', 'sky', 'moon'], color: '#bda0ff' },
+  { id: 'abenteuer', name: 'Abenteuer-Cup', maps: ['pirate', 'candy', 'castle'], color: '#ff8ac0' },
+  { id: 'kosmos', name: 'Kosmos-Cup', maps: ['arctic', 'rooftops', 'galaxy'], color: '#7af4ff' },
 ].map(cup => Object.freeze({ ...cup, maps: Object.freeze(cup.maps) })));
 
 export const CUP_POINTS = Object.freeze([15, 12, 10, 8, 6, 4, 2, 1]);

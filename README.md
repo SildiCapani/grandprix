@@ -86,6 +86,15 @@ Die Werte stehen in `client/src/game/karts.js`.
 10. **Wolkeninseln**: schwebende Straße über einem Wolkenmeer. Eine Acht mit Brücke über die eigene Strecke und zwei Sprünge durch die Wolken.
 11. **Kirschblütental**: Torii-Tore, Pagode am See und eine Abkürzung durch den Bambushain.
 12. **Mondbasis Luna**: wenig Schwerkraft. Drei lange Kratersprünge, bei denen du höher fliegst und länger in der Luft bleibst.
+13. **Piratenbucht**: ein langer Holzsteg übers Meer (mit Sprung), eine Hängebrücke ohne Geländer und eine Höhlen-Abkürzung durch die Totenkopf-Insel. Drumherum Galeonen, die Kanonen abfeuern, ein Krake, Delfine und Möwen.
+14. **Zuckerland**: ein Schokofluss teilt die Welt, du fährst viermal drüber (einmal über eine kaputte Waffelbrücke mit Sprung). Lollis, Cupcakes, Gummibärchen, Riesenrad und ein Schoko-Wasserfall. Abkürzung durchs Keksfeld.
+15. **Drachenburg**: Klippenstraße über dem Abgrund, eine lange Bogenbrücke und ein Zugbrücken-Sprung. Burg, Dorf mit Windmühle, Fackeln, Fledermäuse und ein Drache, der Feuer speit. Abkürzung durch die Kapellen-Ruine.
+16. **Polarlicht-Fjord**: Brücken zwischen Eisschollen, Sprung über einen Gletscherspalt, Abkürzung durch die Eishöhle. Polarlicht, Pinguine, springende Orcas, ein Buckelwal, Eisbär, Forschungsstation und Hundeschlitten.
+17. **Neon-Dächer**: Die Straße läuft über die Dächer einer Stadt bei Nacht. Zwei Sprünge zwischen Hochhäusern, Brücken ohne Geländer, Abkürzung übers Parkdeck. Fliegende Autos, Verkehr tief unten, Luftschiff, Hubschrauber mit Suchscheinwerfer und Feuerwerk.
+18. **Galaxie**: eine leuchtende Glasstraße durchs All, eine Spirale um die Sonne und zwei Sprünge. Außer auf der Startgeraden gibt es **keine einzige Leitplanke**. Drumherum eine sich drehende Spiralgalaxie, Nebel, Planeten mit Ringen, ein Schwarzes Loch, Weltraumwale, Kometen und eine Raumstation.
+
+### Absturz & Rettungsdrohne
+Auf den Strecken 13–18 haben manche Stücke **kein Geländer** (dort fehlen die Leitplanken). Fährst du da über den Rand, stürzt du ins Wasser, in die Schokolade oder in den Nebel. Dann holt dich die **Rettungsdrohne** ab und setzt dich kurz vor der Absturzstelle wieder auf die Straße. Das kostet etwa 2,5 Sekunden. Die KI kann auch runterfallen, zum Beispiel nach einem Panzer-Treffer an der Kante. Online sehen alle die Drohne.
 
 ## Spielmodi
 | Modus | Worum es geht |
@@ -101,6 +110,8 @@ Die Werte stehen in `client/src/game/karts.js`.
 - **Wildnis-Cup:** Dschungel, Savanne, Pilzwald
 - **Gipfel-Cup:** Vulkan, Gletscher, Kirschblüten
 - **Sternen-Cup:** Sternenbahn, Wolkeninseln, Mond
+- **Abenteuer-Cup:** Piratenbucht, Zuckerland, Drachenburg
+- **Kosmos-Cup:** Polarlicht-Fjord, Neon-Dächer, Galaxie
 
 Pokal-Bonus: Gold 300 XP, Silber 200 XP, Bronze 100 XP.
 
@@ -116,7 +127,7 @@ Im Menü auf die Karte **Eigene Strecke bauen** klicken.
 
 - **Bauen:** Punkte verschieben, durch Klick auf die Strecke neue einfügen und mit Rechtsklick oder Entf löschen.
 - **Höhe und Sprünge:** Pro Punkt lässt sich die Höhe einstellen; hebst du einen Teil mindestens 6 m an, wird daraus eine Brücke. Sprungschanzen kannst du mit Lücke setzen.
-- **Welt:** Eine der 12 Welten wählen.
+- **Welt:** Eine der 18 Welten wählen.
 - **Prüfung:** Der Editor warnt vor Überschneidungen, zu engen Kurven und steilen Rampen.
 - **Testfahrt:** Mit Gegnern oder allein.
 - **Teilen:** **Code kopieren** erzeugt einen Code wie `APX1-…`. Freunde laden ihn über **Code laden**.
@@ -126,7 +137,7 @@ Im Menü auf die Karte **Eigene Strecke bauen** klicken.
 Mit Konto ist die Karriere immer an (Admins haben alles frei).
 
 - **AN:** Dein Fahrerlevel schaltet nach und nach frei:
-  - Strecken: Küste und Canyon sofort; Neon + Dschungel ab Level 2, Savanne + Pilzwald ab 3, Vulkan + Kirschblüten ab 4, Gletscher + Wolkeninseln ab 5, Sternenbahn ab 6, Mond ab 7.
+  - Strecken: Küste und Canyon sofort; Neon + Dschungel + Piratenbucht ab Level 2, Savanne + Pilzwald + Zuckerland + Polarlicht-Fjord ab 3, Vulkan + Kirschblüten + Drachenburg ab 4, Gletscher + Wolkeninseln + Neon-Dächer ab 5, Sternenbahn + Galaxie ab 6, Mond ab 7.
   - Karts: Flitzer ab Level 2, Drifter ab 3, Buggy ab 4, Bolide ab 5, Brummer ab 6.
   - Lack-Finishes: Gold ab Level 3, Chrom ab 5, Neon ab 7.
 - **Aufträge:** Es sind immer drei offen, z. B. „Überhole 25 Gegner“ oder „Lande 12 Sprünge“. Sie geben Bonus-XP und werden nach dem Abschluss ersetzt. Mit jeder Runde durch alle Aufträge werden sie etwas schwerer. Es gibt keine Timer und keine Tages-Aufgaben.
@@ -167,6 +178,8 @@ client/
     garage.js         3D-Garage zur Fahrzeugwahl
     tracks.js         Streckendaten inkl. Höhen, Brücken, Sprungschanzen
     world.js          Prozedurale 3D-Welten (inkl. Vulkan, Berge, Weltall)
+    world-adventure.js Piratenbucht, Zuckerland, Drachenburg, Arktis, Neon-Dächer, Galaxie
+    rescue-fx.js      Rettungsdrohne und Platscher beim Absturz
     car-model.js      Auto-Modelle
     multiplayer.js    Lobby- & Rennprotokoll (Host-Autorität)
     room-signaling.js Raumcodes, P2P-/Server-Verbindung

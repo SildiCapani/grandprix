@@ -2,7 +2,7 @@
 export const STORAGE_KEY = 'apex-rush-career-v1';
 const LEGACY_KEY = 'apex-rush-legacy-record';
 // Tracks open up with the driver level (the XP is the level threshold: 500 = Lv 2, 1200 = Lv 3, 2200 = Lv 4, 3600 = Lv 5, 5500 = Lv 6, 8000 = Lv 7).
-const MAPS = [{ id: 'coast', xp: 0 }, { id: 'canyon', xp: 0 }, { id: 'neon', xp: 500 }, { id: 'volcano', xp: 2200 }, { id: 'glacier', xp: 3600 }, { id: 'stars', xp: 5500 }, { id: 'jungle', xp: 500 }, { id: 'savanna', xp: 1200 }, { id: 'forest', xp: 1200 }, { id: 'sky', xp: 3600 }, { id: 'sakura', xp: 2200 }, { id: 'moon', xp: 8000 }];
+const MAPS = [{ id: 'coast', xp: 0 }, { id: 'canyon', xp: 0 }, { id: 'neon', xp: 500 }, { id: 'volcano', xp: 2200 }, { id: 'glacier', xp: 3600 }, { id: 'stars', xp: 5500 }, { id: 'jungle', xp: 500 }, { id: 'savanna', xp: 1200 }, { id: 'forest', xp: 1200 }, { id: 'sky', xp: 3600 }, { id: 'sakura', xp: 2200 }, { id: 'moon', xp: 8000 }, { id: 'pirate', xp: 500 }, { id: 'candy', xp: 1200 }, { id: 'castle', xp: 2200 }, { id: 'arctic', xp: 1200 }, { id: 'rooftops', xp: 3600 }, { id: 'galaxy', xp: 5500 }];
 const MEDALS = ['none', 'bronze', 'silver', 'gold'];
 const THRESHOLDS = [0, 500, 1200, 2200, 3600, 5500, 8000];
 const TITLES = ['Rookie', 'Kurven-Talent', 'Drift-Pilot', 'Rennprofi', 'Apex-Jäger', 'Grand-Prix-Champion', 'Legende'];

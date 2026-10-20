@@ -1,6 +1,6 @@
 // Four-player, host-authoritative WebRTC sessions. Signalling stays in the
 // invitation/answer codes; only car and race data travel over the data channels.
-const MAP_IDS = new Set(['coast', 'canyon', 'neon', 'volcano', 'glacier', 'stars', 'jungle', 'savanna', 'forest', 'sky', 'sakura', 'moon']);
+const MAP_IDS = new Set(['coast', 'canyon', 'neon', 'volcano', 'glacier', 'stars', 'jungle', 'savanna', 'forest', 'sky', 'sakura', 'moon', 'pirate', 'candy', 'castle', 'arctic', 'rooftops', 'galaxy']);
 const KART_IDS = new Set(['allround', 'bolide', 'flitzer', 'brummer', 'drifter', 'buggy']);
 const DEFAULT_COLOR = '#ee4b37';
 const CAR_COLORS = ['#ee4b37', '#42c9cb', '#edc44b', '#9b87e5'];
@@ -46,7 +46,7 @@ function cleanCar(state) {
     x: clamp(state.x, -400, 400), z: clamp(state.z, -400, 400), angle: state.angle % (Math.PI * 2),
     speed: clamp(state.speed, -40, 40), steer: finite(state.steer) ? clamp(state.steer, -1, 1) : 0,
     vx: finite(state.vx) ? clamp(state.vx, -30, 30) : 0, vz: finite(state.vz) ? clamp(state.vz, -30, 30) : 0,
-    y: finite(state.y) ? clamp(state.y, -5, 80) : 0, pitch: finite(state.pitch) ? clamp(state.pitch, -1.2, 1.2) : 0,
+    y: finite(state.y) ? clamp(state.y, -60, 80) : 0, fallT: finite(state.fallT) ? clamp(state.fallT, 0, 4) : 0, pitch: finite(state.pitch) ? clamp(state.pitch, -1.2, 1.2) : 0,
     kart: KART_IDS.has(state.kart) ? state.kart : 'allround',
     skin: typeof state.skin === 'string' && /^[a-z]{2,12}$/.test(state.skin) ? state.skin : 'none',
     finish: ['standard', 'gold', 'chrome', 'neon'].includes(state.finish) ? state.finish : 'standard', mass: finite(state.mass) ? clamp(state.mass, .5, 2) : 1,
@@ -56,7 +56,7 @@ function cleanCar(state) {
       .map(it => ({type: it.type, x: clamp(it.x, -400, 400), z: clamp(it.z, -400, 400), y: finite(it.y) ? clamp(it.y, -5, 80) : 0, b: it.b === 1 ? 1 : undefined})) : [],
     // Host-simulated AI drivers (online fill-up) and item hits that guests report on them.
     bots: Array.isArray(state.bots) ? state.bots.slice(0, 7).filter(b => b && ['x', 'z', 'a', 's', 'p'].every(k => finite(b[k]))).map(b => ({
-      n: finite(b.n) ? clamp(Math.floor(b.n), 0, 6) : 0, x: clamp(b.x, -400, 400), z: clamp(b.z, -400, 400), y: finite(b.y) ? clamp(b.y, -5, 80) : 0, pi: finite(b.pi) ? clamp(b.pi, -1.2, 1.2) : 0, a: b.a % (Math.PI * 2), s: clamp(b.s, -40, 40),
+      n: finite(b.n) ? clamp(Math.floor(b.n), 0, 6) : 0, x: clamp(b.x, -400, 400), z: clamp(b.z, -400, 400), y: finite(b.y) ? clamp(b.y, -60, 80) : 0, fa: finite(b.fa) ? clamp(b.fa, 0, 4) : 0, pi: finite(b.pi) ? clamp(b.pi, -1.2, 1.2) : 0, a: b.a % (Math.PI * 2), s: clamp(b.s, -40, 40),
       vx: finite(b.vx) ? clamp(b.vx, -45, 45) : 0, vz: finite(b.vz) ? clamp(b.vz, -45, 45) : 0, sp: finite(b.sp) ? clamp(b.sp, 0, 40) : 0, p: clamp(b.p, -.2, 4),
       st: b.st === true, rk: b.rk === true, tr: ['banana', 'green', 'red'].includes(b.tr) ? b.tr : undefined, b: b.b === true, dt: finite(b.dt) ? clamp(Math.floor(b.dt), 0, 3) : 0, dr: finite(b.dr) ? clamp(Math.sign(b.dr), -1, 1) : 0 })) : [],
     hits: Array.isArray(state.hits) ? state.hits.slice(0, 8).filter(h => h && typeof h.id === 'string' && h.id.length < 30 && finite(h.bot) && ['green', 'red', 'banana', 'star', 'blue'].includes(h.k))
