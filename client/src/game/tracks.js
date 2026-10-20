@@ -223,7 +223,7 @@ function buildTrack(map) {
   const rampLift = t => { for (const j of jumps) { const ds = (wrap(t - j.t + .5) - .5) * length; if (ds > -RAMP_LEN && ds <= 0) return RAMP_H * (1 + ds / RAMP_LEN); } return 0; };
   const inGap = t => jumps.some(j => { const ds = (wrap(t - j.t + .5) - .5) * length; return j.gap > 0 && ds > 0 && ds < j.gap; });
   // Offroad shortcuts: corridors that leave the road at tA and rejoin at tB. Progress inside a corridor
-  // is mapped linearly from tA to tB, so lap counting stays continuous and the cut really saves time.
+  // is measured as the distance still to go to the exit, so the standings are right at every moment.
   const shortcuts = map.shortcuts.map((sc, k) => {
     const a = nearest(sc.path[0][0], sc.path[0][1]), b = nearest(sc.path.at(-1)[0], sc.path.at(-1)[1]);
     const ctrl = [[a.x, a.z, 0], ...sc.path.slice(1, -1).map(p => [p[0], p[1], 0]), [b.x, b.z, 0]];
@@ -251,7 +251,7 @@ function buildTrack(map) {
         const u = clamp(((x - a.x) * dx + (z - a.z) * dz) / l2, 0, 1), px = a.x + dx * u, pz = a.z + dz * u, d = Math.hypot(x - px, z - pz);
         if (d < bd) { bd = d; const angle = Math.atan2(dx, dz), uu = a.u + (b.u - a.u) * u;
           best = { sc, x: px, z: pz, y: a.y + (b.y - a.y) * u, u: uu, distance: d, angle, nx: Math.cos(angle), nz: -Math.sin(angle),
-            signedDistance: (x - px) * Math.cos(angle) - (z - pz) * Math.sin(angle), t: wrap(sc.tA + uu * sc.span) }; }
+            signedDistance: (x - px) * Math.cos(angle) - (z - pz) * Math.sin(angle), t: wrap(sc.tB - (1 - uu) * sc.len / length) }; }
       }
     }
     return best;

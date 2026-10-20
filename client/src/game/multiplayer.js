@@ -48,15 +48,16 @@ function cleanCar(state) {
     vx: finite(state.vx) ? clamp(state.vx, -30, 30) : 0, vz: finite(state.vz) ? clamp(state.vz, -30, 30) : 0,
     y: finite(state.y) ? clamp(state.y, -5, 80) : 0, pitch: finite(state.pitch) ? clamp(state.pitch, -1.2, 1.2) : 0,
     kart: KART_IDS.has(state.kart) ? state.kart : 'allround', mass: finite(state.mass) ? clamp(state.mass, .5, 2) : 1,
+    trail: ['banana', 'green', 'red'].includes(state.trail) ? state.trail : null,
     star: state.star === true, rocket: state.rocket === true, spinA: finite(state.spinA) ? clamp(state.spinA, 0, 40) : 0,
-    items: Array.isArray(state.items) ? state.items.slice(0, 12).filter(it => it && ['green', 'red', 'banana'].includes(it.type) && finite(it.x) && finite(it.z))
-      .map(it => ({type: it.type, x: clamp(it.x, -400, 400), z: clamp(it.z, -400, 400), y: finite(it.y) ? clamp(it.y, -5, 80) : 0})) : [],
+    items: Array.isArray(state.items) ? state.items.slice(0, 12).filter(it => it && ['green', 'red', 'banana', 'blue'].includes(it.type) && finite(it.x) && finite(it.z))
+      .map(it => ({type: it.type, x: clamp(it.x, -400, 400), z: clamp(it.z, -400, 400), y: finite(it.y) ? clamp(it.y, -5, 80) : 0, b: it.b === 1 ? 1 : undefined})) : [],
     // Host-simulated AI drivers (online fill-up) and item hits that guests report on them.
     bots: Array.isArray(state.bots) ? state.bots.slice(0, 7).filter(b => b && ['x', 'z', 'a', 's', 'p'].every(k => finite(b[k]))).map(b => ({
       n: finite(b.n) ? clamp(Math.floor(b.n), 0, 6) : 0, x: clamp(b.x, -400, 400), z: clamp(b.z, -400, 400), y: finite(b.y) ? clamp(b.y, -5, 80) : 0, pi: finite(b.pi) ? clamp(b.pi, -1.2, 1.2) : 0, a: b.a % (Math.PI * 2), s: clamp(b.s, -40, 40),
       vx: finite(b.vx) ? clamp(b.vx, -45, 45) : 0, vz: finite(b.vz) ? clamp(b.vz, -45, 45) : 0, sp: finite(b.sp) ? clamp(b.sp, 0, 40) : 0, p: clamp(b.p, -.2, 4),
-      st: b.st === true, rk: b.rk === true, b: b.b === true, dt: finite(b.dt) ? clamp(Math.floor(b.dt), 0, 3) : 0, dr: finite(b.dr) ? clamp(Math.sign(b.dr), -1, 1) : 0 })) : [],
-    hits: Array.isArray(state.hits) ? state.hits.slice(0, 8).filter(h => h && typeof h.id === 'string' && h.id.length < 30 && finite(h.bot) && ['green', 'red', 'banana', 'star'].includes(h.k))
+      st: b.st === true, rk: b.rk === true, tr: ['banana', 'green', 'red'].includes(b.tr) ? b.tr : undefined, b: b.b === true, dt: finite(b.dt) ? clamp(Math.floor(b.dt), 0, 3) : 0, dr: finite(b.dr) ? clamp(Math.sign(b.dr), -1, 1) : 0 })) : [],
+    hits: Array.isArray(state.hits) ? state.hits.slice(0, 8).filter(h => h && typeof h.id === 'string' && h.id.length < 30 && finite(h.bot) && ['green', 'red', 'banana', 'star', 'blue'].includes(h.k))
       .map(h => ({id: h.id, bot: clamp(Math.floor(h.bot), 0, 6), k: h.k})) : [],
     boosting: state.boosting === true, drifting: state.drifting === true,
     progress: clamp(state.progress, -.2, 4), lap: finite(state.lap) ? clamp(Math.floor(state.lap), 0, 4) : 0,

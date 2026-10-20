@@ -184,3 +184,4 @@ header.in-garage .top-actions{display:none}
 .g-dots{position:absolute;bottom:58px;left:calc(50% + 200px);transform:translateX(-50%);display:flex;gap:8px}.g-dots i{width:9px;height:9px;border-radius:50%;background:#ffffff40}.g-dots i.on{background:var(--orange);width:24px;border-radius:5px}
 .g-hint{position:absolute;bottom:26px;left:calc(50% + 200px);transform:translateX(-50%);font-size:9px;letter-spacing:1px;color:#b9cbbd;white-space:nowrap}
 @media(max-width:900px){.g-panel{left:16px;top:auto;bottom:16px;width:auto;right:16px;padding:16px;max-height:58vh;overflow:auto}.g-panel h1{font-size:28px}.g-arrow{top:24%}.g-arrow.left{left:16px}.g-arrow.right{right:16px}.g-dots,.g-hint{left:50%;top:76px;bottom:auto}.g-hint{top:96px}}
+.item-slot.trailing{border-color:#7ae0ff;box-shadow:0 0 0 3px #7ae0ff55,0 10px 30px #0006}
