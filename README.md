@@ -96,6 +96,11 @@ Die Werte stehen in `client/src/game/karts.js`.
 ### Absturz & Rettungsdrohne
 Auf den Strecken 13–18 haben manche Stücke **kein Geländer** (dort fehlen die Leitplanken). Fährst du da über den Rand, stürzt du ins Wasser, in die Schokolade oder in den Nebel. Dann holt dich die **Rettungsdrohne** ab und setzt dich kurz vor der Absturzstelle wieder auf die Straße. Das kostet etwa 2,5 Sekunden. Die KI kann auch runterfallen, zum Beispiel nach einem Panzer-Treffer an der Kante. Online sehen alle die Drohne.
 
+## Look & Leben auf der Strecke
+- **Karts:** runde Go-Karts mit dicken Reifen, Fahrer mit Armen am Lenkrad, Chrom-Auspuff mit Boost-Flammen; die Karosserie legt sich in die Kurven. Jede Klasse hat ihre eigene Form (Buggy mit Überrollbügel, Brummer als Monster-Kart, Bolide lang mit großem Flügel …).
+- **Auf jeder Strecke:** Streckenposten mit Flaggen, jubelnde Fan-Zonen, wehende Fahnen, Konfetti beim Start und im Ziel.
+- **Je nach Welt:** Speedboote, Drachen und ein Wasserflugzeug an der Küste, Steppenläufer, Staubteufel und Ballons im Canyon, Lichtshow mit Drohnen in der Stadt, Feuervögel und Lavablasen am Vulkan, Sessellift und Skifahrer am Gletscher, Papageien, Schmetterlinge und Glühwürmchen im Dschungel und Pilzwald, Laternen im Kirschblütental, Raketenstart und Rover auf dem Mond, ein UFO auf der Sternenbahn.
+
 ## Startmenü
 Das Menü führt Schritt für Schritt durch die Auswahl:
 1. **Spielart:** Offline oder Online
@@ -227,6 +232,7 @@ client/
     obstacles.js      Bewegte Hindernisse (Daten + Zeitablauf)
     obstacle-fx.js    Hindernisse zeichnen
     avatars.js        Fahrer-Avatare (3D-Kopf + Porträt)
+    world-life.js     Leben auf allen Strecken (Fans, Streckenposten, Tiere, Fahrzeuge)
     ghost.js          Ghost im Zeitfahren
     car-model.js      Auto-Modelle
     multiplayer.js    Lobby- & Rennprotokoll (Host-Autorität)

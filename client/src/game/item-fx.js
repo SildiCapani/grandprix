@@ -42,8 +42,17 @@ export function createItemFx(scene) {
     }
   }
   function pop(x, y, z) { burst(x, y, z, 0x9ae8ff, 20, 7); }
+  // Confetti: little coloured paper squares tumbling down (race start, finish).
+  const paperGeo = new THREE.PlaneGeometry(.18, .12), papers = [], paperCols = [0xff4a3a, 0xffd04a, 0x3ab8ff, 0x5ad86a, 0xff7ac2, 0xffffff].map(c => new THREE.MeshBasicMaterial({ color: c, side: THREE.DoubleSide }));
+  function confetti(x, y, z, n = 140, spread = 8) {
+    for (let i = 0; i < n; i++) {
+      const m = new THREE.Mesh(paperGeo, paperCols[i % paperCols.length]); m.position.set(x + (Math.random() - .5) * spread, y + 5 + Math.random() * 3, z + (Math.random() - .5) * spread); scene.add(m);
+      papers.push({ m, vx: (Math.random() - .5) * 6, vy: 4 + Math.random() * 5, vz: (Math.random() - .5) * 6, sx: Math.random() * 9, sy: Math.random() * 9, life: 3 + Math.random() * 1.5 });
+    }
+  }
   function swapFx(x, y, z) { burst(x, y, z, 0xffd84a, 14, 4); burst(x, y, z, 0xff6ad8, 10, 2.5); }
   function tick(dt) {
+    for (let i = papers.length - 1; i >= 0; i--) { const p = papers[i]; p.life -= dt; if (p.life <= 0) { scene.remove(p.m); papers.splice(i, 1); continue; } p.vy = Math.max(-2.2, p.vy - 9 * dt); p.vx *= Math.exp(-dt); p.vz *= Math.exp(-dt); p.m.position.x += (p.vx + Math.sin(p.life * 3) * .6) * dt; p.m.position.y += p.vy * dt; p.m.position.z += p.vz * dt; p.m.rotation.x += p.sx * dt; p.m.rotation.y += p.sy * dt; }
     for (let i = sparkles.length - 1; i >= 0; i--) {
       const p = sparkles[i]; p.life -= dt;
       if (p.life <= 0) { scene.remove(p.s); p.s.material.dispose(); sparkles.splice(i, 1); continue; }
@@ -67,5 +76,5 @@ export function createItemFx(scene) {
     if (Math.abs(o - shown) < .01) return; shown = o;
     ink.style.opacity = o.toFixed(2); ink.style.display = o > 0 ? 'block' : 'none';
   }
-  return { bubble, pop, swapFx, tick, clear, inkLevel };
+  return { bubble, pop, swapFx, tick, clear, inkLevel, confetti };
 }

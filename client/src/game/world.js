@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { buildAdventure, ADVENTURE_THEMES } from './world-adventure.js';
+import { buildLife } from './world-life.js';
 
 // Three complete outdoor worlds, generated procedurally around the track:
 //   day    → Riviera coast: sea, beach, palms, villas, lighthouse
@@ -200,6 +201,7 @@ export function createWorld(map, track) {
   const builders = { day: buildCoast, desert: buildDesert, volcano: buildVolcano, snow: buildSnow, space: buildSpace, jungle: buildJungle, savanna: buildSavanna, forest: buildForest, night: buildCity, sky: buildSky, sakura: buildSakura, moon: buildMoon, pirate: adventure, candy: adventure, castle: adventure, arctic: adventure, rooftops: adventure, galaxy: adventure, arena: buildArena, colosseum: buildArena, ice: buildArena };
   function adventure() { buildAdventure({ group, track, W, r, inst, M, G, std, free, updaters, canvasTex, clouds, speckle, textPanel, glowTex, weather, theme, at }); }
   (builders[theme] || buildCity)();
+  buildLife({ group, track, W, r, inst, M, G, std, free, updaters, glowTex, theme, map });
 
   function scatter(n, minD, maxR, place, tries = 6) {
     let placed = 0;
