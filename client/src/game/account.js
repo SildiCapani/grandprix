@@ -3,7 +3,12 @@
 import { STORAGE_KEY } from './progression.js';
 
 const TOKEN_KEY = 'apex-rush-session';
-export const account = { user: null, token: null, profile: null, online: true };
+// guest: playing without an account – the career then lives in this browser (localStorage).
+export const account = { user: null, token: null, profile: null, online: true, guest: false };
+const GUEST_KEY = 'apex-rush-guest';
+export const wasGuest = () => { try { return localStorage.getItem(GUEST_KEY) === '1'; } catch { return false; } };
+export function playAsGuest() { account.guest = true; account.user = null; account.profile = null; try { localStorage.setItem(GUEST_KEY, '1'); } catch {} }
+const local = { get: k => { try { return localStorage.getItem(k); } catch { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch {} } };
 let pushTimer = 0, pushing = false, pending = false;
 
 const readToken = () => { try { return localStorage.getItem(TOKEN_KEY); } catch { return null; } };
@@ -20,6 +25,7 @@ async function api(path, { body, method = body ? 'POST' : 'GET' } = {}) {
 }
 
 function apply(data) {
+  account.guest = false; try { localStorage.removeItem(GUEST_KEY); } catch {}
   account.user = data.user; account.profile = data.profile || null;
   if (data.token) { account.token = data.token; writeToken(data.token); }
 }
@@ -58,7 +64,7 @@ addEventListener('pagehide', () => {
 
 // Drop-in storage for loadProfile/saveProfile: the career belongs to the logged-in account.
 export const accountStore = {
-  getItem(key) { return key === STORAGE_KEY && account.profile ? JSON.stringify(account.profile) : null; },
-  setItem(key, value) { if (key !== STORAGE_KEY) return; account.profile = JSON.parse(value); schedulePush(); },
+  getItem(key) { if (key !== STORAGE_KEY) return null; if (!account.user) return local.get(STORAGE_KEY); return account.profile ? JSON.stringify(account.profile) : null; },
+  setItem(key, value) { if (key !== STORAGE_KEY) return; if (!account.user) { local.set(STORAGE_KEY, value); return; } account.profile = JSON.parse(value); schedulePush(); },
   removeItem() {},
 };

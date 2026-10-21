@@ -342,3 +342,77 @@ header.in-garage .top-actions{display:none}
 /* Ink blots (Tintenklecks): over the race view, under the HUD */
 #inkOverlay{position:fixed;inset:0;pointer-events:none;display:none;opacity:0;z-index:1;transition:opacity .25s}
 #inkOverlay svg{position:absolute;filter:drop-shadow(0 4px 10px rgba(0,0,0,.35))}
+.platinum{color:#9ae8ff!important;text-shadow:0 0 10px #5ad8ff88}
+/* ===================== Start menu: steps ===================== */
+.menu.wizard-menu{max-width:1080px;width:100%;margin:auto}
+.menu-layer:has(.wizard-menu){background:radial-gradient(ellipse at 20% 30%,#10242af2,#10242ad9 45%,#10242a99 80%);justify-content:center}
+.wiz-steps{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:22px}
+.wiz-steps button{display:flex;align-items:center;gap:8px;background:#ffffff0a;border:1px solid #ffffff1f;border-radius:999px;padding:6px 14px 6px 6px;font-size:9px;font-weight:800;letter-spacing:1.2px;color:#9fb3ad}
+.wiz-steps button b{display:grid;place-items:center;width:22px;height:22px;border-radius:50%;background:#ffffff14;font-size:10px;color:#dce6df}
+.wiz-steps button.on{background:#ff653d22;border-color:var(--orange);color:#fff}.wiz-steps button.on b{background:var(--orange);color:#fff}
+.wiz-steps button.done{color:#cfe3c9}.wiz-steps button.done b{background:#3fbf5a;color:#0b1d12}
+.wiz-steps button:disabled{opacity:.45;cursor:default}
+.wiz-back{background:none;border:0;color:#b8c8c2;font-size:10px;font-weight:800;letter-spacing:1.2px;padding:4px 0;margin:-8px 0 8px}
+.wiz-back:hover{color:#fff}
+.wiz-title{font-size:clamp(30px,4vw,48px);font-style:italic;font-weight:1000;letter-spacing:-2px;margin:4px 0 22px}
+.wiz-home{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(280px,1fr);gap:clamp(24px,4vw,56px);align-items:center}
+.wiz-hero h1{font-size:clamp(48px,6.5vw,92px);margin:16px 0 12px}
+.wiz-hero h1 em{color:var(--orange)}
+.wiz-cards{display:grid;gap:14px}
+.wiz-cards.two{grid-template-columns:1fr 1fr;margin-top:6px}
+.wiz-cards.modes{grid-template-columns:repeat(auto-fit,minmax(190px,1fr))}
+.wiz-cards.classes{grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
+.wiz-card{position:relative;text-align:left;border:1px solid #ffffff22;border-radius:16px;padding:20px 20px 18px;min-height:160px;background:linear-gradient(160deg,#ffffff12,#ffffff04);display:flex;flex-direction:column;gap:8px;overflow:hidden;transition:transform .15s,border-color .15s,box-shadow .15s;backdrop-filter:blur(10px)}
+.wiz-card:hover{transform:translateY(-4px)!important;border-color:#ffffff55;box-shadow:0 14px 40px #0008}
+.wiz-card.selected{border-color:var(--orange);box-shadow:0 0 0 2px #ff653d55,0 14px 40px #0008}
+.wiz-card b{font-size:20px;font-style:italic;font-weight:1000;letter-spacing:-.4px}
+.wiz-card small{font-size:12px;line-height:1.5;color:#c3d1cb}
+.wiz-card .wiz-icon{font-size:34px;line-height:1;filter:drop-shadow(0 4px 10px #0007)}
+.wiz-card i{font-style:normal;font-size:11px;font-weight:900;letter-spacing:1.5px;margin-top:auto;color:#fff}
+.wiz-card.big{min-height:230px;padding:26px}
+.wiz-card.big b{font-size:34px}
+.wiz-card.offline{background:linear-gradient(150deg,#ff653dd0,#b8341ccc 70%);border-color:#ff9a7a}
+.wiz-card.online{background:linear-gradient(150deg,#2bb7c4d0,#1a5a8acc 70%);border-color:#7ae8f0}
+.wiz-card.offline small,.wiz-card.online small{color:#fff3ec}
+.wiz-card.mode-race{background:linear-gradient(160deg,#ff653d33,#ffffff05)}
+.wiz-card.mode-cup{background:linear-gradient(160deg,#ffd04a33,#ffffff05)}
+.wiz-card.mode-time{background:linear-gradient(160deg,#5ad8ff33,#ffffff05)}
+.wiz-card.mode-battle{background:linear-gradient(160deg,#ff4fd833,#ffffff05)}
+.wiz-card.mode-editor{background:linear-gradient(160deg,#7ad35a2a,#ffffff05)}
+.wiz-me{display:flex;align-items:center;gap:12px;margin-top:18px;background:#ffffff0a;border:1px solid #ffffff1c;border-radius:12px;padding:10px 12px;max-width:430px}
+.wiz-me .avatar-svg{width:46px;height:46px}
+.wiz-me small{display:block;font-size:8px;letter-spacing:1.3px;color:#9fb3ad;font-weight:800}
+.wiz-me b{font-size:13px}
+.wiz-me span{flex:1}
+.wiz-link{background:none;border:1px solid #ffffff33;border-radius:6px;padding:6px 10px;font-size:9px;font-weight:900;letter-spacing:1px}
+.wiz-career .career-card{margin:0}
+.avatar-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(118px,1fr));gap:10px;margin-bottom:20px;max-height:52vh;overflow:auto;padding:4px}
+.avatar-card{display:flex;flex-direction:column;align-items:center;text-align:center;gap:5px;padding:12px 8px 10px;border-radius:14px;border:1px solid #ffffff1f;background:radial-gradient(circle at 50% 30%,color-mix(in srgb,var(--av) 30%,transparent),#ffffff05 70%);transition:transform .12s,border-color .12s}
+.avatar-card:hover{transform:translateY(-3px)!important;border-color:#ffffff55}
+.avatar-card .avatar-svg{width:74px;height:74px;filter:drop-shadow(0 6px 10px #0008)}
+.avatar-card b{font-size:13px;font-style:italic;font-weight:900}
+.avatar-card small{font-size:9px;color:#b3c4be;line-height:1.35}
+.avatar-card.selected{border-color:var(--orange);box-shadow:0 0 0 2px #ff653d66}
+.avatar-card.locked{filter:grayscale(.85) brightness(.7)}
+.wiz-row{display:flex;gap:16px;align-items:stretch;flex-wrap:wrap}
+.wiz-row>*:first-child{flex:1;min-width:260px;margin:0}
+.wiz-next{width:auto!important;min-width:240px;align-self:center}
+.cc-card{min-height:200px}
+.cc-num{font-size:54px;font-weight:1000;font-style:italic;letter-spacing:-3px;line-height:.9}
+.cc-num small{font-size:11px;letter-spacing:1px;margin-left:6px;color:#c3d1cb}
+.cc-gauge{display:block;height:6px;border-radius:6px;background:#ffffff18;overflow:hidden;margin-top:auto}
+.cc-gauge i{display:block;height:100%;width:calc(var(--lvl) * 100%);background:linear-gradient(90deg,#3fbf5a,#ffd04a,#ff653d,#ff2a6a)}
+.wiz-left .wiz-summary{display:grid;gap:8px;margin:6px 0 16px}
+.wiz-summary button{display:flex;align-items:center;gap:10px;text-align:left;background:#132d35b8;border:1px solid #ffffff24;border-radius:10px;padding:10px 12px}
+.wiz-summary button:hover{border-color:#ffffff66}
+.wiz-summary small{display:block;font-size:7px;letter-spacing:1.3px;color:#9fb3ad;font-weight:800}
+.wiz-summary b{font-size:13px}
+.wiz-summary .avatar-svg{width:38px;height:38px;flex:none}
+.ghost-info{font-size:10px;line-height:1.6;color:#c8e8f0;background:#5ad8ff14;border:1px solid #5ad8ff40;border-radius:10px;padding:10px 12px;margin-bottom:14px}
+.ghost-info b{color:#fff}
+@media(max-width:800px){.wiz-home{grid-template-columns:1fr}.wiz-cards.two{grid-template-columns:1fr}.wiz-card.big{min-height:150px}.wiz-career{display:none}.wiz-steps button span{display:none}.wiz-steps button{padding:6px}}
+.guest-btn{display:flex;justify-content:space-between;align-items:center;width:100%;margin-top:10px;background:#ffffff0d;border:1px solid #ffffff33;border-radius:4px;padding:13px 18px;font-size:10px;font-weight:900;letter-spacing:1.3px;color:#dce6df}.guest-btn:hover{background:#ffffff1a}
+.menu-layer:has(.wizard-menu){overflow-y:auto;align-items:flex-start;padding-top:96px}
+.avatar-grid{grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:8px;max-height:none}
+.avatar-card{padding:9px 6px 8px}.avatar-card .avatar-svg{width:58px;height:58px}
+@media(min-height:820px){.menu-layer:has(.wizard-menu){align-items:center;padding-top:80px}}

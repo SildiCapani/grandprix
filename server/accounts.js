@@ -79,10 +79,6 @@ function userByToken(token) {
   return null;
 }
 
-// Very small brute-force brake: at most 10 failed logins per IP and 10 minutes.
-const fails = new Map();
-const blocked = ip => { const f = fails.get(ip); return f && f.n >= 10 && Date.now() - f.at < 6e5; };
-const failed = ip => { const f = fails.get(ip); fails.set(ip, f && Date.now() - f.at < 6e5 ? { n: f.n + 1, at: f.at } : { n: 1, at: Date.now() }); };
 
 // Merge an uploaded career into the stored one with the game's own rules (progress never goes backwards).
 function mergeProfile(user, incoming) {
@@ -114,7 +110,6 @@ export async function handleApi(req, res) {
   try {
     const route = req.method + ' ' + url.pathname;
     if (route === 'POST /api/register' || route === 'POST /api/login') {
-      if (blocked(ip)) return send(res, 429, { error: 'Zu viele Versuche. Warte ein paar Minuten.' }), true;
       const { name, password } = await body(req);
       const clean = String(name || '').trim();
       if (!NAME_RE.test(clean)) return send(res, 400, { error: 'Name: 3–16 Zeichen (Buchstaben, Zahlen, Leerzeichen, _ . -).' }), true;
@@ -127,8 +122,7 @@ export async function handleApi(req, res) {
         return send(res, 200, { token, user: publicUser(u), profile: u.profile }), true;
       }
       const u = db.users[k];
-      if (!u || !(await checkPassword(u, password))) { failed(ip); return send(res, 401, { error: 'Name oder Passwort falsch.' }), true; }
-      fails.delete(ip);
+      if (!u || !(await checkPassword(u, password))) { return send(res, 401, { error: 'Name oder Passwort falsch.' }), true; }
       const token = newSession(u); await persist();
       return send(res, 200, { token, user: publicUser(u), profile: u.profile }), true;
     }

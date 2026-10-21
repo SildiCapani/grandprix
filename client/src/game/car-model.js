@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { buildAvatarHead } from './avatars.js';
 import { applySkin } from './skins.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { carbon as carbonWeave, contactShadow } from './surfaces.js';
@@ -82,7 +83,7 @@ const LAYOUT = {
   buggy:    { body: [1.02, 1.05, .95], zf: .5, zr: -.46, x: .5, wf: 1.42, wr: 1.48, lift: .14 },
 };
 
-export function createCar(color = '#e34335', number = '07', kart = 'allround', finish = 'standard', skin = 'none') {
+export function createCar(color = '#e34335', number = '07', kart = 'allround', finish = 'standard', skin = 'none', avatar = 'pilot') {
   const L = LAYOUT[kart] || LAYOUT.allround;
   const car = new THREE.Group();
   car.name = `Mini Formula ${number}`;
@@ -128,13 +129,18 @@ export function createCar(color = '#e34335', number = '07', kart = 'allround', f
   cockpit.scale.z = 1.43;
   // Driver's shoulders and helmet with a wide smoked visor.
   addMesh(body, new THREE.SphereGeometry(.105, 12, 8), darkPaint, 0, .315, -.075).scale.set(1.1, .55, 1);
-  const helmet = addMesh(body, new THREE.SphereGeometry(.094, 16, 10), driver, 0, .401, -.07);
-  helmet.scale.y = .95;
-  const visorMesh = addMesh(body, new THREE.SphereGeometry(.096, 16, 8, -.94, 1.88, 1.02, .75), visor, 0, .407, -.07);
-  // SphereGeometry's visible hemisphere starts at -X; face the visor toward +Z.
-  visorMesh.rotation.y = Math.PI / 2;
-  const helmetStripe = box(body, cream, .027, .006, .11, 0, .489, -.064);
-  helmetStripe.rotation.x = -.14;
+  if (avatar && avatar !== 'pilot') {
+    // A character instead of the helmet: big head, so you can tell who is driving.
+    const head = buildAvatarHead(avatar); head.position.set(0, .45, -.07); head.scale.setScalar(1.05); head.name = 'avatar'; body.add(head);
+  } else {
+    const helmet = addMesh(body, new THREE.SphereGeometry(.094, 16, 10), driver, 0, .401, -.07);
+    helmet.scale.y = .95;
+    const visorMesh = addMesh(body, new THREE.SphereGeometry(.096, 16, 8, -.94, 1.88, 1.02, .75), visor, 0, .407, -.07);
+    // SphereGeometry's visible hemisphere starts at -X; face the visor toward +Z.
+    visorMesh.rotation.y = Math.PI / 2;
+    const helmetStripe = box(body, cream, .027, .006, .11, 0, .489, -.064);
+    helmetStripe.rotation.x = -.14;
+  }
 
   // The halo is a continuous dark arch plus its central nose support.
   const haloPoints = [
@@ -269,7 +275,7 @@ export function createCar(color = '#e34335', number = '07', kart = 'allround', f
   car.userData.frontWheels = frontWheels;
   car.userData.exhaust = exhaust;
   car.userData.materials = {paint, darkPaint, carbon, rubber, rim, cream};
-  car.userData.kart = kart; car.userData.skin = skin || 'none';
+  car.userData.kart = kart; car.userData.skin = skin || 'none'; car.userData.avatar = avatar || 'pilot';
   car.userData.animationTime = Math.random()*10;
   return car;
 }

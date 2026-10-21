@@ -96,6 +96,40 @@ Die Werte stehen in `client/src/game/karts.js`.
 ### Absturz & Rettungsdrohne
 Auf den Strecken 13–18 haben manche Stücke **kein Geländer** (dort fehlen die Leitplanken). Fährst du da über den Rand, stürzt du ins Wasser, in die Schokolade oder in den Nebel. Dann holt dich die **Rettungsdrohne** ab und setzt dich kurz vor der Absturzstelle wieder auf die Straße. Das kostet etwa 2,5 Sekunden. Die KI kann auch runterfallen, zum Beispiel nach einem Panzer-Treffer an der Kante. Online sehen alle die Drohne.
 
+## Startmenü
+Das Menü führt Schritt für Schritt durch die Auswahl:
+1. **Spielart:** Offline oder Online
+2. **Modus:** Grand Prix, Cups, Zeitfahren, Battle oder Strecken-Editor
+3. **Fahrer & Kart:** Avatar wählen; Kart, Lack und Skin in der 3D-Garage
+4. **Klasse:** 80 / 100 / 120 / 150 km/h
+5. **Strecke** (bzw. Cup oder Arena), dann Start
+
+Online geht es nach Schritt 3 direkt in die Lobby. Oben kann man jederzeit auf einen früheren Schritt zurückspringen.
+
+## Fahrer-Avatare
+Elf eigene Figuren, die im Kart sitzen und im Menü als Porträt erscheinen: Rennpilot, Flinn (Fuchs), Pia (Panda), Kater Mo, Robo-7, Fridolin (Frosch), Frost (Pinguin), Zorx (Alien), Ritter Rolf, Nova (Astronautin) und Drako (Drache). Drei sind sofort frei, die anderen kommen mit Level, Rennen oder Siegen (Admins haben alle). Online sehen alle deinen Fahrer, die Bots haben ihre eigenen.
+
+## Zeitfahren: Ghost & Platin
+- Deine beste Fahrt pro Strecke und Klasse wird gespeichert und fährt beim nächsten Zeitfahren als durchsichtiger **Ghost** mit. Schlägst du sie, wird der Ghost ersetzt. Ghosts liegen in diesem Browser (pro Konto).
+- Neu ist die Medaille **Platin** (✦): 8 % schneller als Gold, nur im Zeitfahren.
+
+## Bewegte Hindernisse
+Auf Strecken, wo es passt, kommt einem etwas in die Quere. Treffer schleudern dich wie ein Panzer (Stern und Schutzblase schützen, mit der Feder kann man drüberspringen):
+| Strecke | Hindernis |
+|---|---|
+| Vulkan Inferno | Lavabrocken schlagen auf dem Viadukt ein (roter Ring warnt vorher) |
+| Canyon Sunset | Felsbrocken rollen über die Straße |
+| Gletscherpass, Polarlicht-Fjord | riesige Schneebälle; im Fjord springt ein Orca über die Eisbrücke |
+| Dschungel-Tempel | Tempelkugeln aus Stein |
+| Savannen-Safari | Nashörner überqueren die Piste |
+| Mondbasis, Galaxie | Meteoriten |
+| Piratenbucht | Kanonenkugeln auf dem Steg, ein Kraken-Tentakel schlägt auf eine Straßenhälfte |
+| Zuckerland | rollende Donuts und ein Riesen-Gummibär |
+| Drachenburg | Drachenfeuer auf einer Straßenhälfte (Seite wechselt) |
+| Neon-Dächer | Schwebeautos fliegen tief über die Brücken |
+
+Alles läuft nach der Rennuhr ab, online sehen also alle dasselbe.
+
 ## Neue Items
 | Item | Was es macht |
 |---|---|
@@ -189,6 +223,11 @@ client/
     world.js          Prozedurale 3D-Welten (inkl. Vulkan, Berge, Weltall)
     world-adventure.js Piratenbucht, Zuckerland, Drachenburg, Arktis, Neon-Dächer, Galaxie
     rescue-fx.js      Rettungsdrohne und Platscher beim Absturz
+    item-fx.js        Schutzblase, Tinte, Tausch-Funken
+    obstacles.js      Bewegte Hindernisse (Daten + Zeitablauf)
+    obstacle-fx.js    Hindernisse zeichnen
+    avatars.js        Fahrer-Avatare (3D-Kopf + Porträt)
+    ghost.js          Ghost im Zeitfahren
     car-model.js      Auto-Modelle
     multiplayer.js    Lobby- & Rennprotokoll (Host-Autorität)
     room-signaling.js Raumcodes, P2P-/Server-Verbindung

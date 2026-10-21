@@ -50,6 +50,7 @@ function cleanCar(state) {
     y: finite(state.y) ? clamp(state.y, -60, 80) : 0, fallT: finite(state.fallT) ? clamp(state.fallT, 0, 4) : 0, pitch: finite(state.pitch) ? clamp(state.pitch, -1.2, 1.2) : 0,
     kart: KART_IDS.has(state.kart) ? state.kart : 'allround',
     skin: typeof state.skin === 'string' && /^[a-z]{2,12}$/.test(state.skin) ? state.skin : 'none',
+    avatar: typeof state.avatar === 'string' && /^[a-z]{2,12}$/.test(state.avatar) ? state.avatar : 'pilot',
     finish: ['standard', 'gold', 'chrome', 'neon'].includes(state.finish) ? state.finish : 'standard', mass: finite(state.mass) ? clamp(state.mass, .5, 2) : 1,
     trail: ['banana', 'green', 'red'].includes(state.trail) ? state.trail : null,
     star: state.star === true, rocket: state.rocket === true, spinA: finite(state.spinA) ? clamp(state.spinA, 0, 40) : 0,

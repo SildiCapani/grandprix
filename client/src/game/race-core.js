@@ -1,5 +1,6 @@
 import { getTrack, RAMP_H, RAMP_LEN } from './tracks.js';
 import { kartById } from './karts.js';
+import { buildObstacles, hazardsAt } from './obstacles.js';
 
 // Compact, dependency-free arcade physics. Units are metres and seconds.
 // v5: faster cars (80 km/h top speed), no turbo meter – instead a kart-style
@@ -108,13 +109,13 @@ function rollItem(frac, lastTwo = false, rnd = Math.random) {
 //  aggr   – 0 clean racer … 1 rammer who blocks and leans on you
 //  itemIQ – how cleverly they time their items
 export const RIVAL_ROSTER = Object.freeze([
-  { name: 'Apex Phantom',      tag: 'PROFI',      color: 0x54e7c7, number: '03', pace: 22.9, corner: .85, aggr: .25, itemIQ: .9,  mass: 1.0 , kart: 'bolide' },
-  { name: 'Brutus Motorsport', tag: 'SCHWER',     color: 0xffcf4a, number: '12', pace: 22.0, corner: .55, aggr: .55, itemIQ: .5,  mass: 1.45 , kart: 'brummer' },
-  { name: 'Volt Hornets',      tag: 'HEISSSPORN', color: 0xbda0ff, number: '19', pace: 22.6, corner: .9,  aggr: .7,  itemIQ: .6,  mass: .95 , kart: 'flitzer' },
-  { name: 'Iron Ramblers',     tag: 'RAMMBOCK',   color: 0xff5a8a, number: '26', pace: 21.7, corner: .6,  aggr: .95, itemIQ: .4,  mass: 1.3 , kart: 'brummer' },
-  { name: 'Kobalt Racing',     tag: 'TAKTIKER',   color: 0x7ad35a, number: '31', pace: 22.3, corner: .75, aggr: .35, itemIQ: 1,   mass: 1.0 , kart: 'drifter' },
-  { name: 'Nordlicht GP',      tag: 'VORSICHTIG', color: 0x5aa7ff, number: '44', pace: 21.2, corner: .45, aggr: .1,  itemIQ: .7,  mass: 1.05 , kart: 'allround' },
-  { name: 'Comet Rookies',     tag: 'ROOKIE',     color: 0xff9a3d, number: '58', pace: 20.6, corner: .4,  aggr: .45, itemIQ: .3,  mass: .9 , kart: 'buggy' },
+  { name: 'Apex Phantom',      tag: 'PROFI',      color: 0x54e7c7, number: '03', pace: 22.9, corner: .85, aggr: .25, itemIQ: .9,  mass: 1.0 , kart: 'bolide' , avatar: 'robot' },
+  { name: 'Brutus Motorsport', tag: 'SCHWER',     color: 0xffcf4a, number: '12', pace: 22.0, corner: .55, aggr: .55, itemIQ: .5,  mass: 1.45 , kart: 'brummer' , avatar: 'knight' },
+  { name: 'Volt Hornets',      tag: 'HEISSSPORN', color: 0xbda0ff, number: '19', pace: 22.6, corner: .9,  aggr: .7,  itemIQ: .6,  mass: .95 , kart: 'flitzer' , avatar: 'fox' },
+  { name: 'Iron Ramblers',     tag: 'RAMMBOCK',   color: 0xff5a8a, number: '26', pace: 21.7, corner: .6,  aggr: .95, itemIQ: .4,  mass: 1.3 , kart: 'brummer' , avatar: 'dragon' },
+  { name: 'Kobalt Racing',     tag: 'TAKTIKER',   color: 0x7ad35a, number: '31', pace: 22.3, corner: .75, aggr: .35, itemIQ: 1,   mass: 1.0 , kart: 'drifter' , avatar: 'cat' },
+  { name: 'Nordlicht GP',      tag: 'VORSICHTIG', color: 0x5aa7ff, number: '44', pace: 21.2, corner: .45, aggr: .1,  itemIQ: .7,  mass: 1.05 , kart: 'allround' , avatar: 'penguin' },
+  { name: 'Comet Rookies',     tag: 'ROOKIE',     color: 0xff9a3d, number: '58', pace: 20.6, corner: .4,  aggr: .45, itemIQ: .3,  mass: .9 , kart: 'buggy' , avatar: 'frog' },
 ].map(r => Object.freeze(r)));
 
 export const GRID_SIZE = RIVAL_ROSTER.length + 1;
@@ -200,6 +201,7 @@ export class RaceCore {
     this.keepBotsRacing = false;
     this.boxes = itemBoxLayout(this.track);
     this.pads = boostPadLayout(this.track);
+    this.obstacles = buildObstacles(this.track); this.hazards = [];
     this.shells = [];
     this.bananas = [];
     this.blueCount = 0;
@@ -519,6 +521,7 @@ export class RaceCore {
     if (this.rivals.length) this._collideCars();
     if (this.externals.length) this._collideExternal();
     if (this.itemsEnabled) this._stepItems(dt);
+    if (this.obstacles.length && this.mode !== 'battle') this._stepObstacles();
 
     if (this.mode === 'battle') this._battleTick(dt);
     if (this.mode === 'battle' && this.status === 'racing') this._checkBattleEnd();
@@ -862,6 +865,19 @@ export class RaceCore {
     }
     this.emit('item', { item: isMushroom(item) ? 'mushroom' : item, by: c === this.player ? 'player' : 'bot', name: c.name, backward });
     return item;
+  }
+  // Moving obstacles: whatever is "hot" right now spins out the cars it touches (bubble and star protect, jumping over works).
+  _stepObstacles() {
+    this.hazards = hazardsAt(this.track, this.obstacles, this.elapsed);
+    for (const h of this.hazards) {
+      if (!h.hot) continue;
+      for (const c of [this.player, ...this.rivals]) {
+        if (c.fallT > 0 || c.ghost > 0 || c.out) continue;
+        const dx = c.x - h.x, dz = c.z - h.z, reach = h.r + .7;
+        if (dx * dx + dz * dz > reach * reach || Math.abs(c.y - h.y) > h.r + 1.2) continue;
+        if (this._hit(c, 'obstacle', null) && c === this.player) this.emit('obstaclehit', { kind: h.kind, x: c.x, z: c.z });
+      }
+    }
   }
   // Spring: a high hop on the spot – over shells, bananas and gaps. Landing gives the usual trick boost.
   _spring(c) {
@@ -1210,6 +1226,13 @@ export class RaceCore {
       for (const pad of this.pads) {
         const ds = (wrap(pad.t - bot.t + .5) - .5) * L;
         if (ds > 8 && ds < 45 && bot.itemIQ > .35) { lane = pad.lane; break; }
+      }
+      // moving obstacles ahead: steer to the other side of the road (careful drivers ease off a little)
+      for (const h of this.hazards) {
+        if (!(h.hot || h.warn > .3)) continue;
+        const ds = (wrap(h.t - bot.t + .5) - .5) * L;
+        if (ds < 2 || ds > 32 || Math.abs(h.lane - lane) > h.r + 2) continue;
+        if (Math.random() < .25 + bot.itemIQ * .75) { lane = clamp(h.lane + (h.lane > 0 ? -(h.r + 2.6) : h.r + 2.6), -laneMax, laneMax); if (bot.corner < .5) target *= .97; }
       }
       if (this._draftFor(bot, bot.progress, others)) target += (DRAFT_BONUS * K) * .8;
       if (bot.offroad || bot.route) target = Math.min(bot.pace, Math.max(target, bot.pace * .9));
