@@ -1,6 +1,6 @@
 # Apex Rush 🏁
 
-3D-Kart-Racer (three.js) mit Items, Power-Drifts, Boost-Pads, 6 Fahrzeugen (3D-Garage), 12 Strecken, Grand-Prix-Cups mit Siegerpodest, Ballon-Battle, Strecken-Editor, optionaler Karriere mit Aufträgen und Speed-Klassen 80/100/120 km/h.
+3D-Kart-Racer (three.js) mit Items, Power-Drifts, Boost-Pads, 6 Fahrzeugen (3D-Garage), 18 Strecken, Grand-Prix-Cups mit Siegerpodest, Ballon-Battle, Strecken-Editor, optionaler Karriere mit Aufträgen und Speed-Klassen 80/100/120/150 km/h.
 Online-Multiplayer läuft über einen **eigenen Node.js-Server** (Raumcodes, bis 8 Fahrer, KI-Auffüllung).
 
 ## Voraussetzungen
@@ -95,6 +95,15 @@ Die Werte stehen in `client/src/game/karts.js`.
 
 ### Absturz & Rettungsdrohne
 Auf den Strecken 13–18 haben manche Stücke **kein Geländer** (dort fehlen die Leitplanken). Fährst du da über den Rand, stürzt du ins Wasser, in die Schokolade oder in den Nebel. Dann holt dich die **Rettungsdrohne** ab und setzt dich kurz vor der Absturzstelle wieder auf die Straße. Das kostet etwa 2,5 Sekunden. Die KI kann auch runterfallen, zum Beispiel nach einem Panzer-Treffer an der Kante. Online sehen alle die Drohne.
+
+## Neue Items
+| Item | Was es macht |
+|---|---|
+| Feder | Hoher Sprung aus dem Stand: über Panzer, Bananen und Lücken. Beim Landen gibt es den Trick-Boost. Auf Strecken ohne Geländer kannst du dich damit aber auch selbst runterkatapultieren. |
+| Schutzblase | Eine schillernde Blase um dein Kart, die genau einen Treffer abwehrt (auch den blauen Panzer). Hält 12 Sekunden. |
+| Tauschwürfel | Du tauschst Platz, Position und Tempo mit dem Fahrer direkt vor dir. Gibt es nur ab Platz 4. Bots tauschen nie mit dir. |
+| Tintenklecks | Alle vor dir bekommen 4,5 Sekunden Tintenkleckse auf den Bildschirm. Bots fahren dann langsamer und schlingern. Wirkt auch online. |
+| Ballonpumpe | Nur im Ballon-Battle: +1 Ballon (bis 5). |
 
 ## Spielmodi
 | Modus | Worum es geht |

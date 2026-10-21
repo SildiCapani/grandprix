@@ -16,6 +16,8 @@ export function buildAdventure(ctx) {
   const fbm = (x, z) => Math.sin(x * .021 + Math.sin(z * .013) * 2) * .5 + Math.sin(z * .027 + x * .009) * .35 + Math.sin((x + z) * .061) * .15;
   const lerp = (a, b, k) => a + (b - a) * k;
   const add = (o, x, y, z) => { o.position.set(x, y, z); group.add(o); return o; };
+  // Shortcut decoration must never reach onto the main road (the corridor ends meet the road).
+  const offRoad = (x, z, margin) => track.nearest(x, z).distance > W / 2 + margin;
 
   // ---------- terrain shaped by the course ----------
   let terrainH = () => fallY - 5;
@@ -297,8 +299,8 @@ export function buildAdventure(ctx) {
       const cave = std(0x9a8c7a, { roughness: 1, flatShading: true });
       for (let k = Math.floor(sc.pts.length * .3); k < sc.pts.length * .7; k += 2) {
         const p = sc.pts[k], o = sc.pts[Math.min(sc.pts.length - 1, k + 1)], aa = Math.atan2(o.x - p.x, o.z - p.z), cx = Math.cos(aa), cz = -Math.sin(aa);
-        for (const sd of [-1, 1]) inst(G.rock, cave, M(p.x + cx * sd * (sc.width / 2 + 2.6), p.y + 2.5, p.z + cz * sd * (sc.width / 2 + 2.6), 3.2, 4.5 + r() * 2, 3.2, r() * 6));
-        inst(G.rock, cave, M(p.x, p.y + 7.4, p.z, sc.width / 2 + 4, 2.4, 3.4, aa));
+        for (const sd of [-1, 1]) { const x = p.x + cx * sd * (sc.width / 2 + 2.6), z = p.z + cz * sd * (sc.width / 2 + 2.6); if (offRoad(x, z, 4.2)) inst(G.rock, cave, M(x, p.y + 2.5, z, 3.2, 4.5 + r() * 2, 3.2, r() * 6)); }
+        if (offRoad(p.x, p.z, sc.width / 2 + 5)) inst(G.rock, cave, M(p.x, p.y + 7.4, p.z, sc.width / 2 + 4, 2.4, 3.4, aa));
       }
       for (const sd of [-1, 1]) { const tx = mid.x + nx * sd * 7, tz = mid.z + nz * sd * 7; flame(tx, mid.y + 3, tz, 1.4); }
       // the skull rock next to the cave entry
@@ -537,8 +539,8 @@ export function buildAdventure(ctx) {
       const ruin = std(0xb8b0a0, { roughness: 1, flatShading: true });
       for (let k = 2; k < sc.pts.length - 2; k += 3) {
         const p = sc.pts[k], o = sc.pts[k + 1], a = Math.atan2(o.x - p.x, o.z - p.z), cx = Math.cos(a), cz = -Math.sin(a);
-        for (const sd of [-1, 1]) { const h = 2 + r() * 6; inst(G.box, ruin, M(p.x + cx * sd * (sc.width / 2 + 1.4), p.y + h / 2, p.z + cz * sd * (sc.width / 2 + 1.4), 1.2, h, 2.6, a)); }
-        if (k % 9 === 2) { const arch = add(new THREE.Mesh(new THREE.TorusGeometry(sc.width / 2 + 1.4, .7, 8, 20, Math.PI), ruin), p.x, p.y + 5, p.z); arch.rotation.y = a + Math.PI / 2; arch.castShadow = true; }
+        for (const sd of [-1, 1]) { const h = 2 + r() * 6, x = p.x + cx * sd * (sc.width / 2 + 1.4), z = p.z + cz * sd * (sc.width / 2 + 1.4); if (offRoad(x, z, 2.6)) inst(G.box, ruin, M(x, p.y + h / 2, z, 1.2, h, 2.6, a)); }
+        if (k % 9 === 2 && offRoad(p.x, p.z, sc.width / 2 + 3)) { const arch = add(new THREE.Mesh(new THREE.TorusGeometry(sc.width / 2 + 1.4, .7, 8, 20, Math.PI), ruin), p.x, p.y + 5, p.z); arch.rotation.y = a + Math.PI / 2; arch.castShadow = true; }
       }
       const mid = sc.pts[Math.floor(sc.pts.length / 2)]; flame(mid.x, mid.y + 6.5, mid.z, 2.4, 0x8ab8ff);
     }
@@ -714,8 +716,8 @@ export function buildAdventure(ctx) {
     const sc = track.shortcuts[0];
     if (sc) for (let k = 2; k < sc.pts.length - 2; k += 2) {
       const p = sc.pts[k], o = sc.pts[k + 1], a = Math.atan2(o.x - p.x, o.z - p.z), cx = Math.cos(a), cz = -Math.sin(a);
-      for (const sd of [-1, 1]) inst(G.rock, iceSolid, M(p.x + cx * sd * (sc.width / 2 + 2.4), p.y + 2.6, p.z + cz * sd * (sc.width / 2 + 2.4), 2.8, 4.6 + r() * 2, 3, r() * 6));
-      if (k > sc.pts.length * .25 && k < sc.pts.length * .75) { inst(G.box, ice, M(p.x, p.y + 6.6, p.z, sc.width + 6, 1.2, 3.2, a), { cast: false }); for (let j = 0; j < 3; j++) inst(G.cone, ice, M(p.x + cx * (r() - .5) * sc.width, p.y + 5.4, p.z + cz * (r() - .5) * sc.width, .25, 1.6, .25, 0, Math.PI), { cast: false }); }
+      for (const sd of [-1, 1]) { const x = p.x + cx * sd * (sc.width / 2 + 2.4), z = p.z + cz * sd * (sc.width / 2 + 2.4); if (offRoad(x, z, 4)) inst(G.rock, iceSolid, M(x, p.y + 2.6, z, 2.8, 4.6 + r() * 2, 3, r() * 6)); }
+      if (k > sc.pts.length * .25 && k < sc.pts.length * .75 && offRoad(p.x, p.z, sc.width / 2 + 4)) { inst(G.box, ice, M(p.x, p.y + 6.6, p.z, sc.width + 6, 1.2, 3.2, a), { cast: false }); for (let j = 0; j < 3; j++) inst(G.cone, ice, M(p.x + cx * (r() - .5) * sc.width, p.y + 5.4, p.z + cz * (r() - .5) * sc.width, .25, 1.6, .25, 0, Math.PI), { cast: false }); }
     }
     // ---- a husky sled running along the shore ----
     {

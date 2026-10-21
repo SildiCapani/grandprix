@@ -44,8 +44,9 @@ function cleanCar(state) {
   return {
     // Outdoor circuits span roughly ±260 m.
     x: clamp(state.x, -400, 400), z: clamp(state.z, -400, 400), angle: state.angle % (Math.PI * 2),
-    speed: clamp(state.speed, -40, 40), steer: finite(state.steer) ? clamp(state.steer, -1, 1) : 0,
-    vx: finite(state.vx) ? clamp(state.vx, -30, 30) : 0, vz: finite(state.vz) ? clamp(state.vz, -30, 30) : 0,
+    speed: clamp(state.speed, -60, 60), steer: finite(state.steer) ? clamp(state.steer, -1, 1) : 0,
+    vx: finite(state.vx) ? clamp(state.vx, -60, 60) : 0, vz: finite(state.vz) ? clamp(state.vz, -60, 60) : 0,
+    bubble: state.bubble === true, ink: finite(state.ink) ? clamp(Math.floor(state.ink), 0, 999) : 0,
     y: finite(state.y) ? clamp(state.y, -60, 80) : 0, fallT: finite(state.fallT) ? clamp(state.fallT, 0, 4) : 0, pitch: finite(state.pitch) ? clamp(state.pitch, -1.2, 1.2) : 0,
     kart: KART_IDS.has(state.kart) ? state.kart : 'allround',
     skin: typeof state.skin === 'string' && /^[a-z]{2,12}$/.test(state.skin) ? state.skin : 'none',
@@ -56,10 +57,10 @@ function cleanCar(state) {
       .map(it => ({type: it.type, x: clamp(it.x, -400, 400), z: clamp(it.z, -400, 400), y: finite(it.y) ? clamp(it.y, -5, 80) : 0, b: it.b === 1 ? 1 : undefined})) : [],
     // Host-simulated AI drivers (online fill-up) and item hits that guests report on them.
     bots: Array.isArray(state.bots) ? state.bots.slice(0, 7).filter(b => b && ['x', 'z', 'a', 's', 'p'].every(k => finite(b[k]))).map(b => ({
-      n: finite(b.n) ? clamp(Math.floor(b.n), 0, 6) : 0, x: clamp(b.x, -400, 400), z: clamp(b.z, -400, 400), y: finite(b.y) ? clamp(b.y, -60, 80) : 0, fa: finite(b.fa) ? clamp(b.fa, 0, 4) : 0, pi: finite(b.pi) ? clamp(b.pi, -1.2, 1.2) : 0, a: b.a % (Math.PI * 2), s: clamp(b.s, -40, 40),
-      vx: finite(b.vx) ? clamp(b.vx, -45, 45) : 0, vz: finite(b.vz) ? clamp(b.vz, -45, 45) : 0, sp: finite(b.sp) ? clamp(b.sp, 0, 40) : 0, p: clamp(b.p, -.2, 4),
+      n: finite(b.n) ? clamp(Math.floor(b.n), 0, 6) : 0, x: clamp(b.x, -400, 400), z: clamp(b.z, -400, 400), y: finite(b.y) ? clamp(b.y, -60, 80) : 0, fa: finite(b.fa) ? clamp(b.fa, 0, 4) : 0, pi: finite(b.pi) ? clamp(b.pi, -1.2, 1.2) : 0, a: b.a % (Math.PI * 2), s: clamp(b.s, -60, 60), bu: b.bu === 1 ? 1 : undefined,
+      vx: finite(b.vx) ? clamp(b.vx, -70, 70) : 0, vz: finite(b.vz) ? clamp(b.vz, -70, 70) : 0, sp: finite(b.sp) ? clamp(b.sp, 0, 40) : 0, p: clamp(b.p, -.2, 4),
       st: b.st === true, rk: b.rk === true, tr: ['banana', 'green', 'red'].includes(b.tr) ? b.tr : undefined, b: b.b === true, dt: finite(b.dt) ? clamp(Math.floor(b.dt), 0, 3) : 0, dr: finite(b.dr) ? clamp(Math.sign(b.dr), -1, 1) : 0 })) : [],
-    hits: Array.isArray(state.hits) ? state.hits.slice(0, 8).filter(h => h && typeof h.id === 'string' && h.id.length < 30 && finite(h.bot) && ['green', 'red', 'banana', 'star', 'blue'].includes(h.k))
+    hits: Array.isArray(state.hits) ? state.hits.slice(0, 8).filter(h => h && typeof h.id === 'string' && h.id.length < 30 && finite(h.bot) && ['green', 'red', 'banana', 'star', 'blue', 'ink'].includes(h.k))
       .map(h => ({id: h.id, bot: clamp(Math.floor(h.bot), 0, 6), k: h.k})) : [],
     boosting: state.boosting === true, drifting: state.drifting === true,
     progress: clamp(state.progress, -.2, 4), lap: finite(state.lap) ? clamp(Math.floor(state.lap), 0, 4) : 0,
@@ -286,7 +287,7 @@ export class MultiplayerSession {
     if (!peer.ready) return;
     if (data.type === 'start' && idOf(data.race?.id) && finite(data.race.startAt)) {
       if (this._state.race?.id === data.race.id) return;
-      this._state.status = 'racing'; this._state.race = {id: data.race.id, startAt: data.race.startAt, status: 'racing', cc: [80, 100, 120].includes(data.race.cc) ? data.race.cc : 80};
+      this._state.status = 'racing'; this._state.race = {id: data.race.id, startAt: data.race.startAt, status: 'racing', cc: [80, 100, 120, 150].includes(data.race.cc) ? data.race.cc : 80};
       this._state.players.forEach(p => { p.progress = 0; p.finishedTime = null; p.dnf = false; });
       this._change(); this.onEvent({type: 'start', race: clone(this._state.race)}); return;
     }
@@ -338,7 +339,7 @@ export class MultiplayerSession {
   startRace(extra = {}) {
     if (!this.canStart) throw new Error('Mindestens zwei verbundene Fahrer müssen bereit sein.');
     this._state.status = 'racing'; this._state.error = ''; this._firstFinish = 0;
-    this._state.race = {id: uid(), startAt: Date.now() + 4000, status: 'racing', cc: [80, 100, 120].includes(extra.cc) ? extra.cc : 80};
+    this._state.race = {id: uid(), startAt: Date.now() + 4000, status: 'racing', cc: [80, 100, 120, 150].includes(extra.cc) ? extra.cc : 80};
     this._state.players.forEach(p => { p.progress = 0; p.finishedTime = null; p.dnf = false; delete p.finish; });
     // Offers without a completed handshake cannot join a race in progress.
     for (const [id, peer] of this._peers) if (!peer.ready) this._closePeer(id);

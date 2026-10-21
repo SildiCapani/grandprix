@@ -6,8 +6,8 @@ const MAPS = [{ id: 'coast', xp: 0 }, { id: 'canyon', xp: 0 }, { id: 'neon', xp:
 const MEDALS = ['none', 'bronze', 'silver', 'gold'];
 const THRESHOLDS = [0, 500, 1200, 2200, 3600, 5500, 8000];
 const TITLES = ['Rookie', 'Kurven-Talent', 'Drift-Pilot', 'Rennprofi', 'Apex-Jäger', 'Grand-Prix-Champion', 'Legende'];
-// Records are kept per speed class: 'race' = 80 km/h, 'race100', 'race120' …
-const MODES = ['race', 'time', 'online', 'race100', 'time100', 'online100', 'race120', 'time120', 'online120'];
+// Records are kept per speed class: 'race' = 80 km/h, 'race100', 'race120', 'race150' …
+const MODES = ['race', 'time', 'online', 'race100', 'time100', 'online100', 'race120', 'time120', 'online120', 'race150', 'time150', 'online150'];
 const baseMode = m => String(m).replace(/\d+$/, '');
 let resultCounter = 0;
 
