@@ -35,3 +35,28 @@ export function kartStats(k) {
     ['OFFROAD', bar(k.offroad, .32, .88)],
   ];
 }
+
+// Wheels for the garage: they shift the kart's stats a little (multipliers, offroad is added).
+//   look: r = radius factor, w = width factor, knob = offroad studs, rim = rim colour ('paint' = kart colour), tread = tyre colour
+export const WHEELS = Object.freeze([
+  { id: 'standard', name: 'Standard', tag: 'AUSGEWOGEN', desc: 'Die Serienräder. Keine Stärken, keine Schwächen.', level: 1,
+    mod: {}, look: { r: 1, w: 1, knob: null, rim: 'paint' } },
+  { id: 'slick', name: 'Slicks', tag: 'TEMPO', desc: 'Profillose Rennreifen: mehr Topspeed auf Asphalt, aber rutschig im Gelände.', level: 2,
+    mod: { top: 1.022, offroad: -.08, turn: 1.03 }, look: { r: .95, w: 1.25, knob: false, rim: '#e8ecf0', band: '#ffd400' } },
+  { id: 'studs', name: 'Stollen', tag: 'OFFROAD', desc: 'Grobe Stollen: im Gras und Sand kaum langsamer, auf der Straße etwas träger.', level: 2,
+    mod: { top: .99, offroad: .2 }, look: { r: 1.08, w: 1.15, knob: true, rim: '#3a3a40' } },
+  { id: 'drift', name: 'Drift-Räder', tag: 'DRIFT', desc: 'Weiche Mischung: Mini-Turbos laden deutlich schneller, dafür etwas weniger Grip.', level: 3,
+    mod: { drift: 1.18, turn: .96, accel: .97 }, look: { r: .98, w: 1.05, knob: false, rim: '#ff4ad8', band: '#ff4ad8' } },
+  { id: 'light', name: 'Leichtfelgen', tag: 'BESCHL.', desc: 'Superleicht: zieht schneller los, wird aber leichter weggerammt.', level: 4,
+    mod: { accel: 1.12, mass: .9, top: .995 }, look: { r: .92, w: .85, knob: false, rim: '#3ab8ff', spokes: 3 } },
+  { id: 'monster', name: 'Monster-Räder', tag: 'GEWICHT', desc: 'Riesige Ballonreifen: schwer, robust und gut im Gelände. Langsamer beim Anfahren.', level: 5,
+    mod: { mass: 1.25, offroad: .12, accel: .93, top: 1.005 }, look: { r: 1.32, w: 1.45, knob: true, rim: '#ffd400' } },
+  { id: 'gold', name: 'Goldräder', tag: 'LEGENDE', desc: 'Für echte Champions: ein bisschen besser in allem.', level: 8,
+    mod: { top: 1.008, accel: 1.03, drift: 1.04, offroad: .03 }, look: { r: 1, w: 1.05, knob: false, rim: '#f2c040', band: '#f2c040', gold: true } },
+].map(w => Object.freeze(w)));
+export const wheelById = id => WHEELS.find(w => w.id === id) || WHEELS[0];
+// Kart stats with a set of wheels on.
+export function withWheels(k, wheelId) {
+  const m = wheelById(wheelId).mod;
+  return { ...k, top: k.top * (m.top || 1), accel: k.accel * (m.accel || 1), turn: k.turn * (m.turn || 1), mass: k.mass * (m.mass || 1), drift: k.drift * (m.drift || 1), offroad: Math.min(.95, k.offroad + (m.offroad || 0)) };
+}

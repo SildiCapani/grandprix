@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { buildAdventure, ADVENTURE_THEMES } from './world-adventure.js';
 import { buildLife } from './world-life.js';
+import { sculpt } from './sculpt.js';
 import { giraffe as cartoonGiraffe, elephant as cartoonElephant, zebra as cartoonZebra } from './critters.js';
 
 // Three complete outdoor worlds, generated procedurally around the track:
@@ -78,7 +79,10 @@ export function createWorld(map, track) {
   const hex = c => c ? c.getHexString() : '';
   const matKey = m => m.userData.live ? m.uuid : [m.type, hex(m.color), hex(m.emissive), m.emissiveIntensity, m.roughness, m.metalness, m.flatShading,
     m.side, m.transparent, m.opacity, m.toneMapped, m.depthWrite, m.vertexColors, m.fog, m.map?.uuid, m.emissiveMap?.uuid, m.alphaMap?.uuid, m.bumpMap?.uuid, m.roughnessMap?.uuid].join('|');
+  // Rounded vegetation / hills: these shapes are drawn with smooth shading even if the material asked for flat facets.
+  const softMats = new Map();
   function inst(geo, mat, matrix, opts = {}) {
+    if (mat.flatShading && SOFT.has(geo)) { let m = softMats.get(mat.uuid); if (!m) { m = mat.clone(); m.flatShading = false; softMats.set(mat.uuid, m); } mat = m; }
     const key = geo.uuid + '#' + matKey(mat) + '#' + (opts.cast !== false) + '#' + !!opts.color;
     if (!pools.has(key)) pools.set(key, { geo, mat, list: [], cast: opts.cast !== false, colors: [] });
     const pool = pools.get(key); pool.list.push(matrix); if (opts.color) pool.colors.push(opts.color);
@@ -89,12 +93,16 @@ export function createWorld(map, track) {
     box: new THREE.BoxGeometry(1, 1, 1),
     cyl: new THREE.CylinderGeometry(1, 1, 1, 10),
     cylLow: new THREE.CylinderGeometry(1, 1, 1, 6),
-    cone: new THREE.ConeGeometry(1, 1, 8),
+    cone: new THREE.ConeGeometry(1, 1, 16),
     roof: new THREE.ConeGeometry(.75, 1, 4),
     ico: new THREE.IcosahedronGeometry(1, 1),
     rock: new THREE.IcosahedronGeometry(1, 0),
-    sphere: new THREE.SphereGeometry(1, 12, 8),
+    sphere: new THREE.SphereGeometry(1, 18, 12),
+    // puffy cartoon foliage: a few balls melted together (see sculpt.js), about unit size
+    puff: (() => { const g = sculpt([{ e: [0, -.1, 0], r: [.78, .7, .78], c: 0xffffff }, { e: [.5, .05, .15], r: [.5, .48, .5], c: 0xffffff }, { e: [-.45, .1, -.2], r: [.52, .5, .52], c: 0xffffff }, { e: [.05, .2, .5], r: [.48, .46, .48], c: 0xffffff }, { e: [-.1, .2, -.5], r: [.46, .44, .46], c: 0xffffff }, { e: [0, .5, 0], r: [.52, .45, .52], c: 0xffffff }], { k: .3, res: 20 }).clone(); g.deleteAttribute('color'); g.computeBoundingBox(); const b = g.boundingBox, s = 2 / Math.max(b.max.x - b.min.x, b.max.z - b.min.z); g.translate(0, -(b.min.y + b.max.y) / 2, 0); g.scale(s, s, s); return g; })(),
+    hill: new THREE.SphereGeometry(1, 32, 16),
   };
+  const SOFT = new Set([G.puff, G.hill, G.cone, G.sphere, G.cyl]);
   G.roof.rotateY(Math.PI / 4);
   const std = (color, o = {}) => new THREE.MeshStandardMaterial({ color, roughness: .85, metalness: 0, ...o });
 
@@ -274,7 +282,7 @@ export function createWorld(map, track) {
     const hillMat = std(0x6f8f4e, { roughness: 1, flatShading: true }), cliffMat = std(0xa39a88, { roughness: 1, flatShading: true });
     for (let i = 0; i < 26; i++) {
       const a = -Math.PI * .05 - r() * Math.PI * 1.1, d = 420 + r() * 600;
-      inst(G.ico, i % 3 ? hillMat : cliffMat, M(Math.cos(a) * d, -10, Math.sin(a) * d * .9 - 60, 120 + r() * 160, 40 + r() * 90, 110 + r() * 120, r() * 6), { cast: false });
+      inst(G.hill, i % 3 ? hillMat : cliffMat, M(Math.cos(a) * d, -10, Math.sin(a) * d * .9 - 60, 120 + r() * 160, 40 + r() * 90, 110 + r() * 120, r() * 6), { cast: false });
     }
     // villas on the hillside
     const wallMat = std(0xf6f1e7, { roughness: .7 }), roofMat = std(0xb5532c, { roughness: .8 }), shutter = std(0x2f7f9e);
@@ -290,7 +298,7 @@ export function createWorld(map, track) {
     scatter(110, 9, 300, (x, z) => palm(x, z, 6 + r() * 5));
     // shrubs and flowers
     const bush = std(0x4f7d3a, { roughness: .9, flatShading: true }), flower = [std(0xe94f87), std(0xf7c948), std(0xffffff)];
-    scatter(450, 6, 320, (x, z) => { inst(G.ico, bush, M(x, .4, z, 1 + r() * 1.4, .8 + r(), 1 + r() * 1.4)); if (r() < .5) inst(G.sphere, flower[Math.floor(r() * 3)], M(x + 1, .3, z, .25, .25, .25), { cast: false }); });
+    scatter(450, 6, 320, (x, z) => { inst(G.puff, bush, M(x, .4, z, 1 + r() * 1.4, .8 + r(), 1 + r() * 1.4)); if (r() < .5) inst(G.sphere, flower[Math.floor(r() * 3)], M(x + 1, .3, z, .25, .25, .25), { cast: false }); });
   }
 
   function buildDesert() {
@@ -336,7 +344,7 @@ export function createWorld(map, track) {
     });
     // boulders and dry brush
     const boulder = std(0x9c5a3a, { roughness: 1, flatShading: true }), brush = std(0x8a7a4a, { roughness: 1, flatShading: true });
-    scatter(380, 6, 420, (x, z) => { if (r() < .5) inst(G.rock, boulder, M(x, .2, z, .6 + r() * 2.4, .4 + r() * 1.6, .6 + r() * 2.2, r() * 6)); else inst(G.ico, brush, M(x, .3, z, .7 + r() * .6, .45, .7 + r() * .6), { cast: false }); });
+    scatter(380, 6, 420, (x, z) => { if (r() < .5) inst(G.rock, boulder, M(x, .2, z, .6 + r() * 2.4, .4 + r() * 1.6, .6 + r() * 2.2, r() * 6)); else inst(G.puff, brush, M(x, .3, z, .7 + r() * .6, .45, .7 + r() * .6), { cast: false }); });
     // roadside motel with a neon sign near the start
     {
       const [mx, mz] = at(60, W / 2 + 34), wall = std(0xe8c9a0), roof = std(0x7a4b33);
@@ -541,7 +549,7 @@ export function createWorld(map, track) {
     });
     // distant ridges
     const ridge = std(0x1f1a1a, { roughness: 1, flatShading: true });
-    for (let i = 0; i < 22; i++) { const a = r() * Math.PI * 2, d = 650 + r() * 450; if (Math.abs(Math.atan2(Math.sin(a + Math.PI / 2), Math.cos(a + Math.PI / 2))) < .4) continue; inst(G.ico, ridge, M(Math.cos(a) * d, -15, Math.sin(a) * d, 90 + r() * 140, 40 + r() * 80, 90 + r() * 120, r() * 6), { cast: false }); }
+    for (let i = 0; i < 22; i++) { const a = r() * Math.PI * 2, d = 650 + r() * 450; if (Math.abs(Math.atan2(Math.sin(a + Math.PI / 2), Math.cos(a + Math.PI / 2))) < .4) continue; inst(G.hill, ridge, M(Math.cos(a) * d, -15, Math.sin(a) * d, 90 + r() * 140, 40 + r() * 80, 90 + r() * 120, r() * 6), { cast: false }); }
     // floating embers and ash
     weather(700, 0xff8a3a, .32, 2.2, 80, 30, 2.5);
     weather(500, 0x6a5a58, .25, 1.2, 80, 30, 1.5);
@@ -694,7 +702,7 @@ export function createWorld(map, track) {
   }
   function leafyTree(x, z, h, trunkMat, leafMats, spread = 1) {
     inst(G.cylLow, trunkMat, M(x, h * .45, z, .35 * spread, h * .9, .35 * spread));
-    for (let k = 0; k < 4; k++) inst(G.ico, leafMats[k % leafMats.length], M(x + (r() - .5) * 2.2 * spread, h * (.85 + r() * .25), z + (r() - .5) * 2.2 * spread, (1.8 + r() * 1.4) * spread, (1.3 + r() * .9) * spread, (1.8 + r() * 1.4) * spread, r() * 6));
+    for (let k = 0; k < 4; k++) inst(G.puff, leafMats[k % leafMats.length], M(x + (r() - .5) * 2.2 * spread, h * (.85 + r() * .25), z + (r() - .5) * 2.2 * spread, (1.8 + r() * 1.4) * spread, (1.3 + r() * .9) * spread, (1.8 + r() * 1.4) * spread, r() * 6));
   }
 
   function buildJungle() {
@@ -730,7 +738,7 @@ export function createWorld(map, track) {
     for (let i = 0; i < 160; i++) { const t = r(), s = track.sample(t), side = r() < .5 ? -1 : 1, off = W / 2 + 4 + r() * 4, x = s.x + s.nx * side * off, z = s.z + s.nz * side * off; if (!free(x, z, W / 2 + 2.5)) continue; inst(G.cylLow, vine, M(x, 6, z, .05, 7 + r() * 4, .05)); }
     // distant misty mountains
     const hill = std(0x3d6a3a, { roughness: 1, flatShading: true });
-    for (let i = 0; i < 26; i++) { const a = r() * Math.PI * 2, d = 520 + r() * 480; inst(G.ico, hill, M(Math.cos(a) * d, -10, Math.sin(a) * d, 110 + r() * 150, 50 + r() * 110, 110 + r() * 120, r() * 6), { cast: false }); }
+    for (let i = 0; i < 26; i++) { const a = r() * Math.PI * 2, d = 520 + r() * 480; inst(G.hill, hill, M(Math.cos(a) * d, -10, Math.sin(a) * d, 110 + r() * 150, 50 + r() * 110, 110 + r() * 120, r() * 6), { cast: false }); }
     weather(260, 0xd8ff8a, .22, -.25, 70, 18, 2.2); // fireflies / pollen drifting up
   }
 
@@ -761,7 +769,7 @@ export function createWorld(map, track) {
     updaters.push((dt, t) => { for (const h of herd) { const k = Math.sin(t * .05 + h.ph) * 6; h.a.position.set(h.x + Math.sin(h.dir) * k, 0, h.z + Math.cos(h.dir) * k); h.a.rotation.y = h.dir + (Math.cos(t * .05 + h.ph) > 0 ? 0 : Math.PI); h.a.userData.anim(t + h.ph, 1); } });
     // distant flat-topped hills
     const hill = std(0xa0784a, { roughness: 1, flatShading: true });
-    for (let i = 0; i < 20; i++) { const a = r() * Math.PI * 2, d = 650 + r() * 500; inst(G.ico, hill, M(Math.cos(a) * d, -6, Math.sin(a) * d, 110 + r() * 140, 28 + r() * 40, 110 + r() * 140, r() * 6), { cast: false }); }
+    for (let i = 0; i < 20; i++) { const a = r() * Math.PI * 2, d = 650 + r() * 500; inst(G.hill, hill, M(Math.cos(a) * d, -6, Math.sin(a) * d, 110 + r() * 140, 28 + r() * 40, 110 + r() * 140, r() * 6), { cast: false }); }
     weather(300, 0xe8c890, .3, .15, 80, 12, 3); // drifting dust
   }
 
@@ -792,7 +800,7 @@ export function createWorld(map, track) {
       const door = new THREE.Mesh(new THREE.PlaneGeometry(1.4, 2.4), std(0x6a4024)); door.position.set(hx + s0.nx * 4.01, 1.2, hz + s0.nz * 4.01); door.lookAt(hx + s0.nx * 10, 1.2, hz + s0.nz * 10); group.add(door); }
     // rolling hills around
     const hill = std(0x5a7a3a, { roughness: 1, flatShading: true });
-    for (let i = 0; i < 24; i++) { const a = r() * Math.PI * 2, d = 520 + r() * 480; inst(G.ico, hill, M(Math.cos(a) * d, -12, Math.sin(a) * d, 120 + r() * 140, 40 + r() * 70, 120 + r() * 120, r() * 6), { cast: false }); }
+    for (let i = 0; i < 24; i++) { const a = r() * Math.PI * 2, d = 520 + r() * 480; inst(G.hill, hill, M(Math.cos(a) * d, -12, Math.sin(a) * d, 120 + r() * 140, 40 + r() * 70, 120 + r() * 120, r() * 6), { cast: false }); }
     weather(220, 0xfff2a8, .2, -.2, 70, 16, 2.5); // pollen
   }
 
@@ -800,7 +808,7 @@ export function createWorld(map, track) {
   // A tree on any height (leafyTree only stands on the ground).
   function treeAt(x, y, z, h, trunkMat, leafMats, spread = 1) {
     inst(G.cylLow, trunkMat, M(x, y + h * .45, z, .35 * spread, h * .9, .35 * spread));
-    for (let k = 0; k < 4; k++) inst(G.ico, leafMats[k % leafMats.length], M(x + (r() - .5) * 2.2 * spread, y + h * (.85 + r() * .25), z + (r() - .5) * 2.2 * spread, (1.8 + r() * 1.4) * spread, (1.3 + r() * .9) * spread, (1.8 + r() * 1.4) * spread, r() * 6));
+    for (let k = 0; k < 4; k++) inst(G.puff, leafMats[k % leafMats.length], M(x + (r() - .5) * 2.2 * spread, y + h * (.85 + r() * .25), z + (r() - .5) * 2.2 * spread, (1.8 + r() * 1.4) * spread, (1.3 + r() * .9) * spread, (1.8 + r() * 1.4) * spread, r() * 6));
   }
 
   function buildSky() {
@@ -884,7 +892,7 @@ export function createWorld(map, track) {
     inst(G.cone, std(0x6a7a9a, { roughness: 1 }), M(-260, 60, -900, 380, 260, 380), { cast: false });
     inst(G.cone, std(0xf4f8ff, { roughness: .9 }), M(-260, 160, -900, 140, 64, 140), { cast: false });
     const hill = std(0x7a9a5a, { roughness: 1, flatShading: true });
-    for (let i = 0; i < 20; i++) { const a = r() * Math.PI * 2, d = 540 + r() * 420; inst(G.ico, hill, M(Math.cos(a) * d, -14, Math.sin(a) * d, 120 + r() * 140, 40 + r() * 60, 120 + r() * 120, r() * 6), { cast: false }); }
+    for (let i = 0; i < 20; i++) { const a = r() * Math.PI * 2, d = 540 + r() * 420; inst(G.hill, hill, M(Math.cos(a) * d, -14, Math.sin(a) * d, 120 + r() * 140, 40 + r() * 60, 120 + r() * 120, r() * 6), { cast: false }); }
     // drifting petals
     weather(520, 0xffb7d0, .3, .7, 80, 22, 3.2);
   }
@@ -917,7 +925,7 @@ export function createWorld(map, track) {
     const boulder = std(0x8a8c92, { roughness: 1, flatShading: true });
     scatter(300, 6, 480, (x, z) => inst(G.rock, boulder, M(x, .2, z, .6 + r() * 2.6, .4 + r() * 1.6, .6 + r() * 2.4, r() * 6)));
     const ridge = std(0x6a6c72, { roughness: 1, flatShading: true });
-    for (let i = 0; i < 26; i++) { const a = r() * Math.PI * 2, d = 600 + r() * 450; inst(G.ico, ridge, M(Math.cos(a) * d, -20, Math.sin(a) * d, 140 + r() * 160, 50 + r() * 90, 120 + r() * 140, r() * 6), { cast: false }); }
+    for (let i = 0; i < 26; i++) { const a = r() * Math.PI * 2, d = 600 + r() * 450; inst(G.hill, ridge, M(Math.cos(a) * d, -20, Math.sin(a) * d, 140 + r() * 160, 50 + r() * 90, 120 + r() * 140, r() * 6), { cast: false }); }
     // --- Earth rising over the horizon ---
     const earthTex = canvasTex(512, (g, s) => { g.fillStyle = '#1d5fb8'; g.fillRect(0, 0, s, s); g.fillStyle = '#3f9a4a'; for (let i = 0; i < 26; i++) { g.beginPath(); g.ellipse(r() * s, s * .2 + r() * s * .6, 20 + r() * 60, 12 + r() * 40, r() * 3, 0, 6.28); g.fill(); } clouds(g, s, r, 60, 'rgba(255,255,255,.55)', 10, 40); }, 1);
     const earth = new THREE.Mesh(new THREE.SphereGeometry(110, 48, 32), new THREE.MeshStandardMaterial({ map: earthTex, roughness: .7, emissive: 0x16304a, emissiveIntensity: .5, fog: false }));

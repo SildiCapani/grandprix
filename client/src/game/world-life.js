@@ -133,6 +133,14 @@ export function buildLife(ctx) {
     updaters.push((dt, t) => list.forEach(o => { const a = o.a + t * o.sp; o.b.position.set(Math.cos(a) * o.d, o.y + Math.sin(t * .3 + o.a) * 3, Math.sin(a) * o.d); o.b.rotation.y = t * .05; }));
   }
 
+  // ---------- puffy cartoon clouds in daylight skies (one instanced draw call, no shadows) ----------
+  if (['day', 'desert', 'jungle', 'savanna', 'forest', 'sakura', 'pirate', 'snow', 'colosseum', 'candy'].includes(theme) && G.puff) {
+    const cloudMat = std(theme === 'candy' ? 0xfff0f8 : theme === 'desert' ? 0xfff0e0 : 0xffffff, { roughness: 1, emissive: theme === 'desert' ? 0xffc8a0 : 0xdfe8ff, emissiveIntensity: .45 });
+    for (let i = 0; i < 26; i++) {
+      const a = r() * TAU, d = 320 + r() * 520, cx = Math.cos(a) * d, cz = Math.sin(a) * d, cy = 70 + r() * 70, s = 12 + r() * 14, rot = r() * TAU;
+      for (let k = 0; k < 4; k++) { const off = (k - 1.5) * s * .9, w = s * (k === 1 || k === 2 ? 1.25 : .85); inst(G.puff, cloudMat, M(cx + Math.cos(rot) * off, cy + (k === 1 || k === 2 ? s * .25 : 0), cz + Math.sin(rot) * off, w, w * .7, w * .9, rot), { cast: false }); }
+    }
+  }
   // ---------- per world ----------
   const sea = 205 + 60;
   ({

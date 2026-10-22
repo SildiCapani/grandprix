@@ -1,5 +1,5 @@
 import { getTrack, RAMP_H, RAMP_LEN } from './tracks.js';
-import { kartById } from './karts.js';
+import { kartById, wheelById, withWheels } from './karts.js';
 import { buildObstacles, hazardsAt } from './obstacles.js';
 
 // Compact, dependency-free arcade physics. Units are metres and seconds.
@@ -47,7 +47,7 @@ const CIRCLE_OFFSETS = [0.42, -0.34];
 const RESTITUTION = 0.32;
 
 // ---- items ----
-export const ITEM_TYPES = ['mushroom', 'mushroom2', 'mushroom3', 'banana', 'green', 'red', 'blue', 'star', 'rocket', 'spring', 'bubble', 'swap', 'ink', 'pump'];
+export const ITEM_TYPES = ['mushroom', 'mushroom2', 'mushroom3', 'banana', 'green', 'red', 'blue', 'star', 'rocket', 'spring', 'bubble', 'swap', 'ink', 'pump', 'giant'];
 // New items: spring (jump), bubble (blocks one hit), swap (trade places with the car ahead), ink (blots the view of everyone ahead), pump (battle: +1 balloon).
 const BUBBLE_TIME = 12, INK_TIME = 4.5;
 // Blue shell: flies over everyone to the leader and explodes there. At most this many per race.
@@ -59,6 +59,8 @@ const TRAIL_BACK = 1.35;
 const STAR_TIME = 7, MUSHROOM_TIME = 1.3, SPIN_TIME = 1.15, ROULETTE_TIME = 1.1;
 const BOX_RESPAWN = 3, BOX_RADIUS = 1.5, RAMP_LEN_BOX = 8;
 const GREEN_SPEED = 40, RED_SPEED = 36, GREEN_BOUNCES = 3;
+// Giant spiked shell: only for the last place. Huge, ploughs through everything, spins every kart it touches, breaks after 5 wall bounces.
+export const GIANT_R = 2.4; const GIANT_BOUNCES = 5, GIANT_SPEED = 30;
 // ---- battle: balloons instead of laps ----
 export const BATTLE_TIME = 150, BALLOONS = 3, MAX_BALLOONS = 5;
 // Coin hunt: most coins after two minutes. Crown hunt: first to hold the crown for 20 s in total.
@@ -131,7 +133,7 @@ export function gridPlacement(track, slot) {
 }
 
 // Kart stats copied onto a body (player, bots).
-const kartFields = id => { const k = kartById(id); return { kart: k.id, top: k.top, accel: k.accel, turn: k.turn, mass: k.mass, driftRate: k.drift, offroadF: k.offroad }; };
+const kartFields = (id, wheel = 'standard') => { const k = withWheels(kartById(id), wheel); return { kart: k.id, top: k.top, accel: k.accel, turn: k.turn, mass: k.mass, driftRate: k.drift, offroadF: k.offroad }; };
 function makeBody(extra) {
   return { speed: 0, steer: 0, vx: 0, vz: 0, slide: 0, spin: 0, ghost: 0, y: 0, pitch: 0, airT: 0, airDur: 0, airY0: 0, airH: 0,
     trail: null, trailT: 0, top: 1, accel: 1, turn: 1, driftRate: 1, offroadF: .4, offroad: false, scY: 0, route: 0, scSeen: -1, kart: 'allround',
@@ -159,7 +161,7 @@ export class RaceCore {
   constructor(options = {}) {
     this.onEvent = options.onEvent || (() => {});
     this.track = getTrack(options.mapId);
-    this.kartId = 'allround';
+    this.kartId = 'allround'; this.wheelId = 'standard';
     this.reset();
   }
 
@@ -191,7 +193,7 @@ export class RaceCore {
     this.position = 1;
     this.checkpointCount = 0;
     this.nextCheckpoint = 1;
-    this.player = makeBody({ x: s.x, z: s.z, y: s.y, angle: s.angle, drifting: false, boosting: false, name: 'DU', isPlayer: true, ...kartFields(this.kartId) });
+    this.player = makeBody({ x: s.x, z: s.z, y: s.y, angle: s.angle, drifting: false, boosting: false, name: 'DU', isPlayer: true, ...kartFields(this.kartId, this.wheelId) });
     this.rivals = [];
     // Other online players (positions from the network). Each client resolves its own car
     // against them, so both sides bounce off each other.
@@ -218,7 +220,8 @@ export class RaceCore {
     return this;
   }
 
-  setKart(id) { this.kartId = kartById(id).id; Object.assign(this.player, kartFields(this.kartId)); return this; }
+  setKart(id) { this.kartId = kartById(id).id; Object.assign(this.player, kartFields(this.kartId, this.wheelId)); return this; }
+  setWheels(id) { this.wheelId = wheelById(id).id; Object.assign(this.player, kartFields(this.kartId, this.wheelId)); return this; }
 
   start(mode = 'race', mapId = this.track.id, { items, cc, kart, battle } = {}) {
     this.battleType = BATTLE_TYPES.includes(battle) ? battle : 'balloons';
@@ -292,7 +295,7 @@ export class RaceCore {
   // Compact bot snapshot for the network.
   botsForNet() {
     return this.rivals.map(b => ({ n: b.index, x: +b.x.toFixed(2), z: +b.z.toFixed(2), y: +b.y.toFixed(2), pi: +b.pitch.toFixed(3), a: +b.angle.toFixed(3), s: +b.speed.toFixed(2), vx: +b.vx.toFixed(2), vz: +b.vz.toFixed(2),
-      sp: +(b.spinAngle || 0).toFixed(2), p: +b.progress.toFixed(4), bu: b.bubbleT > 0 ? 1 : undefined, fa: b.fallT > 0 ? +b.fallT.toFixed(2) : undefined, tr: b.trail || undefined, st: b.starT > 0, rk: b.rocketT > 0, b: !!b.boosting, dt: b.drift ? driftTier(b.driftT) : 0, dr: b.drift || 0 }));
+      sp: +(b.spinAngle || 0).toFixed(2), p: +b.progress.toFixed(4), bu: b.bubbleT > 0 ? 1 : undefined, gl: b.glide ? 1 : undefined, fa: b.fallT > 0 ? +b.fallT.toFixed(2) : undefined, tr: b.trail || undefined, st: b.starT > 0, rk: b.rocketT > 0, b: !!b.boosting, dt: b.drift ? driftTier(b.driftT) : 0, dr: b.drift || 0 }));
   }
   // A guest reported that its item hit one of our bots.
   remoteBotHit(index, kind) { const b = this.rivals.find(r => r.index === index); if (b) this._hit(b, kind, null); }
@@ -502,7 +505,7 @@ export class RaceCore {
     // In a drift the car keeps turning toward the drift side; steering only tightens or widens the arc.
     const yaw = p.drift ? -p.drift * p.speed / turnRadius(p.speed, p.turn) * (.62 + .66 * clamp(p.steer * p.drift, -1, 1)) : -p.steer * p.speed / turnRadius(p.speed, p.turn);
     // In the air the kart barely steers.
-    p.angle += yaw * dt * (p.airT > 0 ? .35 : 1);
+    p.angle += yaw * dt * (p.airT > 0 ? (p.glide ? .8 : .35) : 1);
     scrub(p, yaw, dt);
     const roadBefore = this._locate(p, this._lastTrackT);
     const alignment = angleDiff(roadBefore.angle, p.angle);
@@ -672,17 +675,31 @@ export class RaceCore {
       c.speed = v; c.vx = Math.sin(c.angle) * v; c.vz = Math.cos(c.angle) * v;
       // Low gravity (moon): the same jump flies higher and hangs longer in the air.
       const lg = 1 / (T.gravity || 1), hang = Math.sqrt(lg);
-      c.airDur = clamp((((j.gap || 6) + 5) / v + .3) * hang, .55, 1.3 * hang); c.airT = c.airDur;
+      if (j.glide) {
+        // Glider ramp: the kart opens its glider, climbs, then sails slowly over the whole gap (steerable).
+        c.airDur = ((j.gap + 12) / v) * 1.25 * hang; c.airT = c.airDur; c.glide = true;
+        c.airY0 = T.heightAt(j.t) + RAMP_H; c.airH = (6 + j.gap * .04) * lg; c.drift = 0; c.driftT = 0; c.drifting = false;
+        if (c === this.player) this.emit('glide', { gap: j.gap });
+        continue;
+      }
+      c.airDur = clamp((((j.gap || 6) + 5) / v + .3) * hang, .55, 1.3 * hang); c.airT = c.airDur; c.glide = false;
       c.airY0 = T.heightAt(j.t) + RAMP_H; c.airH = (1.1 + (j.gap || 3) * .13) * lg; c.drift = 0; c.driftT = 0; c.drifting = false;
       if (c === this.player) this.emit('jump', { gap: j.gap });
     }
     const ground = c.offroad ? c.scY : this._ground(t);
     if (c.airT > 0) {
       c.airT = Math.max(0, c.airT - dt);
-      const u = 1 - c.airT / c.airDur, y = c.airY0 + (ground - c.airY0) * u + c.airH * 4 * u * (1 - u);
-      const v = Math.max(4, Math.abs(c.speed)), dy = (ground - c.airY0) / c.airDur + c.airH * 4 * (1 - 2 * u) / c.airDur;
-      c.pitch = Math.atan2(dy, v) * .8; c.y = y;
-      if (c.airT === 0) { c.y = ground; this._turbo(c, .5, DRIFT_TIERS[0].speed * K, 'trick'); if (c === this.player) { if (this.status === 'racing') this.stats.jumps++; this.emit('land', {}); } }
+      const u = 1 - c.airT / c.airDur;
+      let y, dy;
+      if (c.glide) {
+        // quick climb in the first fifth, then a long gentle descent
+        const g = u < .18 ? Math.sin(u / .18 * Math.PI / 2) : 1 - ((u - .18) / .82) ** 2;
+        const dg = u < .18 ? Math.cos(u / .18 * Math.PI / 2) * Math.PI / 2 / .18 : -2 * (u - .18) / .82 / .82;
+        y = c.airY0 + (ground - c.airY0) * u + c.airH * g; dy = ((ground - c.airY0) + c.airH * dg) / c.airDur;
+      } else { y = c.airY0 + (ground - c.airY0) * u + c.airH * 4 * u * (1 - u); dy = (ground - c.airY0) / c.airDur + c.airH * 4 * (1 - 2 * u) / c.airDur; }
+      const v = Math.max(4, Math.abs(c.speed));
+      c.pitch = Math.atan2(dy, v) * (c.glide ? .35 : .8); c.y = y;
+      if (c.airT === 0) { c.y = ground; c.glide = false; this._turbo(c, .5, DRIFT_TIERS[0].speed * K, 'trick'); if (c === this.player) { if (this.status === 'racing') this.stats.jumps++; this.emit('land', {}); } }
       return;
     }
     // Hovering over a gap without air time (e.g. after a spin-out): float across.
@@ -851,6 +868,10 @@ export class RaceCore {
       if (this.bananas.length > 40) this.bananas.shift();
       const bt = c === this.player ? this._lastTrackT : (c.t ?? 0);
       this.bananas.push({ id: this._uid++, x: c.x - hx * 2.2, z: c.z - hz * 2.2, y: c.offroad ? c.scY : this.track.heightAt(bt), owner: c, arm: 0.6 });
+    } else if (item === 'giant') {
+      const base = Math.max(0, c.speed);
+      this.shells.push({ id: this._uid++, type: 'giant', x: c.x + hx * 3.4, z: c.z + hz * 3.4, y: c.y, vx: hx * (GIANT_SPEED * K + base * .25), vz: hz * (GIANT_SPEED * K + base * .25),
+        owner: c, arm: .6, life: 22, bounces: 0, t: c === this.player ? this._lastTrackT : (c.t ?? 0), target: null, hitSet: new Set(), spin: 0 });
     } else if ((item === 'green' || item === 'red') && backward) {
       // thrown backward: flies straight back (a red shell does not home in this direction)
       const sp = GREEN_SPEED * K * .75;
@@ -961,6 +982,35 @@ export class RaceCore {
     return s.target;
   }
   // A car gets hit: spin on the spot, lose speed. Stars and fresh spins are immune.
+  // The giant shell rolls along the road like a green shell, bounces off the walls and runs over karts, bananas and shells.
+  _giantStep(s, dt, cars) {
+    s.life -= dt; s.arm -= dt; s.spin += dt;
+    s.x += s.vx * dt; s.z += s.vz * dt;
+    const road = this.track.nearestNear(s.x, s.z, s.t); s.t = road.t;
+    s.y += (this.track.heightAt(s.t) - s.y) * Math.min(1, dt * 12);
+    const limit = Math.max(.5, this.track.width / 2 - GIANT_R * .8);
+    if (road.distance > limit && !this._inCorridor(s.x, s.z)) {
+      const side = Math.sign(road.signedDistance) || 1;
+      s.x = road.x + road.nx * side * limit; s.z = road.z + road.nz * side * limit;
+      const vn = s.vx * road.nx * side + s.vz * road.nz * side;
+      if (vn > 0) { s.vx -= 2 * vn * road.nx * side; s.vz -= 2 * vn * road.nz * side; }
+      s.bounces++; this.emit('shellbounce', { x: s.x, z: s.z, giant: true });
+      if (s.bounces >= GIANT_BOUNCES) return true;
+    }
+    if (s.life <= 0) return true;
+    const R = GIANT_R + .7;
+    for (const c of cars) {
+      if ((c === s.owner && s.arm > 0) || s.hitSet.has(c) || Math.abs(c.y - s.y) > 2.6) continue;
+      if (Math.hypot(c.x - s.x, c.z - s.z) < R) { s.hitSet.add(c); if (c.trail) { c.item = null; c.trail = null; } this._hit(c, 'giant', s.owner); }
+    }
+    for (const e of this.externals) {
+      const key = 'e:' + (e.key ?? e.id ?? ''); if (s.hitSet.has(key)) continue;
+      if (Math.hypot(e.x - s.x, e.z - s.z) < R && Math.abs((e.y ?? s.y) - s.y) < 2.6) { s.hitSet.add(key); if (!e.star) this.emit('remotehit', { kind: 'giant', target: e }); }
+    }
+    for (let j = this.bananas.length - 1; j >= 0; j--) { const b = this.bananas[j]; if (Math.hypot(b.x - s.x, b.z - s.z) < GIANT_R + .3) this.bananas.splice(j, 1); }
+    for (let j = this.shells.length - 1; j >= 0; j--) { const o = this.shells[j]; if (o !== s && o.type !== 'blue' && o.type !== 'giant' && Math.hypot(o.x - s.x, o.z - s.z) < GIANT_R + .3) { this.shells.splice(j, 1); this.emit('shellbreak', { x: o.x, z: o.z }); } }
+    return false;
+  }
   _hit(c, kind, by) {
     if (kind === 'ink') {
       if (c.ghost > 0 || c.rocketT > 0) return false;
@@ -992,6 +1042,7 @@ export class RaceCore {
           const frac = this._rankFrac(c), n = c === this.player && this.rankFrac ? (this.onlineCount || 2) : this._field().length;
           c.pending = this.mode === 'battle' ? rollBattleItem(Math.random, this.battleType) : rollItem(frac, n >= 3 && frac >= (n - 2.5) / (n - 1)); c.roulette = c === this.player ? ROULETTE_TIME : .6;
           if (c.pending === 'blue') { if (this.blueCount >= BLUE_MAX || frac < .25) c.pending = 'red'; else this.blueCount++; }
+          if (this.mode !== 'battle' && n >= 3 && frac >= .999 && Math.random() < .3 && !this.shells.some(x => x.type === 'giant')) c.pending = 'giant';
           if (c === this.player) this.emit('itembox', {});
         }
         break;
@@ -1002,6 +1053,7 @@ export class RaceCore {
     for (let i = this.shells.length - 1; i >= 0; i--) {
       const s = this.shells[i];
       if (s.type === 'blue') { if (this._blueStep(s, dt, cars)) this.shells.splice(i, 1); continue; }
+      if (s.type === 'giant') { if (this._giantStep(s, dt, cars)) { this.shells.splice(i, 1); this.emit('shellbreak', { x: s.x, z: s.z, giant: true }); } continue; }
       s.life -= dt; s.arm -= dt;
       if (s.type === 'red' && !s.straight) {
         const road = this.track.nearestNear(s.x, s.z, s.t); s.t = road.t;
@@ -1067,6 +1119,7 @@ export class RaceCore {
     }
     // items thrown by online players hit me and (on the host) the AI drivers – unless a held item blocks them
     for (const it of this.externalItems) {
+      if (it.type === 'giant') { for (const c of cars) if (Math.hypot(c.x - it.x, c.z - it.z) < GIANT_R + .7 && Math.abs(c.y - (it.y ?? c.y)) < 2.6) this._hit(c, 'giant', null); continue; }
       if (it.type === 'blue') { if (it.b) for (const c of cars) if (Math.hypot(c.x - it.x, c.z - it.z) < BLUE_RADIUS && Math.abs(c.y - (it.y ?? c.y)) < 3) this._hit(c, 'blue', null); continue; }
       for (const c of cars) {
         if (Math.abs(c.y - (it.y ?? c.y)) > 1.3) continue;
@@ -1130,6 +1183,7 @@ export class RaceCore {
         const lined = ahead.some(f => { const dx = f.c.x - bot.x, dz = f.c.z - bot.z; return dx * hx + dz * hz > 3 && Math.abs(dx * hz - dz * hx) < 1.4; });
         use = (lined && bend < .3 && hold > .4) || hold > 10 - iq * 3; break;
       }
+      case 'giant': use = (bend < .25 && hold > .6) || hold > 3; break;
       case 'banana': use = (behind.length > 0 && hold > .5) || hold > 8; break;
       case 'bubble': use = hold > .4; break;
       case 'ink': use = hold > 1 + iq * 2; break;
@@ -1354,6 +1408,7 @@ export class RaceCore {
       case 'star': use = hold > .3; break;
       case 'red': use = near && hold > .5; break;
       case 'green': use = (ahead && hold > .3) || hold > 9; break;
+      case 'giant': use = hold > 1; break;
       case 'banana': use = (behind && hold > .4) || hold > 7; break;
       case 'mushroom': use = (ahead && hold > .3) || hold > 6; break;
       case 'bubble': case 'pump': use = hold > .4; break;

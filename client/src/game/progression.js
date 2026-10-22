@@ -1,3 +1,4 @@
+import { WHEELS } from './karts.js';
 // Career data stays local to this browser. No accounts, timers or daily streaks.
 export const STORAGE_KEY = 'apex-rush-career-v1';
 const LEGACY_KEY = 'apex-rush-legacy-record';
@@ -41,6 +42,7 @@ export function rewardsForLevel(level, names = {}) {
   for (const [id, xp] of Object.entries(MAP_XP)) if (xp > 0 && levelOfXP(xp) === level) out.push({ kind: 'map', id, name: names[id] || id });
   for (const [id, lv] of Object.entries(KART_LEVEL)) if (lv > 1 && lv === level) out.push({ kind: 'kart', id, name: names[id] || id });
   for (const f of FINISHES) if (f.level > 1 && f.level === level) out.push({ kind: 'finish', id: f.id, name: 'Lack ' + f.name });
+  for (const w of WHEELS) if (w.level > 1 && w.level === level) out.push({ kind: 'wheel', id: w.id, name: 'Räder ' + w.name });
   return out;
 }
 // The next level that brings something new (or null when everything is open).

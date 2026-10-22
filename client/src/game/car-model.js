@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { buildAvatarHead } from './avatars.js';
 import { applySkin } from './skins.js';
+import { wheelById } from './karts.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { contactShadow } from './surfaces.js';
 let shadowGeo, shadowMat;
@@ -51,7 +52,7 @@ const LAYOUT = {
 };
 
 // A fat tyre with rounded shoulders (lathe profile) around a coloured rim and a chrome cap.
-function makeWheel(r, w, paint, rubber, chrome, cream, knobbly, side) {
+function makeWheel(r, w, paint, rubber, chrome, cream, knobbly, side, spokes = 5) {
   const g = new THREE.Group();
   const prof = [], s = 10, rim = r * .62;
   prof.push(new THREE.Vector2(rim, -w / 2));
@@ -62,15 +63,15 @@ function makeWheel(r, w, paint, rubber, chrome, cream, knobbly, side) {
   const rimGeo = new THREE.CylinderGeometry(rim, rim, w * .92, 22); rimGeo.rotateZ(Math.PI / 2);
   addMesh(g, rimGeo, paint);
   const capGeo = new THREE.SphereGeometry(rim * .55, 14, 10); const cap = addMesh(g, capGeo, chrome, side * w * .42, 0, 0); cap.scale.set(.45, 1, 1);
-  for (let k = 0; k < 5; k++) { const a = k / 5 * Math.PI * 2; const b = addMesh(g, new THREE.BoxGeometry(.012, rim * 1.5, rim * .26), chrome, side * w * .47, 0, 0); b.rotation.x = a; }
+  for (let k = 0; k < spokes; k++) { const a = k / spokes * Math.PI * 2; const b = addMesh(g, new THREE.BoxGeometry(.012, rim * 1.5, rim * .26), chrome, side * w * .47, 0, 0); b.rotation.x = a; }
   if (knobbly) for (let k = 0; k < 16; k++) { const a = k / 16 * Math.PI * 2; const n = addMesh(g, new THREE.BoxGeometry(w * .9, r * .16, r * .2), rubber, 0, Math.cos(a) * r * .98, Math.sin(a) * r * .98); n.rotation.x = -a; }
   else { const band = new THREE.TorusGeometry(r * .82, .006, 4, 30); band.rotateY(Math.PI / 2); addMesh(g, band, cream, side * w * .5, 0, 0); }
   g.userData.r = r;
   return g;
 }
 
-export function createCar(color = '#e34335', number = '07', kart = 'allround', finish = 'standard', skin = 'none', avatar = 'pilot') {
-  const L = LAYOUT[kart] || LAYOUT.allround;
+export function createCar(color = '#e34335', number = '07', kart = 'allround', finish = 'standard', skin = 'none', avatar = 'pilot', wheelId = 'standard') {
+  const L = LAYOUT[kart] || LAYOUT.allround, WL = wheelById(wheelId).look;
   const car = new THREE.Group(); car.name = `Mini Formula ${number}`; car.rotation.order = 'YXZ';
   const body = new THREE.Group(); body.position.y = L.lift; car.add(body);
   const lean = new THREE.Group(); body.add(lean);
@@ -112,7 +113,7 @@ export function createCar(color = '#e34335', number = '07', kart = 'allround', f
   if (kart !== 'flitzer' && kart !== 'buggy') { for (const sd of [-1, 1]) rod(lean, chassis, [sd * .15, .38, -.6 * S], [sd * .17, .52, -.7 * S], .014); rbox(lean, paint, .62 * Wd, .035, .14, 0, .53, -.72 * S, .016); for (const sd of [-1, 1]) rbox(lean, darkPaint, .02, .1, .16, sd * .31 * Wd, .53, -.72 * S, .008); }
 
   // --- driver: suit, arms on the steering wheel, head (avatar or helmet) ---
-  const driver = new THREE.Group(); lean.add(driver); driver.position.set(0, 0, -.17 * S);
+  const driver = new THREE.Group(); lean.add(driver); driver.position.set(0, -.04, -.17 * S); driver.scale.setScalar(1.28); // big chibi driver, well visible from the chase camera
   capsule(driver, suit, .12, .14, 0, .44, 0).scale.set(1.05, 1, .85);
   rbox(driver, darkPaint, .26, .05, .2, 0, .32, .02, .02);                  // belt
   const wheelGroup = new THREE.Group(); wheelGroup.position.set(0, .46, .26); wheelGroup.rotation.x = -.85; lean.add(wheelGroup);
@@ -120,14 +121,14 @@ export function createCar(color = '#e34335', number = '07', kart = 'allround', f
   const sw = new THREE.Mesh(new THREE.TorusGeometry(.085, .016, 8, 22), chassis); sw.castShadow = true; wheelGroup.add(sw);
   const hub = new THREE.Mesh(new THREE.CylinderGeometry(.03, .03, .02, 10), paint); hub.rotation.x = Math.PI / 2; wheelGroup.add(hub);
   for (const sd of [-1, 1]) {
-    const arm = new THREE.Group(); arm.position.set(sd * .14, .5, -.17 * S); lean.add(arm);
+    const arm = new THREE.Group(); arm.position.set(sd * .17, .57, -.17 * S); arm.scale.setScalar(1.28); lean.add(arm);
     const a = capsule(arm, suit, .042, .16, 0, 0, 0); a.position.set(-sd * .02, -.03, .11); a.rotation.x = 1.15; a.rotation.z = sd * .25;
     ball(arm, glove, .045, -sd * .06, -.08, .22);
   }
   let head;
-  if (avatar && avatar !== 'pilot') { head = buildAvatarHead(avatar); head.position.set(0, .7, -.17 * S); head.scale.setScalar(1.2); head.name = 'avatar'; lean.add(head); }
+  if (avatar && avatar !== 'pilot') { head = buildAvatarHead(avatar); head.position.set(0, .84, -.17 * S); head.scale.setScalar(1.5); head.name = 'avatar'; lean.add(head); }
   else {
-    head = new THREE.Group(); head.position.set(0, .7, -.17 * S); lean.add(head);
+    head = new THREE.Group(); head.position.set(0, .84, -.17 * S); head.scale.setScalar(1.3); lean.add(head);
     const helmet = new THREE.MeshPhysicalMaterial({ color: '#f6cf42', roughness: .22, clearcoat: 1, clearcoatRoughness: .04 });
     ball(head, helmet, .155, 0, 0, 0, 1, .96, 1.02);
     const visor = new THREE.MeshPhysicalMaterial({ color: '#0c1820', roughness: .03, metalness: .7, clearcoat: 1, envMapIntensity: 1.6 });
@@ -137,12 +138,24 @@ export function createCar(color = '#e34335', number = '07', kart = 'allround', f
   }
   head.userData.base = head.position.y;
 
+  // --- glider (opens over glider ramps): an arched parafoil in the kart colours on a light frame ---
+  const glider = new THREE.Group(); glider.visible = false; glider.position.set(0, .55, -.1 * S); glider.rotation.x = .42; lean.add(glider);
+  { const cols = [paint, cream, paint, cream, paint, cream, paint], n = cols.length, span = 1.9, R = 2.1;
+    for (let i = 0; i < n; i++) { const g = new THREE.CylinderGeometry(R, R, 1.6, 4, 1, true, -span / 2 + span * i / n, span / n); g.rotateX(-Math.PI / 2); addMesh(glider, g, cols[i], 0, 1.35 - R, 0); }
+    const frameMat = chassis; for (const sd of [-1, 1]) { rod(glider, frameMat, [sd * .12, -.02, 0], [sd * Math.sin(span / 2) * R * .98, 1.35 - R + Math.cos(span / 2) * R * .98, 0], .012); rod(glider, frameMat, [sd * .12, -.02, 0], [sd * .55, 1.3, .2], .01); }
+    rod(glider, frameMat, [0, -.05, 0], [0, 1.3, .1], .02); }
+  const sail = new Map([[paint, paint.clone()], [cream, cream.clone()]]); sail.forEach(m => { m.side = THREE.DoubleSide; });
+  glider.traverse(o => { if (o.isMesh) { o.castShadow = false; if (sail.has(o.material)) o.material = sail.get(o.material); } });
+
   // --- wheels ---
-  const wheels = [], frontWheels = [], knob = kart === 'buggy' || kart === 'brummer';
+  const wheels = [], frontWheels = [], knob = WL.knob ?? (kart === 'buggy' || kart === 'brummer');
+  const rimMat = WL.rim === 'paint' ? paint : new THREE.MeshPhysicalMaterial({ color: WL.rim, roughness: WL.gold ? .15 : .3, metalness: WL.gold ? 1 : .4, clearcoat: 1 });
+  const bandMat = WL.band ? mat(WL.band, .4) : cream;
+  body.position.y += (WL.r - 1) * (L.rf + L.rr) * .5;
   for (const z of [L.zr * S, L.zf * S]) for (const side of [-1, 1]) {
-    const front = z > 0, r = front ? L.rf : L.rr, w = front ? L.wf : L.wr;
-    const pivot = new THREE.Group(); pivot.position.set(side * (L.x * Wd + (front ? 0 : .02)), r, z); car.add(pivot);
-    const wheel = makeWheel(r, w, paint, rubber, chrome, cream, knob, side); pivot.add(wheel);
+    const front = z > 0, r = (front ? L.rf : L.rr) * WL.r, w = (front ? L.wf : L.wr) * WL.w;
+    const pivot = new THREE.Group(); pivot.position.set(side * (L.x * Wd + (front ? 0 : .02) + w * (1 - 1 / WL.w) * .5), r, z); car.add(pivot);
+    const wheel = makeWheel(r, w, rimMat, rubber, chrome, bandMat, knob, side, WL.spokes); pivot.add(wheel);
     rod(car, chassis, [side * .2 * Wd, Math.max(.14, r * .8) + L.lift * .6, z], [side * (L.x * Wd - w * .3), r, z], .018);
     wheels.push(wheel); if (front) frontWheels.push(pivot);
   }
@@ -181,9 +194,9 @@ export function createCar(color = '#e34335', number = '07', kart = 'allround', f
   car.userData.wheels = wheels;
   car.userData.frontWheels = frontWheels;
   car.userData.exhaust = exhaust;
-  car.userData.body = body; car.userData.lean = lean; car.userData.head = head; car.userData.steeringWheel = wheelGroup;
+  car.userData.body = body; car.userData.lean = lean; car.userData.head = head; car.userData.steeringWheel = wheelGroup; car.userData.glider = glider;
   car.userData.materials = { paint, darkPaint, carbon: chassis, rubber, rim: chrome, cream };
-  car.userData.kart = kart; car.userData.skin = skin || 'none'; car.userData.avatar = avatar || 'pilot';
+  car.userData.kart = kart; car.userData.wheel = wheelId; car.userData.skin = skin || 'none'; car.userData.avatar = avatar || 'pilot';
   car.userData.animationTime = Math.random() * 10; car.userData.lift = L.lift;
   return car;
 }

@@ -2,6 +2,7 @@
 // invitation/answer codes; only car and race data travel over the data channels.
 const MAP_IDS = new Set(['coast', 'canyon', 'neon', 'volcano', 'glacier', 'stars', 'jungle', 'savanna', 'forest', 'sky', 'sakura', 'moon', 'pirate', 'candy', 'castle', 'arctic', 'rooftops', 'galaxy']);
 const KART_IDS = new Set(['allround', 'bolide', 'flitzer', 'brummer', 'drifter', 'buggy']);
+const WHEEL_IDS = new Set(['standard', 'slick', 'studs', 'drift', 'light', 'monster', 'gold']);
 const DEFAULT_COLOR = '#ee4b37';
 const CAR_COLORS = ['#ee4b37', '#42c9cb', '#edc44b', '#9b87e5'];
 const PREFIX = 'APX1-';
@@ -14,7 +15,7 @@ const nameOf = v => String(v || 'Rookie Pilot').replace(/[\u0000-\u001f\u007f]/g
 const colorOf = v => /^#[\da-f]{6}$/i.test(v || '') ? v.toLowerCase() : DEFAULT_COLOR;
 const word = (v, d) => typeof v === 'string' && /^[a-z]{2,12}$/.test(v) ? v : d;
 // What a driver looks like in the lobby (kart, driver avatar, paint skin, finish).
-const lookOf = v => ({kart: KART_IDS.has(v?.kart) ? v.kart : 'allround', avatar: word(v?.avatar, 'pilot'), skin: word(v?.skin, 'none'),
+const lookOf = v => ({kart: KART_IDS.has(v?.kart) ? v.kart : 'allround', wheel: WHEEL_IDS.has(v?.wheel) ? v.wheel : 'standard', avatar: word(v?.avatar, 'pilot'), skin: word(v?.skin, 'none'),
   finish: ['standard', 'gold', 'chrome', 'neon'].includes(v?.finish) ? v.finish : 'standard'});
 const idOf = v => typeof v === 'string' && /^[a-zA-Z0-9_-]{5,64}$/.test(v);
 const clone = v => JSON.parse(JSON.stringify(v));
@@ -53,19 +54,20 @@ function cleanCar(state) {
     bubble: state.bubble === true, ink: finite(state.ink) ? clamp(Math.floor(state.ink), 0, 999) : 0,
     y: finite(state.y) ? clamp(state.y, -60, 80) : 0, fallT: finite(state.fallT) ? clamp(state.fallT, 0, 4) : 0, pitch: finite(state.pitch) ? clamp(state.pitch, -1.2, 1.2) : 0,
     kart: KART_IDS.has(state.kart) ? state.kart : 'allround',
+    wheel: WHEEL_IDS.has(state.wheel) ? state.wheel : 'standard', glide: state.glide === true,
     skin: typeof state.skin === 'string' && /^[a-z]{2,12}$/.test(state.skin) ? state.skin : 'none',
     avatar: typeof state.avatar === 'string' && /^[a-z]{2,12}$/.test(state.avatar) ? state.avatar : 'pilot',
     finish: ['standard', 'gold', 'chrome', 'neon'].includes(state.finish) ? state.finish : 'standard', mass: finite(state.mass) ? clamp(state.mass, .5, 2) : 1,
     trail: ['banana', 'green', 'red'].includes(state.trail) ? state.trail : null,
     star: state.star === true, rocket: state.rocket === true, spinA: finite(state.spinA) ? clamp(state.spinA, 0, 40) : 0,
-    items: Array.isArray(state.items) ? state.items.slice(0, 12).filter(it => it && ['green', 'red', 'banana', 'blue'].includes(it.type) && finite(it.x) && finite(it.z))
+    items: Array.isArray(state.items) ? state.items.slice(0, 12).filter(it => it && ['green', 'red', 'banana', 'blue', 'giant'].includes(it.type) && finite(it.x) && finite(it.z))
       .map(it => ({type: it.type, x: clamp(it.x, -400, 400), z: clamp(it.z, -400, 400), y: finite(it.y) ? clamp(it.y, -5, 80) : 0, b: it.b === 1 ? 1 : undefined})) : [],
     // Host-simulated AI drivers (online fill-up) and item hits that guests report on them.
     bots: Array.isArray(state.bots) ? state.bots.slice(0, 7).filter(b => b && ['x', 'z', 'a', 's', 'p'].every(k => finite(b[k]))).map(b => ({
-      n: finite(b.n) ? clamp(Math.floor(b.n), 0, 6) : 0, x: clamp(b.x, -400, 400), z: clamp(b.z, -400, 400), y: finite(b.y) ? clamp(b.y, -60, 80) : 0, fa: finite(b.fa) ? clamp(b.fa, 0, 4) : 0, pi: finite(b.pi) ? clamp(b.pi, -1.2, 1.2) : 0, a: b.a % (Math.PI * 2), s: clamp(b.s, -60, 60), bu: b.bu === 1 ? 1 : undefined,
+      n: finite(b.n) ? clamp(Math.floor(b.n), 0, 6) : 0, x: clamp(b.x, -400, 400), z: clamp(b.z, -400, 400), y: finite(b.y) ? clamp(b.y, -60, 80) : 0, fa: finite(b.fa) ? clamp(b.fa, 0, 4) : 0, pi: finite(b.pi) ? clamp(b.pi, -1.2, 1.2) : 0, a: b.a % (Math.PI * 2), s: clamp(b.s, -60, 60), bu: b.bu === 1 ? 1 : undefined, gl: b.gl === 1 ? 1 : undefined,
       vx: finite(b.vx) ? clamp(b.vx, -70, 70) : 0, vz: finite(b.vz) ? clamp(b.vz, -70, 70) : 0, sp: finite(b.sp) ? clamp(b.sp, 0, 40) : 0, p: clamp(b.p, -.2, 4),
       st: b.st === true, rk: b.rk === true, tr: ['banana', 'green', 'red'].includes(b.tr) ? b.tr : undefined, b: b.b === true, dt: finite(b.dt) ? clamp(Math.floor(b.dt), 0, 3) : 0, dr: finite(b.dr) ? clamp(Math.sign(b.dr), -1, 1) : 0 })) : [],
-    hits: Array.isArray(state.hits) ? state.hits.slice(0, 8).filter(h => h && typeof h.id === 'string' && h.id.length < 30 && finite(h.bot) && ['green', 'red', 'banana', 'star', 'blue', 'ink'].includes(h.k))
+    hits: Array.isArray(state.hits) ? state.hits.slice(0, 8).filter(h => h && typeof h.id === 'string' && h.id.length < 30 && finite(h.bot) && ['green', 'red', 'banana', 'star', 'blue', 'ink', 'giant'].includes(h.k))
       .map(h => ({id: h.id, bot: clamp(Math.floor(h.bot), 0, 6), k: h.k})) : [],
     boosting: state.boosting === true, drifting: state.drifting === true,
     progress: clamp(state.progress, -.2, 4), lap: finite(state.lap) ? clamp(Math.floor(state.lap), 0, 4) : 0,

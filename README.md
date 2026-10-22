@@ -75,6 +75,23 @@ Wer bei hohem Tempo hart lenkt, verliert Geschwindigkeit („Radieren“). Ein P
 Gewählt wird in der **Garage** (Menü → „Zur Garage“): Kart in 3D auf dem Drehteller, alle Werte und die Lackierung.
 Die Werte stehen in `client/src/game/karts.js`.
 
+### Räder (Garage)
+| Räder | Wirkung | ab Level |
+|---|---|---|
+| Standard | ausgewogen | 1 |
+| Slicks | +Topspeed, schlechter im Gelände | 2 |
+| Stollen | viel besser im Gelände, minimal langsamer | 2 |
+| Drift-Räder | Mini-Turbos laden schneller, etwas weniger Grip | 3 |
+| Leichtfelgen | bessere Beschleunigung, leichter | 4 |
+| Monster-Räder | schwer und gut im Gelände, langsameres Anfahren | 5 |
+| Goldräder | ein bisschen besser in allem | 8 |
+
+Die Räder ändern die Kart-Werte (`WHEELS` in `karts.js`) und sind auch online für alle sichtbar.
+
+### Gleiter
+Auf Wolkeninseln, Galaxie, Drachenburg, Neon-Dächer und Piratenbucht gibt es eine blaue **Gleiter-Rampe** mit Tor („▲ GLEITER ▲“).
+Wer drüberfährt, klappt einen Gleitschirm in Kartfarbe auf, steigt hoch und segelt 70–80 m über die Lücke. In der Luft lässt sich gut lenken; leuchtende Ringe zeigen die Flugbahn. Bei der Landung gibt es den Trick-Boost.
+
 ## Strecken
 1. Riviera Küstenring
 2. Canyon Sunset
@@ -143,6 +160,7 @@ Alles läuft nach der Rennuhr ab, online sehen also alle dasselbe.
 | Tauschwürfel | Du tauschst Platz, Position und Tempo mit dem Fahrer direkt vor dir. Gibt es nur ab Platz 4. Bots tauschen nie mit dir. |
 | Tintenklecks | Alle vor dir bekommen 4,5 Sekunden Tintenkleckse auf den Bildschirm. Bots fahren dann langsamer und schlingern. Wirkt auch online. |
 | Ballonpumpe | Nur im Ballon-Battle: +1 Ballon (bis 5). |
+| Stachelpanzer | Nur für den Letzten (30 % aus der Itembox, höchstens einer gleichzeitig): ein riesiger Panzer mit Stacheln. Rollt wie ein grüner Panzer, prallt 5-mal von den Wänden ab und dreht **jeden** Fahrer, den er berührt. Bananen und kleine Panzer walzt er platt. |
 
 ## Spielmodi
 | Modus | Worum es geht |

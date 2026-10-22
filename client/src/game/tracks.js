@@ -147,7 +147,7 @@ export const MAPS = Object.freeze([
     id: 'sky', index: 9, name: 'Wolkeninseln', subtitle: 'Schwebende Inseln · Brücke über die eigene Strecke · Sprünge durch die Wolken',
     width: 10.8, theme: 'sky', unlockXP: 0, botScale: 1.16, deck: 'float',
     nodes: SKY,
-    jumps: [{ at: [-226, -70], gap: 14 }, { at: [62, -60], gap: 12 }],
+    jumps: [{ at: [-226, -70], gap: 14 }, { at: [62, -60], gap: 12 }, { at: [-51, 111], gap: 80, glide: true }],
     parTimes: { gold: 313, silver: 353, bronze: 404 },
     boostPads: [],
     sectors: [{ name: 'Himmelstor', t: 0 }, { name: 'Wolkenbrücke', t: 0.33 }, { name: 'Sturzflug', t: 0.66 }],
@@ -174,7 +174,7 @@ export const MAPS = Object.freeze([
     id: 'pirate', index: 12, name: 'Piratenbucht', subtitle: 'Steg übers Meer · Totenkopf-Insel · Hängebrücke ohne Geländer',
     width: 10.6, theme: 'pirate', unlockXP: 0, botScale: 1.14, deck: 'pillars', fallY: -3,
     nodes: PIRATE,
-    jumps: [{ at: [232, 40], gap: 12 }],
+    jumps: [{ at: [232, 40], gap: 12 }, { at: [-66, -221], gap: 70, glide: true }],
     voids: [{ from: [80, 164], to: [168, -90] }, { from: [10, -230], to: [-176, -155] }],
     open: [{ from: [196, 124], to: [231, 72], side: 0 }, { from: [231, 10], to: [180, -70], side: 'out' }, { from: [-2, -229], to: [-160, -172], side: 0 }],
     shortcuts: [{ path: [[166, -100], [135, -160], [90, -212], [36, -230]], width: 8.5, surface: 'sand' }],
@@ -198,7 +198,7 @@ export const MAPS = Object.freeze([
     id: 'castle', index: 14, name: 'Drachenburg', subtitle: 'Klippenstraße über dem Abgrund · Bogenbrücke · Zugbrücken-Sprung',
     width: 10.6, theme: 'castle', unlockXP: 0, botScale: 1.16, deck: 'pillars', fallY: -30,
     nodes: CASTLE,
-    jumps: [{ at: [-254, -58], gap: 14 }],
+    jumps: [{ at: [-254, -58], gap: 14 }, { at: [159, -94], gap: 70, glide: true }],
     voids: [{ from: [205, 100], to: [228, -40] }, { from: [118, -106], to: [-20, -112] }, { from: [-255, -70], to: [-252, -32] }],
     open: [{ from: [210, 94], to: [230, -34], side: 'out' }, { from: [100, -110], to: [-6, -116], side: 0 }],
     shortcuts: [{ path: [[-58, -40], [-84, -8], [-118, -14], [-132, -46], [-160, -64]], width: 8.5, surface: 'grass' }],
@@ -222,7 +222,7 @@ export const MAPS = Object.freeze([
     id: 'rooftops', index: 16, name: 'Neon-Dächer', subtitle: 'Über den Dächern der Stadt · Sprünge zwischen Hochhäusern · fliegende Autos',
     width: 10.6, theme: 'rooftops', unlockXP: 0, botScale: 1.16, deck: 'pillars', fallY: 0,
     nodes: ROOFTOPS,
-    jumps: [{ at: [223, 30], gap: 14 }, { at: [-60, -190], gap: 13 }],
+    jumps: [{ at: [223, 30], gap: 14 }, { at: [-60, -190], gap: 13 }, { at: [-132, -199], gap: 70, glide: true }],
     voids: [{ from: [215, 55], to: [223, 10] }, { from: [150, -128], to: [70, -128] }, { from: [-50, -185], to: [-80, -196] }, { from: [-128, 24], to: [-145, 68] }],
     open: [{ from: [150, -128], to: [70, -128], side: 0 }, { from: [-130, 28], to: [-143, 64], side: 0 }],
     shortcuts: [{ path: [[-112, -198], [-160, -150], [-190, -100], [-206, -55]], width: 8.5, surface: 'roof' }],
@@ -234,7 +234,7 @@ export const MAPS = Object.freeze([
     id: 'galaxy', index: 17, name: 'Galaxie', subtitle: 'Leuchtstraße durchs All · keine einzige Leitplanke · Spirale um die Sonne',
     width: 11.2, theme: 'galaxy', unlockXP: 0, botScale: 1.18, deck: 'float', fallY: -40, gravity: .8,
     nodes: GALAXY,
-    jumps: [{ at: [60, -218], gap: 15 }, { at: [-160, -95], gap: 13 }],
+    jumps: [{ at: [60, -218], gap: 15 }, { at: [-160, -95], gap: 13 }, { at: [191, -130], gap: 80, glide: true }],
     voids: 'all', open: [{ from: [-40, 190], to: [-266, 155], side: 0 }],
     parTimes: { gold: 309, silver: 349, bronze: 399 },
     boostPads: [],
@@ -354,7 +354,7 @@ function buildTrack(map) {
   }
   const slopeAt = t => (heightAt(t + 2 / length) - heightAt(t - 2 / length)) / 4;
   // Jump ramps: the lip sits at t; the 6 m before it rise to RAMP_H. After the lip a gap (no road) may follow.
-  const jumps = map.jumps.map(j => { const n = nearest(j.at[0], j.at[1]); return Object.freeze({ t: n.t, gap: j.gap }); });
+  const jumps = map.jumps.map(j => { const n = nearest(j.at[0], j.at[1]); return Object.freeze({ t: n.t, gap: j.gap, glide: !!j.glide }); });
   const rampLift = t => { for (const j of jumps) { const ds = (wrap(t - j.t + .5) - .5) * length; if (ds > -RAMP_LEN && ds <= 0) return RAMP_H * (1 + ds / RAMP_LEN); } return 0; };
   const inGap = t => jumps.some(j => { const ds = (wrap(t - j.t + .5) - .5) * length; return j.gap > 0 && ds > 0 && ds < j.gap; });
   // Offroad shortcuts: corridors that leave the road at tA and rejoin at tB. Progress inside a corridor

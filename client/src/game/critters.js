@@ -426,3 +426,14 @@ export function husky(back = 0x6a7080) {
   g.userData.anim = (t, run = 1) => { walk(g.userData.bones, ['l0', 'l1', 'l2', 'l3'], t, .8 * run, 16); g.userData.bones.body.position.y = Math.abs(Math.sin(t * 16)) * .05; };
   return g;
 }
+
+// Giant spiked shell (item for the last place): a domed shell with a golden rim and a crown of white spikes, ~1 m radius.
+export function spikeShell() {
+  const k = kit(), G = 0x1f8a3a, D = 0x16682c, R = 0xffc23a, C = 0xfff2d0, S = 0xf4f4ec, spikes = [];
+  for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2; spikes.push(Cp(S, [Math.cos(a) * .62, .42, Math.sin(a) * .62], [Math.cos(a) * .95, .78, Math.sin(a) * .95], .14, .02, { k: .06 })); }
+  for (let i = 0; i < 4; i++) { const a = i / 4 * Math.PI * 2 + .4; spikes.push(Cp(S, [Math.cos(a) * .28, .75, Math.sin(a) * .28], [Math.cos(a) * .42, 1.1, Math.sin(a) * .42], .13, .02, { k: .06 })); }
+  spikes.push(Cp(S, [0, .85, 0], [0, 1.3, 0], .15, .02, { k: .06 }));
+  const plates = []; for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2; plates.push(P(E(D, Math.cos(a) * .55, .55, Math.sin(a) * .55, .22, .2, .22))); }
+  k.addGeo('body', sculpt([E(G, 0, .25, 0, 1, .78, 1), E(R, 0, .08, 0, 1.08, .2, 1.08, null, { k: .1 }), E(C, 0, -.02, 0, .95, .14, .95, null, { k: .1 }), ...plates, ...spikes], { k: .12, res: 52 }));
+  return k.build();
+}

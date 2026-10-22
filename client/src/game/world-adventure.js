@@ -174,7 +174,7 @@ export function buildAdventure(ctx) {
     };
     onLand(260, 8, 460, .3, (x, y, z) => palm(x, y, z, 6 + r() * 5));
     const bush = std(0x3f7d34, { flatShading: true }), flower = [std(0xff5a8a), std(0xffd04a), std(0xff8a3a)];
-    onLand(380, 6, 460, 1.4, (x, y, z) => { inst(G.ico, bush, M(x, y + .4, z, 1 + r() * 1.4, .8 + r(), 1 + r() * 1.4)); if (r() < .4) inst(G.sphere, flower[Math.floor(r() * 3)], M(x + .8, y + .5, z, .3, .3, .3), { cast: false }); });
+    onLand(380, 6, 460, 1.4, (x, y, z) => { inst(G.puff, bush, M(x, y + .4, z, 1 + r() * 1.4, .8 + r(), 1 + r() * 1.4)); if (r() < .4) inst(G.sphere, flower[Math.floor(r() * 3)], M(x + .8, y + .5, z, .3, .3, .3), { cast: false }); });
     const rock = std(0x8a8178, { roughness: 1, flatShading: true });
     for (let i = 0; i < 90; i++) { const a = r() * TAU, d = 60 + r() * 420, x = Math.cos(a) * d, z = Math.sin(a) * d; if (!free(x, z, 12)) continue; const h = terrainH(x, z); if (h > fallY + 1.5 || h < fallY - 6) continue; inst(G.rock, rock, M(x, fallY - .6, z, 1.5 + r() * 4, 1 + r() * 2.5, 1.5 + r() * 3, r() * 6)); }
 
@@ -330,7 +330,7 @@ export function buildAdventure(ctx) {
     inWater(22, 14, 300, (x, z) => { const b = new THREE.Group(); const c = new THREE.Mesh(G.cyl, r() < .5 ? barrelMat : plank); c.scale.set(.7, 1.6, .7); b.add(c); const s = new THREE.Mesh(G.cyl, band); s.scale.set(.74, .12, .74); b.add(s); b.position.set(x, fallY, z); b.rotation.set(Math.PI / 2, r() * 6, 0); group.add(b); barrels.push([b, r() * 9]); });
     updaters.push((dt, t) => barrels.forEach(([b, ph]) => { b.position.y = fallY + Math.sin(t * 1.2 + ph) * .18; b.rotation.y += dt * .05; }));
     // ---- far islands on the horizon ----
-    for (let i = 0; i < 14; i++) { const a = r() * TAU, d = 650 + r() * 500, x = Math.cos(a) * d, z = Math.sin(a) * d, s = 40 + r() * 80; inst(G.ico, std(0x5a8a4a, { flatShading: true }), M(x, fallY - s * .25, z, s, s * .45, s * .8, r() * 6), { cast: false }); for (let k = 0; k < 5; k++) palm(x + (r() - .5) * s * .8, fallY + s * .1, z + (r() - .5) * s * .5, 9 + r() * 6); }
+    for (let i = 0; i < 14; i++) { const a = r() * TAU, d = 650 + r() * 500, x = Math.cos(a) * d, z = Math.sin(a) * d, s = 40 + r() * 80; inst(G.hill, std(0x5a8a4a, { flatShading: true }), M(x, fallY - s * .25, z, s, s * .45, s * .8, r() * 6), { cast: false }); for (let k = 0; k < 5; k++) palm(x + (r() - .5) * s * .8, fallY + s * .1, z + (r() - .5) * s * .5, 9 + r() * 6); }
   }
 
   // =====================================================================================
@@ -375,7 +375,7 @@ export function buildAdventure(ctx) {
     onLand(150, 8, 440, .8, (x, y, z) => lolli(x, y, z, 4 + r() * 5));
     onLand(110, 8, 440, .8, (x, y, z) => cane(x, y, z, 5 + r() * 6, r() * TAU));
     onLand(360, 5, 440, .6, (x, y, z) => { const s = .8 + r() * 2.2; inst(halfSphere, gumColors[Math.floor(r() * gumColors.length)], M(x, y - .1, z, s, s * 1.15, s)); });
-    onLand(90, 9, 440, .8, (x, y, z) => { const h = 4 + r() * 4, m = cotton[Math.floor(r() * 2)]; inst(G.cylLow, stick, M(x, y + h / 2, z, .2, h, .2)); for (let k = 0; k < 4; k++) inst(G.ico, m, M(x + (r() - .5) * 2.6, y + h + r() * 1.4, z + (r() - .5) * 2.6, 2 + r(), 1.6 + r(), 2 + r(), r() * 6)); });
+    onLand(90, 9, 440, .8, (x, y, z) => { const h = 4 + r() * 4, m = cotton[Math.floor(r() * 2)]; inst(G.cylLow, stick, M(x, y + h / 2, z, .2, h, .2)); for (let k = 0; k < 4; k++) inst(G.puff, m, M(x + (r() - .5) * 2.6, y + h + r() * 1.4, z + (r() - .5) * 2.6, 2 + r(), 1.6 + r(), 2 + r(), r() * 6)); });
     const mint = new THREE.MeshStandardMaterial({ map: canvasTex(128, (g, s) => { g.fillStyle = '#ffffff'; g.fillRect(0, 0, s, s); g.fillStyle = '#ff2a4a'; for (let k = 0; k < 8; k++) { g.beginPath(); g.moveTo(s / 2, s / 2); g.arc(s / 2, s / 2, s / 2, k * TAU / 8, k * TAU / 8 + TAU / 16); g.fill(); } }, 1), roughness: .3 });
     const mintGeo = new THREE.CylinderGeometry(1, 1, .3, 24);
     onLand(70, 6, 440, .6, (x, y, z) => { const s = 1.5 + r() * 2; inst(mintGeo, mint, M(x, y + .1, z, s, 1, s, r() * TAU), { cast: false }); });
