@@ -1,6 +1,7 @@
 // Four-player, host-authoritative WebRTC sessions. Signalling stays in the
 // invitation/answer codes; only car and race data travel over the data channels.
-const MAP_IDS = new Set(['coast', 'canyon', 'neon', 'volcano', 'glacier', 'stars', 'jungle', 'savanna', 'forest', 'sky', 'sakura', 'moon', 'pirate', 'candy', 'castle', 'arctic', 'rooftops', 'galaxy']);
+const MAP_IDS = new Set(['coast', 'canyon', 'neon', 'volcano', 'glacier', 'stars', 'jungle', 'savanna', 'forest', 'sky', 'sakura', 'moon', 'pirate', 'candy', 'castle', 'arctic', 'rooftops', 'galaxy', 'arena', 'colosseum', 'icering']);
+const BATTLES = ['balloons', 'coins', 'crown'];
 const KART_IDS = new Set(['allround', 'bolide', 'flitzer', 'brummer', 'drifter', 'buggy']);
 const DEFAULT_COLOR = '#ee4b37';
 const CAR_COLORS = ['#ee4b37', '#42c9cb', '#edc44b', '#9b87e5'];
@@ -68,9 +69,20 @@ function cleanCar(state) {
     hits: Array.isArray(state.hits) ? state.hits.slice(0, 8).filter(h => h && typeof h.id === 'string' && h.id.length < 30 && finite(h.bot) && ['green', 'red', 'banana', 'star', 'blue', 'ink'].includes(h.k))
       .map(h => ({id: h.id, bot: clamp(Math.floor(h.bot), 0, 6), k: h.k})) : [],
     boosting: state.boosting === true, drifting: state.drifting === true,
+    // battle: own balloons, knocked out, how often we were hit (the host turns hits into dropped coins / crown)
+    bal: finite(state.bal) ? clamp(Math.floor(state.bal), 0, 5) : undefined, out: state.out === true, hn: finite(state.hn) ? clamp(Math.floor(state.hn), 0, 9999) : 0,
     progress: clamp(state.progress, -.2, 4), lap: finite(state.lap) ? clamp(Math.floor(state.lap), 0, 4) : 0,
     elapsed: finite(state.elapsed) ? clamp(state.elapsed, 0, 1800) : 0,
   };
+}
+const KEY_RE = /^(p:[a-zA-Z0-9_-]{5,64}|b:[0-6])$/;
+function cleanBattle(s) {
+  if (!s || typeof s !== 'object' || !finite(s.left)) return null;
+  const coins = Array.isArray(s.coins) ? s.coins.slice(0, 160).filter(k => Array.isArray(k) && finite(k[0]) && finite(k[1]) && finite(k[2])).map(k => [clamp(k[0], -400, 400), clamp(k[1], -400, 400), k[2]]) : [];
+  const c = s.crown, crown = c && finite(c.x) && finite(c.z) ? { x: clamp(c.x, -400, 400), y: finite(c.y) ? clamp(c.y, -60, 80) : 0, z: clamp(c.z, -400, 400), h: typeof c.h === 'string' && KEY_RE.test(c.h) ? c.h : null } : null;
+  const st = Array.isArray(s.st) ? s.st.slice(0, 16).filter(e => e && typeof e.k === 'string' && KEY_RE.test(e.k)).map(e => ({ k: e.k,
+    c: finite(e.c) ? clamp(Math.floor(e.c), 0, 9999) : 0, t: finite(e.t) ? clamp(e.t, 0, 999) : 0, b: finite(e.b) ? clamp(Math.floor(e.b), 0, 5) : 0, o: e.o === true, h: finite(e.h) ? clamp(Math.floor(e.h), 0, 999) : 0 })) : [];
+  return { left: clamp(s.left, 0, 999), coins, crown, st, end: s.end === true };
 }
 function cleanFinish(data) {
   if (!data || !finite(data.time) || data.time <= 0 || data.time > 1800) return null;
@@ -296,7 +308,7 @@ export class MultiplayerSession {
     if (!peer.ready) return;
     if (data.type === 'start' && idOf(data.race?.id) && finite(data.race.startAt)) {
       if (this._state.race?.id === data.race.id) return;
-      this._state.status = 'racing'; this._state.race = {id: data.race.id, startAt: data.race.startAt, status: 'racing', cc: [80, 100, 120, 150].includes(data.race.cc) ? data.race.cc : 80};
+      this._state.status = 'racing'; this._state.race = {id: data.race.id, startAt: data.race.startAt, status: 'racing', cc: [80, 100, 120, 150].includes(data.race.cc) ? data.race.cc : 80, battle: BATTLES.includes(data.race.battle) ? data.race.battle : undefined};
       this._state.players.forEach(p => { p.progress = 0; p.finishedTime = null; p.dnf = false; });
       this._change(); this.onEvent({type: 'start', race: clone(this._state.race)}); return;
     }
@@ -306,6 +318,8 @@ export class MultiplayerSession {
       if (!state || !player) return;
       player.progress = state.progress;
       this.onState({id: data.id, state, receivedAt: this.now()});
+    } else if (data.type === 'battle' && this._state.status === 'racing' && this._state.race?.battle) {
+      const snap = cleanBattle(data.s); if (snap) this.onEvent({type: 'battle', snap});
     } else if (data.type === 'results' && Array.isArray(data.results)) {
       const results = this._cleanResults(data.results); if (!results) return;
       this._state.status = 'results'; this._state.race.status = 'results'; this._state.race.results = results;
@@ -359,7 +373,7 @@ export class MultiplayerSession {
   startRace(extra = {}) {
     if (!this.canStart) throw new Error('Mindestens zwei verbundene Fahrer müssen bereit sein.');
     this._state.status = 'racing'; this._state.error = ''; this._firstFinish = 0;
-    this._state.race = {id: uid(), startAt: Date.now() + 4000, status: 'racing', cc: [80, 100, 120, 150].includes(extra.cc) ? extra.cc : 80};
+    this._state.race = {id: uid(), startAt: Date.now() + 4000, status: 'racing', cc: [80, 100, 120, 150].includes(extra.cc) ? extra.cc : 80, battle: BATTLES.includes(extra.battle) ? extra.battle : undefined};
     this._state.players.forEach(p => { p.progress = 0; p.finishedTime = null; p.dnf = false; delete p.finish; });
     // Offers without a completed handshake cannot join a race in progress.
     for (const [id, peer] of this._peers) if (!peer.ready) this._closePeer(id);
@@ -391,7 +405,7 @@ export class MultiplayerSession {
     this._roster(); this._maybeFinish();
   }
   _maybeFinish() {
-    if (!this.isHost || this._state.status !== 'racing') return;
+    if (!this.isHost || this._state.status !== 'racing' || this._state.race?.battle) return;
     const allDone = this._state.players.every(p => p.finishedTime !== null || p.dnf);
     if (!allDone && !(this._firstFinish && Date.now() - this._firstFinish >= 30000) && Date.now() - this._state.race.startAt < 180000) return;
     const players = [...this._state.players].sort((a, b) => {
@@ -404,6 +418,23 @@ export class MultiplayerSession {
       const {finish, ...player} = p;
       return {...player, ...(finish || {time: null, bestLap: null, stats: {}, coins: 0}), place: index + 1};
     });
+    this._state.status = 'results'; this._state.race.status = 'results'; this._state.race.results = results;
+    this._broadcast({type: 'results', raceId: this._state.race.id, results});
+    this._change(); this.onEvent({type: 'results', results: clone(results), race: clone(this._state.race)});
+  }
+  // Host: battle clock, coins, crown and standings for everybody (several times a second, may be dropped).
+  publishBattle(snap) {
+    if (!this.isHost || this._state.status !== 'racing' || !this._state.race?.battle) return;
+    this._broadcast({type: 'battle', raceId: this._state.race.id, s: snap}, '', true);
+  }
+  // Host: final battle order of the human players (best first), each with the time played and its score.
+  finishBattle(order) {
+    if (!this.isHost || this._state.status !== 'racing' || !this._state.race?.battle) return;
+    const rows = order.map(o => this._state.players.find(p => p.id === o.id)).filter(Boolean);
+    for (const p of this._state.players) if (!rows.includes(p)) rows.push(p);
+    const time = Math.max(1, Math.min(1800, (Date.now() - this._state.race.startAt) / 1000));
+    const results = rows.map((p, index) => { const o = order.find(x => x.id === p.id) || {}; const {finish, ...player} = p;
+      return {...player, time, bestLap: null, stats: {bv: finite(o.value) ? o.value : 0, hits: finite(o.hits) ? o.hits : 0, out: o.out ? 1 : 0}, coins: 0, finishedTime: time, dnf: !p.connected, place: index + 1}; });
     this._state.status = 'results'; this._state.race.status = 'results'; this._state.race.results = results;
     this._broadcast({type: 'results', raceId: this._state.race.id, results});
     this._change(); this.onEvent({type: 'results', results: clone(results), race: clone(this._state.race)});
