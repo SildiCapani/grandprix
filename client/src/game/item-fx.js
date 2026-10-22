@@ -43,16 +43,20 @@ export function createItemFx(scene) {
   }
   function pop(x, y, z) { burst(x, y, z, 0x9ae8ff, 20, 7); }
   // Confetti: little coloured paper squares tumbling down (race start, finish).
-  const paperGeo = new THREE.PlaneGeometry(.18, .12), papers = [], paperCols = [0xff4a3a, 0xffd04a, 0x3ab8ff, 0x5ad86a, 0xff7ac2, 0xffffff].map(c => new THREE.MeshBasicMaterial({ color: c, side: THREE.DoubleSide }));
+  // One instanced mesh for all paper pieces (a single draw call however much confetti is flying).
+  const MAXP = 700, paperCols = [0xff4a3a, 0xffd04a, 0x3ab8ff, 0x5ad86a, 0xff7ac2, 0xffffff].map(c => new THREE.Color(c)), papers = [];
+  const paperMesh = new THREE.InstancedMesh(new THREE.PlaneGeometry(.18, .12), new THREE.MeshBasicMaterial({ side: THREE.DoubleSide }), MAXP);
+  paperMesh.count = 0; paperMesh.frustumCulled = false; paperMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage); scene.add(paperMesh);
+  for (let i = 0; i < MAXP; i++) paperMesh.setColorAt(i, paperCols[i % paperCols.length]);
+  const _o = new THREE.Object3D();
   function confetti(x, y, z, n = 140, spread = 8) {
-    for (let i = 0; i < n; i++) {
-      const m = new THREE.Mesh(paperGeo, paperCols[i % paperCols.length]); m.position.set(x + (Math.random() - .5) * spread, y + 5 + Math.random() * 3, z + (Math.random() - .5) * spread); scene.add(m);
-      papers.push({ m, vx: (Math.random() - .5) * 6, vy: 4 + Math.random() * 5, vz: (Math.random() - .5) * 6, sx: Math.random() * 9, sy: Math.random() * 9, life: 3 + Math.random() * 1.5 });
-    }
+    for (let i = 0; i < n && papers.length < MAXP; i++) papers.push({ x: x + (Math.random() - .5) * spread, y: y + 5 + Math.random() * 3, z: z + (Math.random() - .5) * spread, rx: 0, ry: 0, vx: (Math.random() - .5) * 6, vy: 4 + Math.random() * 5, vz: (Math.random() - .5) * 6, sx: Math.random() * 9, sy: Math.random() * 9, life: 3 + Math.random() * 1.5 });
   }
   function swapFx(x, y, z) { burst(x, y, z, 0xffd84a, 14, 4); burst(x, y, z, 0xff6ad8, 10, 2.5); }
   function tick(dt) {
-    for (let i = papers.length - 1; i >= 0; i--) { const p = papers[i]; p.life -= dt; if (p.life <= 0) { scene.remove(p.m); papers.splice(i, 1); continue; } p.vy = Math.max(-2.2, p.vy - 9 * dt); p.vx *= Math.exp(-dt); p.vz *= Math.exp(-dt); p.m.position.x += (p.vx + Math.sin(p.life * 3) * .6) * dt; p.m.position.y += p.vy * dt; p.m.position.z += p.vz * dt; p.m.rotation.x += p.sx * dt; p.m.rotation.y += p.sy * dt; }
+    for (let i = papers.length - 1; i >= 0; i--) { const p = papers[i]; p.life -= dt; if (p.life <= 0) { papers.splice(i, 1); continue; } p.vy = Math.max(-2.2, p.vy - 9 * dt); p.vx *= Math.exp(-dt); p.vz *= Math.exp(-dt); p.x += (p.vx + Math.sin(p.life * 3) * .6) * dt; p.y += p.vy * dt; p.z += p.vz * dt; p.rx += p.sx * dt; p.ry += p.sy * dt; }
+    papers.forEach((p, i) => { _o.position.set(p.x, p.y, p.z); _o.rotation.set(p.rx, p.ry, 0); _o.updateMatrix(); paperMesh.setMatrixAt(i, _o.matrix); });
+    if (papers.length || paperMesh.count) { paperMesh.count = papers.length; paperMesh.instanceMatrix.needsUpdate = true; }
     for (let i = sparkles.length - 1; i >= 0; i--) {
       const p = sparkles[i]; p.life -= dt;
       if (p.life <= 0) { scene.remove(p.s); p.s.material.dispose(); sparkles.splice(i, 1); continue; }

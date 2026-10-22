@@ -12,6 +12,10 @@ const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const finite = v => typeof v === 'number' && Number.isFinite(v);
 const nameOf = v => String(v || 'Rookie Pilot').replace(/[\u0000-\u001f\u007f]/g, '').trim().slice(0, 20) || 'Rookie Pilot';
 const colorOf = v => /^#[\da-f]{6}$/i.test(v || '') ? v.toLowerCase() : DEFAULT_COLOR;
+const word = (v, d) => typeof v === 'string' && /^[a-z]{2,12}$/.test(v) ? v : d;
+// What a driver looks like in the lobby (kart, driver avatar, paint skin, finish).
+const lookOf = v => ({kart: KART_IDS.has(v?.kart) ? v.kart : 'allround', avatar: word(v?.avatar, 'pilot'), skin: word(v?.skin, 'none'),
+  finish: ['standard', 'gold', 'chrome', 'neon'].includes(v?.finish) ? v.finish : 'standard'});
 const idOf = v => typeof v === 'string' && /^[a-zA-Z0-9_-]{5,64}$/.test(v);
 const clone = v => JSON.parse(JSON.stringify(v));
 function uid() {
@@ -96,8 +100,8 @@ export class MultiplayerSession {
   now() { return Date.now() + this._clockOffset; }
   _change() { this.onChange(this.state); }
   _error(message) { this._state.error = message; this._change(); }
-  _player(id, name, color, connected = true) {
-    return {id, name: nameOf(name), color: colorOf(color), ready: false, connected, progress: 0, finishedTime: null, dnf: false};
+  _player(id, name, color, connected = true, look = null) {
+    return {id, name: nameOf(name), color: colorOf(color), look: lookOf(look), ready: false, connected, progress: 0, finishedTime: null, dnf: false};
   }
   _begin() {
     this._disposed = false;
@@ -108,7 +112,7 @@ export class MultiplayerSession {
     if (!MAP_IDS.has(mapId)) throw new Error('Unbekannte Strecke.');
     const id = uid();
     this._state = {role: 'host', status: 'lobby', roomId: uid(), selfId: id, hostId: id, mapId,
-      players: [this._player(id, name, color)], race: null, error: ''};
+      players: [this._player(id, name, color, true, this._look)], race: null, error: ''};
     this._clockOffset = 0; this._begin(); this._change();
     return this.state;
   }
@@ -141,7 +145,7 @@ export class MultiplayerSession {
       peer.connected = true; peer.connectSince = 0; peer.lastSeen = Date.now();
       if (!this.isHost) {
         const self = this._state.players.find(p => p.id === this._state.selfId);
-        this._send(peer, {type: 'hello', name: self?.name, color: self?.color});
+        this._send(peer, {type: 'hello', name: self?.name, color: self?.color, look: self?.look});
       }
     };
     channel.onmessage = event => {
@@ -239,7 +243,7 @@ export class MultiplayerSession {
           const used = new Set(this._state.players.map(p => p.color));
           const desired = colorOf(data.color);
           const color = used.has(desired) ? CAR_COLORS.find(c => !used.has(c)) || desired : desired;
-          this._state.players.push(this._player(peer.id, data.name, color));
+          this._state.players.push(this._player(peer.id, data.name, color, true, data.look));
         }
         else player.connected = true;
         this._state.error = ''; this._roster();
@@ -252,6 +256,10 @@ export class MultiplayerSession {
       }
       if (data.type === 'ready' && this._state.status === 'lobby') {
         const player = this._state.players.find(p => p.id === peer.id); if (player) { player.ready = data.ready === true; this._roster(); } return;
+      }
+      if (data.type === 'look' && this._state.status === 'lobby') {
+        const player = this._state.players.find(p => p.id === peer.id);
+        if (player) { player.look = lookOf(data.look); if (data.color) player.color = colorOf(data.color); this._roster(); } return;
       }
       if (data.type === 'leave') { this._dropPeer(peer.id, 'Spieler hat das Rennen verlassen.'); return; }
       if (data.raceId !== this._state.race?.id || this._state.status !== 'racing') return;
@@ -311,7 +319,7 @@ export class MultiplayerSession {
   _cleanRoster(raw) {
     if (!Array.isArray(raw) || raw.length < 1 || raw.length > LIMIT || new Set(raw.map(p => p?.id)).size !== raw.length) return null;
     if (raw.some(p => !p || !idOf(p.id) || typeof p.name !== 'string' || typeof p.color !== 'string')) return null;
-    return raw.map(p => ({...this._player(p.id, p.name, p.color, p.connected === true), ready: p.ready === true,
+    return raw.map(p => ({...this._player(p.id, p.name, p.color, p.connected === true, p.look), ready: p.ready === true,
       progress: finite(p.progress) ? clamp(p.progress, -.2, 4) : 0,
       finishedTime: finite(p.finishedTime) ? clamp(p.finishedTime, 0, 1800) : null, dnf: p.dnf === true}));
   }
@@ -332,6 +340,17 @@ export class MultiplayerSession {
     if (this._state.status !== 'lobby') return;
     if (this.isHost) { const me = this._state.players.find(p => p.id === this._state.selfId); me.ready = !!ready; this._roster(); }
     else this._send(this._peers.get(this._state.hostId), {type: 'ready', ready: !!ready});
+  }
+  // Kart / driver / paint changed in the lobby: everyone sees it on the grid.
+  setLook(look, color) {
+    this._look = lookOf(look);
+    const me = this._state.players.find(p => p.id === this._state.selfId);
+    if (!me || this._state.status !== 'lobby') return;
+    const same = JSON.stringify(me.look) === JSON.stringify(this._look) && (!color || me.color === colorOf(color));
+    if (same) return;
+    me.look = this._look; if (color) me.color = colorOf(color);
+    if (this.isHost) this._roster();
+    else { this._send(this._peers.get(this._state.hostId), {type: 'look', look: this._look, color: color ? colorOf(color) : undefined}); this._change(); }
   }
   setMap(mapId) {
     if (!this.isHost || this._state.status !== 'lobby' || !MAP_IDS.has(mapId)) return false;
@@ -392,7 +411,7 @@ export class MultiplayerSession {
   restartLobby() {
     if (!this.isHost || this._state.status !== 'results') return false;
     this._state.status = 'lobby'; this._state.race = null; this._firstFinish = 0;
-    this._state.players = this._state.players.filter(p => p.connected).map(p => this._player(p.id, p.name, p.color));
+    this._state.players = this._state.players.filter(p => p.connected).map(p => this._player(p.id, p.name, p.color, true, p.look));
     this._roster(); return true;
   }
   _ping(peer) {

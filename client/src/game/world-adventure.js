@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { bird, bat, gummyBear, dragon, penguin, orca, seal, polarBear, dolphin, krakenHead, husky, tentacle } from './critters.js';
 
 // Season 3 worlds: the course runs over water / chocolate / an abyss, with open edges to fall off.
 //   pirate → Piratenbucht: beach, a long pier, galleons firing cannons, a friendly kraken, dolphins, seagulls, Skull Island
@@ -123,22 +124,18 @@ export function buildAdventure(ctx) {
       }
     }
   }
-  // Birds / bats circling: thin V wings that flap.
+  // Birds / bats circling: cartoon models from critters.js (dark colour = bats).
   function flock(n, cx, cz, rad, y0, y1, color, size, speed = .25, flapRate = 9) {
-    const mat = new THREE.MeshStandardMaterial({ color, roughness: .8, side: THREE.DoubleSide });
-    const wingGeo = new THREE.PlaneGeometry(size, size * .38); wingGeo.translate(size / 2, 0, 0);
-    const birds = [];
+    const dark = new THREE.Color(color).getHSL({}).l < .15, birds = [];
     for (let i = 0; i < n; i++) {
-      const b = new THREE.Group(), l = new THREE.Mesh(wingGeo, mat), rr = new THREE.Mesh(wingGeo, mat);
-      l.rotation.x = rr.rotation.x = -Math.PI / 2; rr.rotation.z = Math.PI;
-      const body = new THREE.Mesh(G.sphere, mat); body.scale.set(size * .12, size * .1, size * .4); b.add(l, rr, body);
-      b.userData = { ph: r() * TAU, rad: rad * (.4 + r() * .7), y: lerp(y0, y1, r()), sp: speed * (.7 + r() * .6) * (r() < .5 ? -1 : 1), l, rr, ox: (r() - .5) * rad * .6, oz: (r() - .5) * rad * .6 };
+      const b = dark ? bat() : bird(color); b.scale.setScalar(size * (dark ? 1.1 : 1.4));
+      b.userData.f = { ph: r() * TAU, rad: rad * (.4 + r() * .7), y: lerp(y0, y1, r()), sp: speed * (.7 + r() * .6) * (r() < .5 ? -1 : 1), ox: (r() - .5) * rad * .6, oz: (r() - .5) * rad * .6 };
       group.add(b); birds.push(b);
     }
     updaters.push((dt, t) => birds.forEach(b => {
-      const u = b.userData, a = u.ph + t * u.sp, x = cx + u.ox + Math.cos(a) * u.rad, z = cz + u.oz + Math.sin(a) * u.rad;
-      b.position.set(x, u.y + Math.sin(t * .7 + u.ph) * 2, z); b.rotation.y = -a + (u.sp > 0 ? 0 : Math.PI);
-      const f = Math.sin(t * flapRate + u.ph) * .55; u.l.rotation.y = f; u.rr.rotation.y = -f;
+      const u = b.userData.f, a = u.ph + t * u.sp, x = cx + u.ox + Math.cos(a) * u.rad, z = cz + u.oz + Math.sin(a) * u.rad;
+      b.position.set(x, u.y + Math.sin(t * .7 + u.ph) * 2, z); b.rotation.y = -a + (u.sp > 0 ? 0 : Math.PI); b.rotation.z = u.sp > 0 ? .3 : -.3;
+      b.userData.anim(t + u.ph, flapRate);
     }));
   }
   const striped = (a, b, n = 8, diag = false) => canvasTex(128, (g, s) => {
@@ -250,41 +247,29 @@ export function buildAdventure(ctx) {
 
     // ---- a friendly kraken waving its tentacles next to the pier ----
     {
-      const kx = 175, kz = 30, purple = std(0x8a3aa8, { roughness: .5 }), pale = std(0xe8a0d8, { roughness: .6 });
+      const kx = 175, kz = 30;
       const tentacles = [];
       for (let i = 0; i < 6; i++) {
-        const a = i / 6 * TAU, bx = kx + Math.cos(a) * 9, bz = kz + Math.sin(a) * 9, segs = [];
-        for (let k = 0; k < 9; k++) { const m = new THREE.Mesh(G.sphere, k % 3 === 2 ? pale : purple); const s = 1.5 - k * .14; m.scale.set(s, s * 1.15, s); m.castShadow = true; group.add(m); segs.push(m); }
-        tentacles.push({ bx, bz, a, segs, ph: r() * TAU });
+        const a = i / 6 * TAU, tc = tentacle(); tc.scale.setScalar(1.7); tc.position.set(kx + Math.cos(a) * 8, fallY - 1.5, kz + Math.sin(a) * 8); tc.rotation.y = Math.PI / 2 - a; group.add(tc);
+        tentacles.push({ tc, ph: r() * TAU });
       }
-      const head = add(new THREE.Mesh(G.sphere, purple), kx, fallY + 1.2, kz); head.scale.set(6, 4, 6);
-      for (const sd of [-1, 1]) { const e = add(new THREE.Mesh(G.sphere, std(0xffffff)), kx + sd * 2.4, fallY + 3.4, kz + 4.4); e.scale.setScalar(1.3); const p = add(new THREE.Mesh(G.sphere, std(0x111111)), kx + sd * 2.4, fallY + 3.4, kz + 5.5); p.scale.setScalar(.6); }
+      const head = add(krakenHead(), kx, fallY + 1.2, kz); head.scale.setScalar(5.2);
       updaters.push((dt, t) => {
         head.position.y = fallY + 1 + Math.sin(t * .9) * .4;
-        for (const tc of tentacles) {
-          let x = tc.bx, y = fallY - .5, z = tc.bz;
-          tc.segs.forEach((m, k) => {
-            const bend = Math.sin(t * 1.4 + tc.ph + k * .5) * .5, up = 1.6 - k * .06;
-            x += Math.cos(tc.a) * .5 + Math.cos(tc.a + Math.PI / 2) * bend * .6; z += Math.sin(tc.a) * .5 + Math.sin(tc.a + Math.PI / 2) * bend * .6; y += up * (1 - k * .05);
-            m.position.set(x, y, z);
-          });
-        }
+        for (const o of tentacles) o.tc.userData.bend(.55 + Math.sin(t * 1.2 + o.ph) * .3, t + o.ph);
       });
     }
     // ---- dolphins jumping out of the water ----
     {
-      const dMat = std(0x7a9ab8, { roughness: .35 }), belly = std(0xe0eaf2, { roughness: .4 }), dolphins = [];
+      const dolphins = [];
       for (let i = 0; i < 5; i++) {
-        const d = new THREE.Group(), b = new THREE.Mesh(G.sphere, dMat); b.scale.set(.8, .75, 2.6); d.add(b);
-        const u = new THREE.Mesh(G.sphere, belly); u.scale.set(.65, .5, 2.2); u.position.y = -.25; d.add(u);
-        const fin = new THREE.Mesh(G.cone, dMat); fin.scale.set(.15, .9, .6); fin.position.set(0, .8, -.2); fin.rotation.x = -.5; d.add(fin);
-        const tail = new THREE.Mesh(G.box, dMat); tail.scale.set(1.8, .12, .6); tail.position.z = -2.6; d.add(tail);
+        const d = dolphin(); d.scale.setScalar(1.25);
         group.add(d); dolphins.push({ d, cx: -40 + r() * 140, cz: -110 + r() * 120, a: r() * TAU, ph: r() * 10 });
       }
       updaters.push((dt, t) => dolphins.forEach(o => {
         const k = ((t + o.ph) % 4.2) / 4.2, jump = k < .42, u = jump ? k / .42 : 0;
         const along = (t * .15 + o.ph) % TAU, x = o.cx + Math.cos(along) * 18, z = o.cz + Math.sin(along) * 18;
-        o.d.position.set(x, fallY - 1.4 + (jump ? Math.sin(u * Math.PI) * 4.2 : -2), z); o.d.rotation.y = -along; o.d.rotation.x = jump ? (u - .5) * 1.6 : 0; o.d.visible = jump;
+        o.d.position.set(x, fallY - 1.4 + (jump ? Math.sin(u * Math.PI) * 4.2 : -2), z); o.d.rotation.y = -along; o.d.rotation.x = jump ? (u - .5) * 1.6 : 0; o.d.visible = jump; if (jump) o.d.userData.anim(t);
       }));
     }
     flock(26, 0, 40, 170, 16, 34, 0xf4f4f0, 1.6, .22);
@@ -434,17 +419,12 @@ export function buildAdventure(ctx) {
     {
       const bears = [], bearCols = [0xff3a4a, 0x3ad86a, 0xffc83a, 0xff8a2a, 0xffffff];
       onLand(14, 12, 380, 1, (x, y, z) => {
-        const col = bearCols[bears.length % bearCols.length], m = std(col, { roughness: .2, transparent: true, opacity: .82, emissive: col, emissiveIntensity: .15 }); m.userData.live = true;
-        const b = new THREE.Group(), part = (sx, sy, sz, px, py, pz) => { const p = new THREE.Mesh(G.sphere, m); p.scale.set(sx, sy, sz); p.position.set(px, py, pz); p.castShadow = true; b.add(p); return p; };
-        part(1.3, 1.6, 1.1, 0, 1.8, 0); part(1, .9, .9, 0, 3.8, 0); part(.35, .35, .3, -.7, 4.6, 0); part(.35, .35, .3, .7, 4.6, 0);
-        const legs = [part(.45, .7, .45, -.6, .6, 0), part(.45, .7, .45, .6, .6, 0)], arms = [part(.35, .8, .35, -1.3, 2.2, 0), part(.35, .8, .35, 1.3, 2.2, 0)];
-        for (const sd of [-1, 1]) { const e = new THREE.Mesh(G.sphere, std(0x111111)); e.scale.setScalar(.12); e.position.set(sd * .35, 4, .82); b.add(e); }
-        b.scale.setScalar(1.3 + r() * .8); b.position.set(x, y, z); group.add(b); bears.push({ b, x, z, y, ph: r() * 10, rad: 6 + r() * 10, legs, arms, sp: (.15 + r() * .2) * (r() < .5 ? -1 : 1) });
+        const b = gummyBear(bearCols[bears.length % bearCols.length]); b.scale.setScalar(2.6 + r() * 1.6); b.position.set(x, y, z); group.add(b);
+        bears.push({ b, x, z, y, ph: r() * 10, rad: 6 + r() * 10, sp: (.15 + r() * .2) * (r() < .5 ? -1 : 1) });
       });
       updaters.push((dt, t) => bears.forEach(o => {
         const a = t * o.sp + o.ph, x = o.x + Math.cos(a) * o.rad, z = o.z + Math.sin(a) * o.rad;
-        o.b.position.set(x, Math.max(fallY + .3, terrainH(x, z)) + Math.abs(Math.sin(t * 5 + o.ph)) * .35, z); o.b.rotation.y = -a + (o.sp > 0 ? Math.PI : 0);
-        const sw = Math.sin(t * 5 + o.ph) * .5; o.legs[0].rotation.x = sw; o.legs[1].rotation.x = -sw; o.arms[0].rotation.x = -sw; o.arms[1].rotation.x = sw;
+        o.b.position.set(x, Math.max(fallY + .3, terrainH(x, z)), z); o.b.rotation.y = -a + (o.sp > 0 ? 0 : Math.PI); o.b.userData.anim(t * .7 + o.ph, 1);
       }));
     }
     // ---- marshmallow clouds drifting by, a rainbow, sprinkles in the air ----
@@ -559,27 +539,18 @@ export function buildAdventure(ctx) {
       const scales = std(0x7a1a22, { roughness: .5, metalness: .2 }), belly = std(0xd8a040, { roughness: .6 }), wingMat = new THREE.MeshStandardMaterial({ color: 0x5a1018, roughness: .7, side: THREE.DoubleSide });
       const eyeMat = new THREE.MeshBasicMaterial({ color: 0xffe040, toneMapped: false });
       const makeDragon = (scale) => {
-        const d = new THREE.Group(), part = (geo, mat, x, y, z, sx, sy, sz, rx = 0, ry = 0, rz = 0) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.scale.set(sx, sy, sz); m.rotation.set(rx, ry, rz); m.castShadow = true; d.add(m); return m; };
-        part(G.sphere, scales, 0, 0, 0, 2.2, 2, 5); part(G.sphere, belly, 0, -.8, .2, 1.7, 1.2, 4.2);
-        for (let k = 0; k < 4; k++) part(G.sphere, scales, 0, .6 + k * .7, 4.4 + k * 1.3, 1.1 - k * .1, 1.1 - k * .1, 1.4);
-        const head = part(G.box, scales, 0, 3.6, 9.6, 1.9, 1.5, 3); part(G.box, scales, 0, 3.1, 11.3, 1.4, .8, 1.6);
-        for (const sd of [-1, 1]) { part(G.cone, belly, sd * .7, 4.8, 9, .3, 1.6, .3, -.6); part(G.sphere, eyeMat, sd * .8, 4, 10.6, .25, .25, .25); }
-        for (let k = 0; k < 7; k++) part(G.sphere, scales, 0, -.2 - k * .1, -5 - k * 1.6, 1.2 - k * .15, 1 - k * .12, 1.2);
-        part(G.cone, belly, 0, -1, -16.5, .8, 2, .3, -Math.PI / 2);
-        for (let k = 0; k < 6; k++) part(G.cone, belly, 0, 1.8, -2 + k * 1.5, .3, 1, .3);
-        const wings = [-1, 1].map(sd => { const w = new THREE.Group(), shape = new THREE.Shape(); shape.moveTo(0, 0); shape.lineTo(12, 3); shape.lineTo(15, -2); shape.lineTo(10, -3); shape.lineTo(7, -6); shape.lineTo(3, -5); shape.lineTo(0, -4); shape.closePath();
-          const m = new THREE.Mesh(new THREE.ShapeGeometry(shape), wingMat); m.rotation.x = -Math.PI / 2; m.scale.x = sd; w.add(m); w.position.set(sd * 1.5, 1, 1.5); d.add(w); return w; });
-        const fire = []; for (let k = 0; k < 10; k++) { const f = sprite(flameTex, 0xff8020, 2); f.visible = false; d.add(f); fire.push(f); }
-        d.scale.setScalar(scale); d.userData = { wings, fire, head }; return d;
+        const d = dragon(0xd8403a, 0xffd27a, 0x8a2a5a); d.scale.setScalar(scale * 5.5);
+        const fire = []; for (let k = 0; k < 10; k++) { const f = sprite(flameTex, 0xff8020, .4); f.visible = false; d.add(f); fire.push(f); }
+        d.userData.fire = fire; return d;
       };
       const dragons = [{ d: makeDragon(1.6), cx: -190, cz: -90, rad: 95, y: 42, sp: .16, ph: 0 }, { d: makeDragon(.9), cx: 40, cz: 260, rad: 160, y: 70, sp: -.1, ph: 2 }, { d: makeDragon(.7), cx: 300, cz: -260, rad: 120, y: 30, sp: .13, ph: 4 }];
       dragons.forEach(o => group.add(o.d));
       updaters.push((dt, t) => dragons.forEach((o, i) => {
         const a = o.ph + t * o.sp, x = o.cx + Math.cos(a) * o.rad, z = o.cz + Math.sin(a) * o.rad, dir = o.sp > 0 ? 1 : -1;
         o.d.position.set(x, o.y + Math.sin(t * .8 + o.ph) * 5, z); o.d.rotation.y = Math.atan2(-Math.sin(a) * dir, Math.cos(a) * dir); o.d.rotation.z = -.25 * dir;
-        const flap = Math.sin(t * 3 + o.ph) * .6; o.d.userData.wings[0].rotation.z = -flap; o.d.userData.wings[1].rotation.z = flap;
+        o.d.userData.anim(t + o.ph, 3);
         const breathing = i === 0 && ((t + 3) % 9) < 1.6;
-        o.d.userData.fire.forEach((f, k) => { f.visible = breathing; if (!breathing) return; const u = ((t * 2.5 + k / 10) % 1); f.position.set((Math.random() - .5) * u * 2, 3.1 - u * 2, 12 + u * 14); f.scale.setScalar(1.5 + u * 5); f.material.opacity = 1 - u; });
+        o.d.userData.fire.forEach((f, k) => { f.visible = breathing; if (!breathing) return; const u = ((t * 2.5 + k / 10) % 1); f.position.set((Math.random() - .5) * u * .4, .7 - u * .4, 3.4 + u * 2.6); f.scale.setScalar(.3 + u * .9); f.material.opacity = 1 - u; });
       }));
     }
     flock(36, 180, -60, 70, 5, 25, 0x18141c, 1.1, .5, 16);
@@ -645,14 +616,9 @@ export function buildAdventure(ctx) {
     }
     // ---- penguins: waddling colonies, some sliding on their bellies ----
     {
-      const black = std(0x1a1c22, { roughness: .5 }), white = std(0xf6f6f2), orange = std(0xff9a2a), pens = [];
+      const pens = [];
       const colony = (cx, cz, n) => { for (let i = 0; i < n; i++) {
-        const p = new THREE.Group(), b = new THREE.Mesh(G.sphere, black); b.scale.set(.42, .7, .38); b.position.y = .7; p.add(b);
-        const w = new THREE.Mesh(G.sphere, white); w.scale.set(.32, .55, .3); w.position.set(0, .66, .14); p.add(w);
-        const hd = new THREE.Mesh(G.sphere, black); hd.scale.setScalar(.27); hd.position.y = 1.42; p.add(hd);
-        const bk = new THREE.Mesh(G.cone, orange); bk.scale.set(.07, .2, .07); bk.rotation.x = Math.PI / 2; bk.position.set(0, 1.4, .3); p.add(bk);
-        for (const sd of [-1, 1]) { const fl = new THREE.Mesh(G.box, black); fl.scale.set(.06, .45, .2); fl.position.set(sd * .42, .78, 0); fl.rotation.z = sd * .3; p.add(fl); const ft = new THREE.Mesh(G.box, orange); ft.scale.set(.16, .05, .26); ft.position.set(sd * .14, .03, .1); p.add(ft); }
-        p.traverse(o => { o.castShadow = true; }); const s = .9 + r() * .5; p.scale.setScalar(s);
+        const p = penguin(), s = .95 + r() * .5; p.scale.setScalar(s);
         const x = cx + (r() - .5) * 16, z = cz + (r() - .5) * 16; group.add(p);
         pens.push({ p, x, z, ph: r() * 20, slide: r() < .2, dir: r() * TAU });
       } };
@@ -661,24 +627,20 @@ export function buildAdventure(ctx) {
         const k = ((t * .08 + o.ph) % 1), dist = o.slide ? 14 : 4, along = Math.sin(k * TAU) * dist;
         const x = o.x + Math.cos(o.dir) * along, z = o.z + Math.sin(o.dir) * along, y = Math.max(fallY, terrainH(x, z));
         o.p.position.set(x, y, z); o.p.rotation.y = Math.PI / 2 - o.dir + (Math.cos(k * TAU) < 0 ? Math.PI : 0);
-        if (o.slide) { o.p.rotation.x = Math.PI / 2 * .9; o.p.position.y = y + .35; } else { o.p.rotation.z = Math.sin(t * 7 + o.ph) * .14; }
+        if (o.slide) { o.p.rotation.x = Math.PI / 2 * .9; o.p.position.y = y + .35; o.p.userData.anim(t, 0); } else o.p.userData.anim(t + o.ph, 1);
       }));
     }
     // ---- orcas breaching, a humpback whale blowing its spout ----
     {
-      const black = std(0x15171c, { roughness: .3 }), white = std(0xf2f2f2, { roughness: .3 }), orcas = [];
+      const orcas = [];
       for (let i = 0; i < 4; i++) {
-        const o = new THREE.Group(), b = new THREE.Mesh(G.sphere, black); b.scale.set(1.4, 1.3, 4.2); o.add(b);
-        const bel = new THREE.Mesh(G.sphere, white); bel.scale.set(1.1, .9, 3.4); bel.position.y = -.45; o.add(bel);
-        for (const sd of [-1, 1]) { const e = new THREE.Mesh(G.sphere, white); e.scale.set(.35, .25, .6); e.position.set(sd * 1.05, .4, 2.4); o.add(e); }
-        const fin = new THREE.Mesh(G.cone, black); fin.scale.set(.25, 2.2, .9); fin.position.set(0, 1.9, -.4); o.add(fin);
-        const tail = new THREE.Mesh(G.box, black); tail.scale.set(3.2, .2, 1); tail.position.z = -4.4; o.add(tail);
+        const o = orca(); o.scale.setScalar(1.7);
         group.add(o); orcas.push({ o, ph: r() * 10, cx: -60 + r() * 220, cz: -40 + r() * 120 });
       }
       updaters.push((dt, t) => orcas.forEach(w => {
         const k = ((t + w.ph) % 6) / 6, jump = k < .35, u = jump ? k / .35 : 0, along = (t * .1 + w.ph) % TAU;
         const x = w.cx + Math.cos(along) * 26, z = w.cz + Math.sin(along) * 26; if (terrainH(x, z) > fallY - 2) { w.o.visible = false; return; }
-        w.o.visible = jump; w.o.position.set(x, fallY - 2 + (jump ? Math.sin(u * Math.PI) * 6 : -4), z); w.o.rotation.y = -along; w.o.rotation.x = jump ? (u - .5) * 1.6 : 0;
+        w.o.visible = jump; w.o.position.set(x, fallY - 2 + (jump ? Math.sin(u * Math.PI) * 6 : -4), z); w.o.rotation.y = -along; w.o.rotation.x = jump ? (u - .5) * 1.6 : 0; if (jump) w.o.userData.anim(t);
       }));
       const hump = new THREE.Group(), hb = new THREE.Mesh(G.sphere, std(0x3a4a5a, { roughness: .4 })); hb.scale.set(4, 2.4, 12); hump.add(hb);
       hump.position.set(300, fallY - .8, -40); group.add(hump);
@@ -687,14 +649,12 @@ export function buildAdventure(ctx) {
         const on = (t % 7) < 2.2; spout.forEach((p, k) => { p.visible = on; if (!on) return; const u = ((t * 1.4 + k / 14) % 1); p.position.set(hump.position.x + (Math.random() - .5) * u * 3, hump.position.y + 2 + u * 10, hump.position.z); p.scale.setScalar(1 + u * 4); p.material.opacity = (1 - u) * .8; }); });
     }
     // ---- seals on the floes, a polar bear on patrol ----
-    const grey = std(0x8a8e96, { roughness: .4 });
-    floes.slice(0, 14).forEach(([f], i) => { if (i % 2) return; const s = new THREE.Mesh(G.sphere, grey); s.scale.set(.6, .5, 1.6); s.position.y = .9; s.rotation.y = r() * 6; f.add(s); });
+        const seals = []; floes.slice(0, 14).forEach(([f], i) => { if (i % 2) return; const s = seal(); s.scale.setScalar(1.3); s.position.y = .6; s.rotation.y = r() * 6; f.add(s); seals.push(s); });
+    updaters.push((dt, t) => seals.forEach((s, i) => s.userData.anim(t + i * 1.7)));
     {
-      const fur = std(0xf2eee2, { roughness: .9 }), bear = new THREE.Group(), part = (sx, sy, sz, x, y, z) => { const m = new THREE.Mesh(G.sphere, fur); m.scale.set(sx, sy, sz); m.position.set(x, y, z); m.castShadow = true; bear.add(m); return m; };
-      part(1.1, 1, 2, 0, 1.6, 0); part(.6, .6, .8, 0, 2, 1.9); const legs = [[-.6, .9], [.6, .9], [-.6, -1.1], [.6, -1.1]].map(([x, z]) => part(.3, .8, .3, x, .7, z));
-      const nose = new THREE.Mesh(G.sphere, std(0x111111)); nose.scale.setScalar(.12); nose.position.set(0, 2, 2.65); bear.add(nose);
+      const bear = polarBear(); bear.scale.setScalar(1.5);
       group.add(bear); const bx = -30, bz = 60;
-      updaters.push((dt, t) => { const a = t * .06, x = bx + Math.cos(a) * 26, z = bz + Math.sin(a) * 18; bear.position.set(x, Math.max(fallY, terrainH(x, z)), z); bear.rotation.y = -a; legs.forEach((l, k) => { l.position.y = .7 + Math.max(0, Math.sin(t * 6 + k * 1.6)) * .25; }); });
+      updaters.push((dt, t) => { const a = t * .06, x = bx + Math.cos(a) * 26, z = bz + Math.sin(a) * 18; bear.position.set(x, Math.max(fallY, terrainH(x, z)), z); bear.rotation.y = -a; bear.userData.anim(t, 1); });
     }
     // ---- research station: containers, radar dish, wind turbine, snow cat ----
     {
@@ -722,9 +682,9 @@ export function buildAdventure(ctx) {
     // ---- a husky sled running along the shore ----
     {
       const sled = new THREE.Group(), wood = std(0x8a5a30); const base = new THREE.Mesh(G.box, wood); base.scale.set(1.4, .3, 3); base.position.y = .5; sled.add(base);
-      const dogs = []; for (let k = 0; k < 4; k++) { const d = new THREE.Group(), b = new THREE.Mesh(G.sphere, std(k % 2 ? 0x6a6a72 : 0xd8d8d8)); b.scale.set(.35, .4, .8); b.position.y = .6; d.add(b); const h = new THREE.Mesh(G.sphere, b.material); h.scale.setScalar(.3); h.position.set(0, .9, .7); d.add(h); d.position.set((k % 2 - .5) * 1, 0, 3 + Math.floor(k / 2) * 1.8); sled.add(d); dogs.push(d); }
+      const dogs = []; for (let k = 0; k < 4; k++) { const d = husky(k % 2 ? 0x5a6070 : 0x9a8070); d.scale.setScalar(1.5); d.position.set((k % 2 - .5) * 1.1, 0, 3 + Math.floor(k / 2) * 1.9); sled.add(d); dogs.push(d); }
       group.add(sled);
-      updaters.push((dt, t) => { const a = t * .045 + 2, x = -160 + Math.cos(a) * 70, z = 100 + Math.sin(a) * 40; sled.position.set(x, Math.max(fallY, terrainH(x, z)), z); sled.rotation.y = -a + Math.PI; dogs.forEach((d, k) => { d.position.y = Math.abs(Math.sin(t * 9 + k)) * .25; }); });
+      updaters.push((dt, t) => { const a = t * .045 + 2, x = -160 + Math.cos(a) * 70, z = 100 + Math.sin(a) * 40; sled.position.set(x, Math.max(fallY, terrainH(x, z)), z); sled.rotation.y = -a; dogs.forEach((d, k) => d.userData.anim(t + k * .3, 1)); });
     }
     weather(700, 0xffffff, .22, 2.4, 80, 34, 1.4);
     flock(14, 0, 0, 200, 25, 40, 0xf4f4f4, 1.6, .2);

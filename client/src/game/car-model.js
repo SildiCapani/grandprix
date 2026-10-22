@@ -173,6 +173,9 @@ export function createCar(color = '#e34335', number = '07', kart = 'allround', f
   }
   // Fuse static parts into one mesh per material (few draw calls); moving parts stay separate groups.
   bakeStatic(lean, true);
+  // Moving sub-parts (driver, arms, steering wheel, head) are groups: fuse each of them too, without shadows (the blob shadow covers them).
+  const bakeGroups = node => { for (const child of [...node.children]) if (!child.isMesh && child.children.length) { bakeStatic(child, true); child.traverse(o => { if (o.isMesh && child !== body) o.castShadow = false; }); bakeGroups(child); } };
+  bakeGroups(lean);
   for (const w of wheels) bakeStatic(w, true);
   bakeStatic(car, false);
   car.userData.wheels = wheels;

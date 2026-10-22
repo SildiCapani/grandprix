@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { buildAdventure, ADVENTURE_THEMES } from './world-adventure.js';
 import { buildLife } from './world-life.js';
+import { giraffe as cartoonGiraffe, elephant as cartoonElephant, zebra as cartoonZebra } from './critters.js';
 
 // Three complete outdoor worlds, generated procedurally around the track:
 //   day    → Riviera coast: sea, beach, palms, villas, lighthouse
@@ -150,7 +151,7 @@ export function createWorld(map, track) {
   const at = (along, side) => [s0.x + tx * along + s0.nx * side, s0.z + tz * along + s0.nz * side];
   if (!map.arena) { // the battle arena has its own stadium instead
     const standMat = std(['night', 'volcano', 'space', 'moon'].includes(theme) ? 0x3a3f4c : 0xd9dcdf, { roughness: .6 }), seatMat = std({ day: 0x2a7fd4, desert: 0xc8432b, night: 0x7a2bd1, volcano: 0xd8401a, snow: 0x1f6fd0, space: 0x9b5cff, jungle: 0x2f9a4a, savanna: 0xd8802a, forest: 0xd8342c, sky: 0x39b8ff, sakura: 0xe8507a, moon: 0xd8d8e0 }[theme] || 0x2a7fd4, { roughness: .5 });
-    const side = W / 2 + 9, len = 70, crowdMat = std(0xffffff, { roughness: .8 });
+    const side = W / 2 + 9, len = 70, crowdMat = std(0xffffff, { roughness: .8 }), CROWD_SKIN = [0xf2c8a0, 0xd8a070, 0x8a5a3a, 0xf8dcc0].map(c => new THREE.Color(c));
     for (let row = 0; row < 8; row++) {
       const [x, z] = at(0, side + row * 1.4);
       inst(G.box, standMat, M(x, .4 + row * .7, z, len, .8 + row * 1.4 * 0, 1.4, s0.angle + Math.PI / 2));
@@ -159,7 +160,7 @@ export function createWorld(map, track) {
         if (r() < .18) continue;
         const [px, pz] = at(-len / 2 + 1 + k * (len - 2) / 45 + (r() - .5) * .5, side + row * 1.4 - .1);
         const c = new THREE.Color().setHSL(r(), .55, .45 + r() * .2);
-        inst(G.box, crowdMat, M(px, 1.3 + row * .7, pz, .42, .7, .32, s0.angle + Math.PI / 2), { color: c });
+        inst(G.sphere, crowdMat, M(px, 1.25 + row * .7, pz, .24, .36, .2, s0.angle + Math.PI / 2), { color: c }); inst(G.sphere, crowdMat, M(px, 1.78 + row * .7, pz, .19, .19, .19), { color: CROWD_SKIN[k % 4] });
       }
     }
     // roof
@@ -754,20 +755,10 @@ export function createWorld(map, track) {
     // hay bales and tyre stacks mark the dirt shortcuts
     const hay = std(0xd9b45a, { roughness: 1 });
     corridorEdges((x, z, a) => { if (r() < .55) inst(G.cyl, hay, M(x, .55, z, .55, 1.1, .55, a, Math.PI / 2)); });
-    // animals: giraffes and elephants wandering slowly
-    const giraffeMat = std(0xd9a24a, { roughness: .9 }), elephantMat = std(0x8a8a8e, { roughness: 1 });
+    // animals: cartoon giraffes and elephants wandering slowly (critters.js)
     const herd = [];
-    const giraffe = () => { const g = new THREE.Group(); const body = new THREE.Mesh(G.box, giraffeMat); body.scale.set(.9, .9, 2); body.position.y = 2.6; g.add(body);
-      for (const [lx, lz] of [[-.3, .7], [.3, .7], [-.3, -.7], [.3, -.7]]) { const l = new THREE.Mesh(G.cylLow, giraffeMat); l.scale.set(.1, 2.2, .1); l.position.set(lx, 1.1, lz); g.add(l); }
-      const neck = new THREE.Mesh(G.cylLow, giraffeMat); neck.scale.set(.18, 2.6, .18); neck.position.set(0, 4.1, .9); neck.rotation.x = .35; g.add(neck);
-      const head = new THREE.Mesh(G.box, giraffeMat); head.scale.set(.35, .35, .7); head.position.set(0, 5.4, 1.4); g.add(head); return g; };
-    const elephant = () => { const g = new THREE.Group(); const body = new THREE.Mesh(G.sphere, elephantMat); body.scale.set(1.6, 1.5, 2.3); body.position.y = 2.4; g.add(body);
-      for (const [lx, lz] of [[-.8, 1.1], [.8, 1.1], [-.8, -1.1], [.8, -1.1]]) { const l = new THREE.Mesh(G.cylLow, elephantMat); l.scale.set(.42, 1.6, .42); l.position.set(lx, .8, lz); g.add(l); }
-      const head = new THREE.Mesh(G.sphere, elephantMat); head.scale.set(1, 1, .9); head.position.set(0, 3, 2.3); g.add(head);
-      const trunkM = new THREE.Mesh(G.cylLow, elephantMat); trunkM.scale.set(.2, 2, .2); trunkM.position.set(0, 1.9, 3); trunkM.rotation.x = .2; g.add(trunkM);
-      for (const s of [-1, 1]) { const ear = new THREE.Mesh(G.sphere, elephantMat); ear.scale.set(.15, .9, .8); ear.position.set(s * 1, 3.1, 2); g.add(ear); } return g; };
-    scatter(16, 25, 420, (x, z) => { const a = r() < .6 ? giraffe() : elephant(); a.position.set(x, 0, z); a.rotation.y = r() * 6.28; a.traverse(o => { if (o.isMesh) o.castShadow = true; }); group.add(a); herd.push({ a, x, z, ph: r() * 10, dir: a.rotation.y }); }, 20);
-    updaters.push((dt, t) => { for (const h of herd) { const k = Math.sin(t * .05 + h.ph) * 6; h.a.position.set(h.x + Math.sin(h.dir) * k, 0, h.z + Math.cos(h.dir) * k); h.a.rotation.y = h.dir + (Math.cos(t * .05 + h.ph) > 0 ? 0 : Math.PI); } });
+    scatter(22, 25, 420, (x, z) => { const q = r(), a = q < .4 ? cartoonGiraffe() : q < .7 ? cartoonZebra() : cartoonElephant(); a.position.set(x, 0, z); a.rotation.y = r() * 6.28; a.scale.setScalar(.9 + r() * .3); group.add(a); herd.push({ a, x, z, ph: r() * 10, dir: a.rotation.y }); }, 20);
+    updaters.push((dt, t) => { for (const h of herd) { const k = Math.sin(t * .05 + h.ph) * 6; h.a.position.set(h.x + Math.sin(h.dir) * k, 0, h.z + Math.cos(h.dir) * k); h.a.rotation.y = h.dir + (Math.cos(t * .05 + h.ph) > 0 ? 0 : Math.PI); h.a.userData.anim(t + h.ph, 1); } });
     // distant flat-topped hills
     const hill = std(0xa0784a, { roughness: 1, flatShading: true });
     for (let i = 0; i < 20; i++) { const a = r() * Math.PI * 2, d = 650 + r() * 500; inst(G.ico, hill, M(Math.cos(a) * d, -6, Math.sin(a) * d, 110 + r() * 140, 28 + r() * 40, 110 + r() * 140, r() * 6), { cast: false }); }
@@ -980,7 +971,7 @@ export function createWorld(map, track) {
       for (let i = 0; i < n; i++) {
         const a = i / n * Math.PI * 2, x = A.x + Math.sin(a) * rad, z = A.z + Math.cos(a) * rad, seg = rad * Math.PI * 2 / n + .1;
         inst(G.box, tierMat, M(x, h / 2, z, seg, h, 3.4, a + Math.PI / 2), { cast: false });
-        if (k > 0 && r() < .8) inst(G.box, crowdMat, M(x + (r() - .5) * 1.5, h + .45, z + (r() - .5) * .8, .5, .9, .4, a), { color: fans[Math.floor(r() * fans.length)], cast: false });
+        if (k > 0 && r() < .8) { const fx = x + (r() - .5) * 1.5, fz = z + (r() - .5) * .8; inst(G.sphere, crowdMat, M(fx, h + .42, fz, .28, .45, .24, a), { color: fans[Math.floor(r() * fans.length)], cast: false }); inst(G.sphere, crowdMat, M(fx, h + 1.05, fz, .22, .22, .22), { color: new THREE.Color([0xf2c8a0, 0xd8a070, 0x8a5a3a, 0xf8dcc0][k % 4]), cast: false }); }
       }
     }
     // --- neon banner wall around the arena floor ---

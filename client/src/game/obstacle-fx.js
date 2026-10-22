@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { cannonball, lavaBubble, hotRock, boulder, snowball, stoneball, donut, gummyBear, rhino, orca, hoverCar, tentacle } from './critters.js';
 
 // Draws the moving obstacles (game/obstacles.js) every frame: warning rings, falling cannonballs / lava bombs / meteors
 // with their explosions, things rolling across the road and the dragon fire / kraken tentacle zones.
@@ -35,31 +36,49 @@ export function createObstacleFx(scene) {
   const part = (g, geo, m, x, y, z, sx, sy, sz) => { const o = new THREE.Mesh(geo, m); o.position.set(x, y, z); o.scale.set(sx, sy, sz); o.castShadow = true; g.add(o); return o; };
   const spr = (tex, color, size, add = true) => { const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, color, transparent: true, depthWrite: false, blending: add ? THREE.AdditiveBlending : THREE.NormalBlending, toneMapped: false })); s.scale.setScalar(size); return s; };
 
+  const GUMMY = [0xff3a4a, 0x3ad86a, 0xffc83a, 0xff8a2a, 0x9a5aff], CARS = [0xff4a6a, 0xffc020, 0x3ab8ff, 0x7aff5a, 0xff7ad8];
+  let made = 0;
+  // A cartoon model per kind; models are pooled and reused every cycle.
+  function model(kind, r) {
+    const n = made++;
+    switch (kind) {
+      case 'cannon': { const m = cannonball(); m.scale.setScalar(.95); return m; }
+      case 'lava': { const m = lavaBubble(); m.scale.setScalar(1.05); return m; }
+      case 'meteor': { const m = hotRock(0xc07aff, 0x5a4a7a); m.scale.setScalar(1.15); return m; }
+      case 'boulder': { const m = boulder(); m.scale.setScalar(r); return m; }
+      case 'snowball': { const m = snowball(); m.scale.setScalar(r); return m; }
+      case 'stoneball': { const m = stoneball(); m.scale.setScalar(r); return m; }
+      case 'donut': { const m = donut(), w = new THREE.Group(); m.scale.setScalar(r * 1.05); w.add(m); w.rotation.y = Math.PI / 2; w.userData.spin = m; return w; }
+      case 'gummy': { const m = gummyBear(GUMMY[n % GUMMY.length]); m.scale.setScalar(r * 1.2); return m; }
+      case 'rhino': { const m = rhino(); m.scale.setScalar(r * .85); return m; }
+      case 'whale': { const m = orca(); m.scale.setScalar(r * .62); return m; }
+      case 'hovercar': { const m = hoverCar(CARS[n % CARS.length]); m.scale.setScalar(r * .8); return m; }
+      case 'tentacle': { const m = tentacle(); m.scale.setScalar(1.25); return m; }
+    }
+    return new THREE.Group();
+  }
+  const pool = new Map();
   function make(h) {
-    const g = new THREE.Group(), u = {};
+    const key = h.type + ':' + h.kind, list = pool.get(key);
+    if (list?.length) { const g = list.pop(); g.visible = true; return g; }
+    const g = new THREE.Group(), u = { key };
     if (h.type === 'impact') {
       u.ring = new THREE.Mesh(ringGeo, mat.ring); u.disc = new THREE.Mesh(discGeo, mat.disc); g.add(u.ring, u.disc);
-      const body = new THREE.Group(); g.add(body); u.body = body;
-      if (h.kind === 'cannon') part(body, sph, mat.iron, 0, 0, 0, .75, .75, .75);
-      else part(body, ico, h.kind === 'lava' ? mat.lava : mat.meteor, 0, 0, 0, 1.1, 1, 1.2);
-      u.trail = spr(h.kind === 'cannon' ? puff : fire, h.kind === 'cannon' ? 0xb8b0a8 : BOOM[h.kind], 3, h.kind !== 'cannon'); body.add(u.trail); u.trail.position.y = 1.6;
-      u.boom = [spr(fire, BOOM[h.kind], 1), spr(puff, h.kind === 'cannon' ? 0x9a948c : 0x5a4a5a, 1, false)]; u.boom.forEach(b => g.add(b));
+      const body = new THREE.Group(); g.add(body); u.body = body; u.m = model(h.kind); body.add(u.m);
+      u.trail = spr(h.kind === 'cannon' ? puff : fire, h.kind === 'cannon' ? 0xb8b0a8 : BOOM[h.kind], 3.4, h.kind !== 'cannon'); g.add(u.trail);
+      u.boom = [spr(fire, BOOM[h.kind], 1), spr(puff, h.kind === 'cannon' ? 0x9a948c : 0x5a4a5a, 1, false), spr(fire, 0xffe8a0, 1)]; u.boom.forEach(b => g.add(b));
     } else if (h.type === 'cross') {
-      const r = h.r, roller = new THREE.Group(); g.add(roller); u.roller = roller;
-      if (h.kind === 'boulder') part(roller, ico, mat.boulder, 0, 0, 0, r, r * .9, r);
-      else if (h.kind === 'snowball') { part(roller, sph, mat.snow, 0, 0, 0, r, r, r); for (let k = 0; k < 5; k++) part(roller, sph, mat.snow, Math.cos(k) * r * .7, Math.sin(k * 2) * r * .5, Math.sin(k) * r * .7, r * .35, r * .35, r * .35); }
-      else if (h.kind === 'stoneball') { part(roller, ico, mat.stone, 0, 0, 0, r, r, r); for (let k = 0; k < 4; k++) part(roller, ico, mat.moss, Math.cos(k * 1.7) * r * .8, Math.sin(k * 2.3) * r * .6, Math.sin(k * 1.7) * r * .8, r * .3, r * .2, r * .3); }
-      else if (h.kind === 'donut') { const t = new THREE.Mesh(new THREE.TorusGeometry(r * .7, r * .32, 14, 28), mat.dough); t.castShadow = true; roller.add(t); const ic = new THREE.Mesh(new THREE.TorusGeometry(r * .7, r * .34, 14, 28, Math.PI * 2), mat.icing); ic.scale.z = .55; ic.position.z = r * .1; roller.add(ic); u.wheel = true; }
-      else if (h.kind === 'gummy') { part(roller, sph, mat.gummy, 0, 0, 0, r * .7, r * .85, r * .6); part(roller, sph, mat.gummy, 0, r * 1.1, 0, r * .5, r * .45, r * .45); part(roller, sph, mat.gummy, -r * .35, r * 1.5, 0, r * .17, r * .17, r * .15); part(roller, sph, mat.gummy, r * .35, r * 1.5, 0, r * .17, r * .17, r * .15); u.walker = true; }
-      else if (h.kind === 'rhino') { part(roller, sph, mat.rhino, 0, .2, 0, r * .7, r * .6, r * 1.2); part(roller, sph, mat.rhino, 0, .3, r * 1.15, r * .4, r * .38, r * .55); part(roller, cone, mat.horn, 0, .75, r * 1.55, .18, .7, .18).rotation.x = .5; u.legs = [[-.5, .6], [.5, .6], [-.5, -.7], [.5, -.7]].map(([x, z]) => part(roller, box, mat.rhino, x * r, -r * .45, z * r, .35, r * .7, .35)); u.walker = true; }
-      else if (h.kind === 'whale') { part(roller, sph, mat.black, 0, 0, 0, r * .55, r * .5, r * 1.6); part(roller, sph, mat.white, 0, -r * .18, r * .1, r * .42, r * .32, r * 1.3); part(roller, cone, mat.black, 0, r * .75, 0, .25, r * .9, .7); u.walker = true; u.splash = spr(puff, 0xffffff, 6, false); g.add(u.splash); }
-      else if (h.kind === 'hovercar') { part(roller, sph, mat.hull, 0, 0, 0, r * .75, r * .32, r * 1.3); part(roller, sph, mat.glass, 0, r * .25, r * .15, r * .5, r * .25, r * .6); const gl = spr(fire, 0x6ae8ff, 4); gl.position.y = -r * .4; roller.add(gl); u.walker = true; }
+      const roller = new THREE.Group(); g.add(roller); u.roller = roller; u.m = model(h.kind, h.r); roller.add(u.m);
+      u.walker = ['gummy', 'rhino', 'whale', 'hovercar'].includes(h.kind); u.wheel = h.kind === 'donut';
+      if (h.kind === 'whale') { u.splash = spr(puff, 0xffffff, 7, false); g.add(u.splash); }
+      if (['rhino', 'boulder', 'stoneball', 'snowball', 'donut', 'gummy'].includes(h.kind)) { u.dust = [0, 1, 2].map(() => { const d = spr(puff, h.kind === 'snowball' ? 0xffffff : 0xd8c8a8, 1, false); g.add(d); return d; }); }
     } else if (h.type === 'zone') {
-      if (h.kind === 'fire') { u.flames = [0, 1].map(() => { const f = spr(fire, 0xff6a1a, 1); f.material.opacity = .8; g.add(f); return f; }); u.glow = new THREE.Mesh(discGeo, new THREE.MeshBasicMaterial({ color: 0xff6a10, transparent: true, opacity: .2, depthWrite: false, toneMapped: false, polygonOffset: true, polygonOffsetFactor: -4 })); g.add(u.glow); }
-      else { u.segs = Array.from({ length: 9 }, (_, k) => part(g, sph, k % 3 === 2 ? mat.sucker : mat.tentacle, 0, 0, 0, 1, 1, 1)); }
+      if (h.kind === 'fire') { u.flames = [0, 1, 2, 3].map(k => { const f = spr(fire, k % 2 ? 0xffb02a : 0xff5a10, 1); f.material.opacity = .85; g.add(f); return f; }); u.glow = new THREE.Mesh(discGeo, new THREE.MeshBasicMaterial({ color: 0xff6a10, transparent: true, opacity: .2, depthWrite: false, toneMapped: false, polygonOffset: true, polygonOffsetFactor: -4 })); g.add(u.glow); }
+      else { u.m = model('tentacle'); g.add(u.m); u.splash = spr(puff, 0xffffff, 5, false); g.add(u.splash); }
     }
     g.userData = u; scene.add(g); return g;
   }
+  function release(g) { g.visible = false; const key = g.userData.key; if (!pool.has(key)) pool.set(key, []); pool.get(key).push(g); }
 
   const live = new Map();
   function update(hazards, time) {
@@ -72,31 +91,36 @@ export function createObstacleFx(scene) {
         const pulse = .5 + .5 * Math.sin(time * 18);
         u.ring.visible = u.disc.visible = h.boom === 0; u.ring.scale.setScalar(h.r * (1.1 - h.warn * .15)); u.disc.scale.setScalar(h.r * h.warn); mat.ring.opacity = .55 + pulse * .45;
         u.ring.position.y = u.disc.position.y = .05;
-        u.body.visible = h.boom === 0; u.body.position.y = .6 + h.fall * h.fall * 30; u.body.rotation.set(time * 3, time * 2, 0);
-        const b = h.boom; u.boom.forEach((s, k) => { s.visible = b > 0; if (!s.visible) return; s.scale.setScalar(h.r * (1.5 + b * (k ? 5 : 3.5))); s.position.y = 1 + b * (k ? 3 : 1); s.material.opacity = (1 - b) * (k ? .7 : 1); });
+        u.body.visible = h.boom === 0; u.body.position.y = .9 + h.fall * h.fall * 30;
+        if (h.kind === 'cannon') u.m.rotation.set(-.6, 0, Math.sin(time * 5) * .2); else if (h.kind === 'lava') { u.m.rotation.set(-.5 + Math.sin(time * 9) * .1, 0, 0); u.m.scale.set(1.05 + Math.sin(time * 14) * .06, 1.05 - Math.sin(time * 14) * .06, 1.05); } else u.m.rotation.set(time * 3, time * 2, 0);
+        u.trail.visible = u.body.visible && h.fall > .02; u.trail.position.y = u.body.position.y + 2; u.trail.scale.set(2.6, 4.5, 1);
+        const b = h.boom; u.boom.forEach((s, k) => { s.visible = b > 0; if (!s.visible) return; s.scale.setScalar(h.r * (1.5 + b * [3.5, 5, 2][k])); s.position.y = 1 + b * [1, 3, .5][k]; s.material.opacity = (1 - b) * [1, .7, 1][k]; });
       } else if (h.type === 'cross') {
-        g.position.set(h.x, h.y + (h.kind === 'whale' || h.kind === 'hovercar' ? 0 : h.r * (h.kind === 'rhino' || h.kind === 'gummy' ? .55 : 1)), h.z);
+        const lift = h.kind === 'whale' || h.kind === 'hovercar' ? 0 : ['rhino', 'gummy'].includes(h.kind) ? 0 : h.r;
+        g.position.set(h.x, h.y + lift, h.z);
         g.rotation.y = h.heading;
-        if (u.wheel) { u.roller.rotation.set(0, Math.PI / 2, 0); u.roller.children.forEach(c => { c.rotation.z = -h.roll; }); }
+        if (u.wheel) u.roller.children[0].userData.spin.rotation.z = -h.roll;
         else if (!u.walker) u.roller.rotation.x = h.roll;
-        else { u.roller.position.y = Math.abs(Math.sin(time * 9)) * .12; u.legs?.forEach((l, k) => { l.rotation.x = Math.sin(time * 10 + k * Math.PI) * .5; }); }
-        if (h.kind === 'whale') { u.roller.rotation.x = (h.u - .5) * -1.4; if (u.splash) { const near = h.u < .15 || h.u > .85; u.splash.visible = near; u.splash.position.set(0, -h.y + h.ground - 1, 0); } }
+        else { u.m.userData.anim(time, 1); if (h.kind === 'hovercar') u.roller.position.y = Math.sin(time * 4) * .15; }
+        if (h.kind === 'whale') { u.roller.rotation.x = (h.u - .5) * 1.5; if (u.splash) { const near = h.u < .15 || h.u > .85; u.splash.visible = near; u.splash.position.set(0, -h.y + h.ground - .5, 0); } }
+        if (u.dust) u.dust.forEach((d, k) => { const ph = (time * 2.2 + k / 3) % 1; d.position.set(0, -lift + .4 + ph * 1.2, -1.2 - ph * 2.5); d.scale.setScalar(.8 + ph * 2.2); d.material.opacity = (1 - ph) * .55; });
       } else if (h.type === 'zone') {
         g.position.set(h.x, h.y, h.z);
         if (u.flames) {
           u.glow.scale.setScalar(h.r * 1.2); u.glow.position.y = .06; u.glow.material.opacity = h.hot ? .35 : .1 + .2 * h.warn * (.5 + .5 * Math.sin(time * 14));
-          u.flames.forEach((f, k) => { f.visible = h.hot || (h.warn > .5 && k === 0); const sc = h.hot ? h.r * (.95 + Math.sin(time * 16 + k * 2 + h.k) * .2) * (1 - Math.max(0, h.life - .8) * 5) : .9 * h.warn; f.scale.set(sc, sc * 1.5, 1); f.position.set(Math.sin(k * 2.1 + h.k) * h.r * .45, sc * .55, Math.cos(k * 1.7 + h.k) * h.r * .45); });
+          u.flames.forEach((f, k) => { f.visible = h.hot || (h.warn > .5 && k === 0); const sc = h.hot ? h.r * (.8 + Math.sin(time * 16 + k * 2 + h.k) * .2) * (1 - Math.max(0, h.life - .8) * 5) * (k > 1 ? .7 : 1) : .9 * h.warn; f.scale.set(sc, sc * 1.6, 1); f.position.set(Math.sin(k * 2.1 + h.k) * h.r * .45, sc * .6 + (k > 1 ? sc * .5 : 0), Math.cos(k * 1.7 + h.k) * h.r * .45); });
         } else {
-          // the tentacle: rises at the road edge while warning, slams across the half of the road when hot
-          const edge = h.side * (h.r * 2 + 3.5), lean = h.hot ? 1 : h.warn * .25, up = h.hot ? Math.max(0, 1 - h.life * 1.4) : h.warn;
-          u.segs.forEach((m, k) => { const f = k / 8, lat = edge - h.side * f * (h.r * 2 + 2) * lean; m.position.set(lat - h.lane, (1 - lean) * f * 6 * up + .5 + (h.hot ? Math.sin(time * 8 + k) * .12 : 0), 0); m.scale.setScalar(.75 - f * .42); });
-          g.rotation.y = h.angle;
-          g.visible = h.k === Math.floor(h.n / 2);
+          // the kraken tentacle: rises at the road edge while warning, slams across its half of the road when hot
+          const edge = h.side * (h.r * 2 + 3.5), up = h.hot ? Math.max(0, 1 - Math.max(0, h.life - .55) * 2.4) : h.warn;
+          g.rotation.y = h.angle; g.visible = h.k === Math.floor(h.n / 2);
+          u.m.position.set(edge - h.lane, -9 * (1 - up), 0); u.m.rotation.y = -h.side * Math.PI / 2;
+          u.m.userData.bend(h.hot ? Math.min(1, h.life * 6) * 1.05 : .15 * h.warn, time);
+          u.splash.visible = up > .05 && up < .98; u.splash.position.set(edge - h.lane, .6, 0);
         }
       }
     }
-    for (const [id, g] of live) if (!seen.has(id)) { scene.remove(g); live.delete(id); }
+    for (const [id, g] of live) if (!seen.has(id)) { release(g); live.delete(id); }
   }
-  function clear() { for (const g of live.values()) scene.remove(g); live.clear(); }
+  function clear() { for (const g of live.values()) release(g); live.clear(); }
   return { update, clear };
 }

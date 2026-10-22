@@ -123,7 +123,7 @@ export class RoomMultiplayerSession extends MultiplayerSession {
     const relay = isRelayCode(code);
     this._relayUrl = relay ? RELAY_BROKERS[BROKER_LETTERS.indexOf(code[1])] : null;
     this._state = {...this._empty(), role: 'guest', status: 'connecting', roomId: code, roomCode: code,
-      selfId: id, hostId, signaling: relay ? 'relay' : 'cloud', route: relay ? 'server' : '', players: [this._player(hostId, 'Gastgeber', '#42c9cb', false), this._player(id, name, color)]};
+      selfId: id, hostId, signaling: relay ? 'relay' : 'cloud', route: relay ? 'server' : '', players: [this._player(hostId, 'Gastgeber', '#42c9cb', false), this._player(id, name, color, true, this._look)]};
     this._begin(); this._change();
     try {
       await this._openBroker(id);

@@ -1,4 +1,6 @@
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { bird, person as cartoonPerson } from './critters.js';
 
 // "Life" layer for every racing world: things that move around the course so no track feels empty.
 //   everywhere: track marshals waving flags, fan zones that jump and cheer, flags flapping in the wind
@@ -43,18 +45,11 @@ export function buildLife(ctx) {
   }
 
   // ---------- people: marshals with flags and cheering fan zones ----------
-  const skin = [0xf2c8a0, 0xd8a070, 0x8a5a3a, 0xf8dcc0].map(c => std(c, { roughness: .7 }));
-  const shirts = [0xff4a3a, 0x3ab8ff, 0xffd04a, 0x5ad86a, 0xff7ac2, 0xffffff, 0x9a7aff, 0xff9a3a].map(c => std(c, { roughness: .8 }));
-  const pants = std(0x2a3448, { roughness: .9 }), orange = std(0xff7a1a, { roughness: .6 });
-  function person(shirt, sk) {
-    const g = new THREE.Group();
-    const torso = new THREE.Mesh(G.cyl, shirt); torso.scale.set(.22, .55, .16); torso.position.y = 1.05; g.add(torso);
-    const legs = new THREE.Mesh(G.box, pants); legs.scale.set(.34, .78, .2); legs.position.y = .4; g.add(legs);
-    const head = new THREE.Mesh(G.sphere, sk); head.scale.setScalar(.17); head.position.y = 1.5; g.add(head);
-    const arms = [-1, 1].map(sd => { const a = new THREE.Group(); a.position.set(sd * .26, 1.28, 0); const m = new THREE.Mesh(G.cyl, shirt); m.scale.set(.06, .5, .06); m.position.y = -.25; a.add(m); g.add(a); return a; });
-    g.traverse(o => { if (o.isMesh) o.castShadow = true; });
-    g.userData.arms = arms; return g;
-  }
+  // People are cartoon figures from critters.js (one merged body + two arms each, so a crowd stays cheap).
+  const skin = [0xf2c8a0, 0xd8a070, 0x8a5a3a, 0xf8dcc0];
+  const shirts = [0xff4a3a, 0x3ab8ff, 0xffd04a, 0x5ad86a, 0xff7ac2, 0xffffff, 0x9a7aff, 0xff9a3a];
+  const orange = 0xff7a1a;
+  const person = (shirt, sk) => cartoonPerson(shirt, sk, shirt === orange ? 0xffd04a : null);
   // Marshals: orange vests, one arm waving a flag back and forth. Spaced around the lap on land.
   const marshals = [];
   if (!elevatedOnly.includes(theme)) for (let d = 120; d < L; d += 260) {
@@ -82,10 +77,10 @@ export function buildLife(ctx) {
     for (const sp of spots) {
       const { s, side, cx, cz, t } = sp, y = roadY(t), face = Math.atan2(-s.nx * side, -s.nz * side), tx = Math.sin(s.angle), tz = Math.cos(s.angle);
       inst(G.box, fence, M(cx - s.nx * side * 1.8, y + .55, cz - s.nz * side * 1.8, 16, 1.1, .12, s.angle + Math.PI / 2));
-      for (let i = 0; i < 18; i++) {
-        const along = (i % 9 - 4) * 1.6 + (r() - .5) * .5, back = Math.floor(i / 9) * 1.4 + r() * .3;
+      for (let i = 0; i < 14; i++) {
+        const along = (i % 7 - 3) * 1.9 + (r() - .5) * .5, back = Math.floor(i / 7) * 1.4 + r() * .3;
         const p = person(shirts[Math.floor(r() * shirts.length)], skin[Math.floor(r() * skin.length)]);
-        p.position.set(cx + tx * along + s.nx * side * back, y, cz + tz * along + s.nz * side * back); p.rotation.y = face; group.add(p);
+        p.position.set(cx + tx * along + s.nx * side * back, y, cz + tz * along + s.nz * side * back); p.rotation.y = face; group.add(p); p.traverse(o => { o.castShadow = false; });
         if (r() < .35) { const f = new THREE.Mesh(flagGeo, flagMats[Math.floor(r() * flagMats.length)]); f.scale.setScalar(.42); f.position.set(0, -.55, 0); p.userData.arms[0].add(f); }
         fans.push({ p, ph: r() * 9, base: y, hop: .5 + r() * .8 });
       }
@@ -100,29 +95,29 @@ export function buildLife(ctx) {
   }
 
   // ---------- small creatures ----------
-  const wingGeo = new THREE.PlaneGeometry(1, .5); wingGeo.translate(.5, 0, 0);
+  // Birds are cartoon models from critters.js (dark colour = vultures / crows).
   function flock(n, cx, cz, rad, y0, y1, color, size, speed = .25, flapRate = 9) {
-    const mt = new THREE.MeshStandardMaterial({ color, roughness: .8, side: THREE.DoubleSide }), birds = [];
+    const dark = new THREE.Color(color).getHSL({}).l < .15, birds = [];
     for (let i = 0; i < n; i++) {
-      const b = new THREE.Group(), l = new THREE.Mesh(wingGeo, mt), rr = new THREE.Mesh(wingGeo, mt);
-      l.rotation.x = rr.rotation.x = -Math.PI / 2; rr.rotation.z = Math.PI; l.scale.setScalar(size); rr.scale.setScalar(size);
-      const body = new THREE.Mesh(G.sphere, mt); body.scale.set(size * .12, size * .1, size * .4); b.add(l, rr, body); group.add(b);
-      b.userData = { ph: r() * TAU, rad: rad * (.4 + r() * .7), y: y0 + (y1 - y0) * r(), sp: speed * (.7 + r() * .6) * (r() < .5 ? -1 : 1), l, rr, ox: (r() - .5) * rad * .6, oz: (r() - .5) * rad * .6 };
+      const b = dark ? bird(0x3a2e30, 0x2a2224, 0x6a5a50) : bird(color, color, 0xffffff); b.scale.setScalar(size * 1.3); group.add(b);
+      b.userData.f = { ph: r() * TAU, rad: rad * (.4 + r() * .7), y: y0 + (y1 - y0) * r(), sp: speed * (.7 + r() * .6) * (r() < .5 ? -1 : 1), ox: (r() - .5) * rad * .6, oz: (r() - .5) * rad * .6 };
       birds.push(b);
     }
-    updaters.push((dt, t) => birds.forEach(b => { const u = b.userData, a = u.ph + t * u.sp; b.position.set(cx + u.ox + Math.cos(a) * u.rad, u.y + Math.sin(t * .7 + u.ph) * 2, cz + u.oz + Math.sin(a) * u.rad); b.rotation.y = -a + (u.sp > 0 ? 0 : Math.PI); const f = Math.sin(t * flapRate + u.ph) * .55; u.l.rotation.y = f; u.rr.rotation.y = -f; }));
+    updaters.push((dt, t) => birds.forEach(b => { const u = b.userData.f, a = u.ph + t * u.sp; b.position.set(cx + u.ox + Math.cos(a) * u.rad, u.y + Math.sin(t * .7 + u.ph) * 2, cz + u.oz + Math.sin(a) * u.rad); b.rotation.y = -a + (u.sp > 0 ? 0 : Math.PI); b.rotation.z = u.sp > 0 ? .3 : -.3; b.userData.anim(t + u.ph, flapRate); }));
   }
   // Butterflies: two coloured wings fluttering around a point near the road.
+  const bflyGeo = (() => { const a = new THREE.CircleGeometry(.17, 10), c = new THREE.CircleGeometry(.11, 10); a.scale(1, 1.15, 1); a.translate(.16, .08, 0); c.translate(.12, -.13, 0); const g = mergeGeometries([a, c]); g.rotateX(-Math.PI / 2); return g; })();
+  const bflyBody = new THREE.CapsuleGeometry(.03, .26, 3, 6); bflyBody.rotateX(Math.PI / 2); const bflyBodyMat = new THREE.MeshBasicMaterial({ color: 0x2a1a20 });
   function butterflies(n, colors) {
     const list = [];
     for (let i = 0; i < n; i++) {
       const t = r(), s = track.sample(t), sd = r() < .5 ? -1 : 1, off = W / 2 + 3 + r() * 10, x = s.x + s.nx * sd * off, z = s.z + s.nz * sd * off;
       if (!free(x, z, W / 2 + 1)) continue;
       const m = new THREE.MeshBasicMaterial({ color: colors[i % colors.length], side: THREE.DoubleSide }), b = new THREE.Group();
-      const w1 = new THREE.Mesh(new THREE.CircleGeometry(.16, 8), m), w2 = w1.clone(); w1.position.x = .14; w2.position.x = -.14; b.add(w1, w2); group.add(b);
+      const w1 = new THREE.Mesh(bflyGeo, m), w2 = new THREE.Mesh(bflyGeo, m); w2.scale.x = -1; b.add(w1, w2, new THREE.Mesh(bflyBody, bflyBodyMat)); b.scale.setScalar(1.6); group.add(b);
       list.push({ b, w1, w2, x, z, y: roadY(t) + .8 + r(), ph: r() * 9 });
     }
-    updaters.push((dt, t) => list.forEach(o => { o.b.position.set(o.x + Math.sin(t * .6 + o.ph) * 2, o.y + Math.sin(t * 1.7 + o.ph) * .5, o.z + Math.cos(t * .5 + o.ph) * 2); o.b.rotation.y = t * .6 + o.ph; const f = Math.sin(t * 18 + o.ph) * 1.1; o.w1.rotation.y = f; o.w2.rotation.y = -f; }));
+    updaters.push((dt, t) => list.forEach(o => { o.b.position.set(o.x + Math.sin(t * .6 + o.ph) * 2, o.y + Math.sin(t * 1.7 + o.ph) * .5, o.z + Math.cos(t * .5 + o.ph) * 2); o.b.rotation.y = t * .6 + o.ph; const f = Math.sin(t * 18 + o.ph) * 1.1; o.w1.rotation.z = f; o.w2.rotation.z = -f; }));
   }
   // Fireflies / glowing spores: little lights drifting just above the ground.
   function fireflies(n, color, spread = 14) {
