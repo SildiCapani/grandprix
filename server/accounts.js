@@ -1,5 +1,7 @@
 // Player accounts: name + password (scrypt hash), login sessions and the saved career.
-// Everything lives in one JSON file (DATA_DIR/accounts.json). Admins come from server/admins.json.
+// Everything lives in one JSON file (DATA_DIR/accounts.json). Admins come from server/admins.json (or the ADMINS env variable).
+// Free hosts like Render wipe the disk on every restart/deploy. Then set UPSTASH_REDIS_REST_URL + UPSTASH_REDIS_REST_TOKEN
+// (free Upstash Redis database): the accounts are also stored there and loaded from there on start.
 import { randomBytes, scrypt as scryptCb, timingSafeEqual } from 'node:crypto';
 import { readFile, writeFile, rename, mkdir } from 'node:fs/promises';
 import { existsSync, readFileSync } from 'node:fs';
@@ -14,6 +16,20 @@ const DATA_DIR = process.env.DATA_DIR || join(HERE, 'data');
 const FILE = join(DATA_DIR, 'accounts.json');
 const ADMINS_FILE = join(HERE, 'admins.json');
 const SESSION_DAYS = 60, MAX_SESSIONS = 8;
+const CLOUD_URL = (process.env.UPSTASH_REDIS_REST_URL || '').replace(/\/+$/, ''), CLOUD_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN || '';
+const CLOUD_KEY = process.env.ACCOUNTS_KEY || 'apex-rush-accounts';
+const cloudOn = !!(CLOUD_URL && CLOUD_TOKEN);
+async function cloud(path, body) {
+  const res = await fetch(CLOUD_URL + path, { method: body === undefined ? 'GET' : 'POST', headers: { Authorization: 'Bearer ' + CLOUD_TOKEN }, body });
+  if (!res.ok) throw new Error('Upstash HTTP ' + res.status);
+  return res.json();
+}
+let cloudTimer = null, cloudBusy = Promise.resolve();
+// Cloud copy: at most one upload every 2 seconds (logins and race results can come in bursts).
+function cloudSave() {
+  if (!cloudOn || cloudTimer) return;
+  cloudTimer = setTimeout(() => { cloudTimer = null; cloudBusy = cloudBusy.then(() => cloud('/set/' + encodeURIComponent(CLOUD_KEY), JSON.stringify(db))).catch(e => console.error('Konten-Cloud-Speicher fehlgeschlagen:', e.message)); }, 2000);
+}
 
 const NAME_RE = /^[A-Za-z0-9ÄÖÜäöüß _.-]{3,16}$/;
 const keyOf = name => String(name).trim().toLowerCase();
@@ -41,15 +57,26 @@ function persist() {
     await writeFile(tmp, JSON.stringify(db));
     await rename(tmp, FILE);
   }).catch(e => console.error('Konten konnten nicht gespeichert werden:', e.message));
+  cloudSave();
   return writing;
 }
 
 export async function loadAccounts() {
   try { db = JSON.parse(await readFile(FILE, 'utf8')); if (!db.users) db = { users: {} }; } catch { db = { users: {} }; }
-  // Admin accounts from server/admins.json: [{ "name": "...", "password": "..." }]
-  if (existsSync(ADMINS_FILE)) {
+  // The cloud copy wins: it survives restarts of free hosts that wipe the disk.
+  if (cloudOn) {
+    try {
+      const { result } = await cloud('/get/' + encodeURIComponent(CLOUD_KEY));
+      const remote = result ? JSON.parse(result) : null;
+      if (remote?.users) { db = remote; console.log('Konten aus dem Cloud-Speicher (Upstash) geladen.'); }
+      else console.log('Cloud-Speicher (Upstash) ist noch leer – die Konten werden ab jetzt dort gesichert.');
+    } catch (e) { console.error('Cloud-Speicher (Upstash) nicht erreichbar, nutze die lokale Datei:', e.message); }
+  } else console.log('Hinweis: kein Cloud-Speicher gesetzt (UPSTASH_REDIS_REST_URL / _TOKEN). Auf Render gehen Konten bei jedem Neustart verloren.');
+  // Admin accounts from server/admins.json or the ADMINS env variable: [{ "name": "...", "password": "..." }]
+  const adminSource = existsSync(ADMINS_FILE) ? readFileSync(ADMINS_FILE, 'utf8') : process.env.ADMINS || '';
+  if (adminSource) {
     let admins = [];
-    try { admins = JSON.parse(readFileSync(ADMINS_FILE, 'utf8')); } catch (e) { console.error('admins.json ist kein gültiges JSON:', e.message); }
+    try { admins = JSON.parse(adminSource); } catch (e) { console.error('Admin-Liste (admins.json / ADMINS) ist kein gültiges JSON:', e.message); }
     for (const a of Array.isArray(admins) ? admins : []) {
       if (!a?.name || !a?.password || !NAME_RE.test(a.name)) continue;
       const k = keyOf(a.name), u = db.users[k] ??= { name: a.name.trim(), profile: createProfile(), sessions: [], createdAt: Date.now() };
@@ -149,3 +176,9 @@ export async function handleApi(req, res) {
 }
 
 export { STORAGE_KEY };
+
+// Render & co. stop the server with SIGTERM on every deploy: upload a pending change first.
+for (const sig of ['SIGTERM', 'SIGINT']) process.once(sig, async () => {
+  if (cloudOn && cloudTimer) { clearTimeout(cloudTimer); cloudTimer = null; try { await cloud('/set/' + encodeURIComponent(CLOUD_KEY), JSON.stringify(db)); } catch (e) { console.error(e.message); } }
+  await cloudBusy; process.exit(0);
+});

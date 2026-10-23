@@ -57,8 +57,16 @@ Beim Start meldet man sich an oder erstellt ein Konto. Level, XP, Rekorde und al
 **Admin-Konten** haben alles frei. Sie stehen in `server/admins.json` (wird nicht hochgeladen, Vorlage: `server/admins.example.json`).
 Nach einer Änderung den Server neu starten: das Admin-Konto wird angelegt bzw. das Passwort übernommen.
 
-Hinweis Render (Gratis-Plan): Die Festplatte wird bei jedem Neustart zurückgesetzt, Konten gingen dort verloren.
-Für dauerhafte Konten den Server auf deinem Rechner laufen lassen (Tunnel) oder bei Render eine Disk nutzen und `DATA_DIR` darauf setzen.
+### Konten dauerhaft speichern (Render Gratis-Plan)
+Render setzt die Festplatte bei jedem Neustart und Deploy zurück – ohne Cloud-Speicher sind dann alle Konten weg.
+Lösung (kostenlos): eine **Upstash-Redis**-Datenbank.
+1. Auf [upstash.com](https://upstash.com) anmelden → *Create Database* (Redis, Region Frankfurt, Free).
+2. Bei der Datenbank unter *REST API* die Werte `UPSTASH_REDIS_REST_URL` und `UPSTASH_REDIS_REST_TOKEN` kopieren.
+3. Bei Render: Service → *Environment* → beide Werte als Environment Variables eintragen. Optional `ADMINS` = `[{"name":"Seyyid","password":"…"}]` für die Admin-Konten (die `admins.json` wird nicht hochgeladen).
+4. Speichern → Render startet neu. Im Log steht dann „Cloud-Speicher (Upstash) ist noch leer – die Konten werden ab jetzt dort gesichert.“
+
+Ab dann werden alle Konten (Passwörter nur als Hash) zusätzlich in Upstash gespeichert und beim Start von dort geladen.
+Konten, die vorher auf Render angelegt wurden, sind leider schon gelöscht und müssen einmal neu erstellt werden.
 
 ## Fahrzeuge
 

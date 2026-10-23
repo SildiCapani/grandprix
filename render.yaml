@@ -7,3 +7,12 @@ services:
     buildCommand: npm ci && npm run build
     startCommand: npm start
     healthCheckPath: /health
+    envVars:
+      # Free Upstash Redis database so accounts survive restarts (Render's free disk is wiped on every deploy).
+      - key: UPSTASH_REDIS_REST_URL
+        sync: false
+      - key: UPSTASH_REDIS_REST_TOKEN
+        sync: false
+      # Admin accounts as JSON, e.g. [{"name":"Seyyid","password":"..."}] (admins.json is not uploaded).
+      - key: ADMINS
+        sync: false
