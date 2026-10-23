@@ -1,10 +1,11 @@
+import { SERVER } from './server-url.js';
 // Server relay for networks that block peer-to-peer (eduroam, company Wi-Fi).
 // A tiny MQTT 3.1.1 client over secure WebSockets (port 443 like any HTTPS site)
 // plus a PeerJS-compatible facade, so the lobby/race protocol stays unchanged.
 
 // Index 0 is our own game server (same address the game was loaded from, path /ws).
 // The public MQTT brokers are fallbacks when the game is opened without the server.
-const ownServer = () => typeof location !== 'undefined' && /^https?:$/.test(location.protocol)
+const ownServer = () => SERVER ? SERVER.replace(/^http/, 'ws') + '/ws' : typeof location !== 'undefined' && /^https?:$/.test(location.protocol)
   ? `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws` : null;
 export const RELAY_BROKERS = [
   ownServer(),

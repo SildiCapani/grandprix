@@ -15,6 +15,15 @@ const DIST = fileURLToPath(new URL('../dist/', import.meta.url));
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.ico': 'image/x-icon', '.woff2': 'font/woff2' };
 
 const server = http.createServer(async (req, res) => {
+  // The game may also be opened from a static host (e.g. Netlify) and talk to this server: allow cross-origin API calls.
+  // Logins use a bearer token (no cookies), so any origin is fine.
+  if (req.url.startsWith('/api')) {
+    res.setHeader('access-control-allow-origin', req.headers.origin || '*');
+    res.setHeader('access-control-allow-headers', 'content-type, authorization');
+    res.setHeader('access-control-allow-methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.setHeader('access-control-max-age', '86400'); res.setHeader('vary', 'origin');
+    if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
+  }
   if (await handleApi(req, res)) return;
   if (req.url === '/health') { res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify({ ok: true, rooms: topics.size, clients: wss.clients.size })); return; }
   try {

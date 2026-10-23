@@ -1,6 +1,7 @@
 // Client side of the account system: login/registration, the session token and a storage
 // adapter that keeps the career in the account (server) instead of in this browser.
 import { STORAGE_KEY } from './progression.js';
+import { SERVER, crossOrigin } from './server-url.js';
 
 const TOKEN_KEY = 'apex-rush-session';
 // guest: playing without an account – the career then lives in this browser (localStorage).
@@ -17,7 +18,7 @@ const writeToken = t => { try { t ? localStorage.setItem(TOKEN_KEY, t) : localSt
 async function api(path, { body, method = body ? 'POST' : 'GET' } = {}) {
   let res;
   try {
-    res = await fetch('/api' + path, { method, headers: { 'content-type': 'application/json', ...(account.token ? { authorization: 'Bearer ' + account.token } : {}) }, body: body ? JSON.stringify(body) : undefined });
+    res = await fetch(SERVER + '/api' + path, { method, headers: { 'content-type': 'application/json', ...(account.token ? { authorization: 'Bearer ' + account.token } : {}) }, body: body ? JSON.stringify(body) : undefined });
   } catch { throw Object.assign(new Error('Server nicht erreichbar. Läuft „npm run dev“ bzw. der Server?'), { offline: true }); }
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw Object.assign(new Error(data.error || 'Serverfehler (' + res.status + ')'), { status: res.status });
@@ -59,7 +60,7 @@ export async function flushProfile() {
 // Last chance when the tab closes.
 addEventListener('pagehide', () => {
   if (!account.token || !account.profile) return;
-  try { navigator.sendBeacon('/api/profile', new Blob([JSON.stringify({ token: account.token, profile: account.profile })], { type: 'application/json' })); } catch {}
+  try { navigator.sendBeacon(SERVER + '/api/profile', new Blob([JSON.stringify({ token: account.token, profile: account.profile })], { type: crossOrigin ? 'text/plain' : 'application/json' })); } catch {}
 });
 
 // Drop-in storage for loadProfile/saveProfile: the career belongs to the logged-in account.
