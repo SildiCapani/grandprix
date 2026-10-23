@@ -1,0 +1,15 @@
+# Netlify only hosts the built game (static files). Accounts (/api) and the online relay (/ws)
+# run on the Render server, so the build bakes its address in (read in client/src/game/server-url.js).
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "20"
+  VITE_SERVER_URL = "https://apex-rush-mwk2.onrender.com"
+
+# One-page app: unknown paths load the game instead of a 404.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
