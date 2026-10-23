@@ -13,7 +13,7 @@ export const KARTS = Object.freeze([
   { id: 'allround', name: 'Apex GT', tag: 'ALLROUNDER', desc: 'Ausgewogen in allem. Der beste Einstieg.',
     top: 1, accel: 1, turn: 1, mass: 1, drift: 1, offroad: .4 },
   { id: 'bolide', name: 'Thunder Bolide', tag: 'SPEED', desc: 'Höchste Endgeschwindigkeit, träge in engen Kurven und beim Anfahren. Stark auf schnellen Strecken: Küste, Sternenbahn, Wolkeninseln, Mondbasis.',
-    top: 1.021, accel: .78, turn: 1.45, mass: 1.1, drift: .85, offroad: .32 },
+    top: 1.018, accel: .78, turn: 1.33, mass: 1.1, drift: .85, offroad: .32 },
   { id: 'flitzer', name: 'Pixel Flitzer', tag: 'HANDLING', desc: 'Leicht und superwendig, zieht blitzschnell los. Weniger Topspeed, wird leicht weggerammt. Stark auf kurvigen Strecken: Neon Boulevard, Gletscherpass, Galaxie.',
     top: .993, accel: 1.35, turn: .52, mass: .75, drift: 1.1, offroad: .45 },
   { id: 'brummer', name: 'Iron Brummer', tag: 'GEWICHT', desc: 'Schwerer Panzer: schiebt alle zur Seite und lässt sich kaum abdrängen. Langsam beim Anfahren, sonst solide. Die Wahl für Rempeleien und Battles.',
