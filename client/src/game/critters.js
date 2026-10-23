@@ -437,3 +437,6 @@ export function spikeShell() {
   k.addGeo('body', sculpt([E(G, 0, .25, 0, 1, .78, 1), E(R, 0, .08, 0, 1.08, .2, 1.08, null, { k: .1 }), E(C, 0, -.02, 0, .95, .14, .95, null, { k: .1 }), ...plates, ...spikes], { k: .12, res: 52 }));
   return k.build();
 }
+
+// Shared with the driver heads (avatars.js).
+export { kit, E as sE, Cp as sCp, P as sP };

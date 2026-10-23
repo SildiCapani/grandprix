@@ -563,3 +563,7 @@ header.in-garage .top-actions{display:none}
 .g-wheel>span i.up{color:#8fe07a}.g-wheel>span i.down{color:#ff8a6a}
 .g-wheel.selected{border-color:var(--orange);background:#ff653d1c;box-shadow:0 0 0 2px #ff653d40}
 .g-wheel.locked{filter:grayscale(.8) brightness(.7)}
+
+.ghost-info .diamond{color:#9ff0ff;font-weight:900;text-shadow:0 0 8px #5ad8ff88}
+.avatar-card.star{border-color:#ffd04a55;background:radial-gradient(circle at 50% 30%,color-mix(in srgb,var(--av) 38%,transparent),#ffd04a0d 70%)}
+.avatar-card.star b::after{content:' ★';color:#ffd04a}

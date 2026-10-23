@@ -12,7 +12,7 @@ import { MAPS,getTrack,WORLD_SCALE,RAMP_LEN,RAMP_H,registerCustomTrack,CUSTOM_ID
 import { createEditor } from './editor.js';
 import { KARTS,kartById,kartStats,WHEELS,wheelById,withWheels } from './game/karts.js';
 import { createGarage } from './game/garage.js';
-import { AVATARS,avatarById,avatarPortrait } from './game/avatars.js';
+import { AVATARS,avatarById,avatarPortrait,avatarUnlocked,avatarRequirement,diamondPar } from './game/avatars.js';
 import { SKINS,skinById,skinProgress,skinRequirement,skinUnlocked,skinPreview } from './game/skins.js';
 import { account,accountStore,restoreSession,login,register,logout,flushProfile,playAsGuest,wasGuest,uploadGhost,syncGhosts } from './game/account.js';
 const S=WORLD_SCALE;
@@ -55,13 +55,16 @@ let chosenSkin='none';try{chosenSkin=skinById(localStorage.getItem('apex-rush-sk
 const skinOk=id=>DEV_UNLOCK||skinUnlocked(skinById(id),skinProgress(profile,playerLevel()));
 const mySkin=()=>skinOk(chosenSkin)?chosenSkin:'none';
 let chosenAvatar='pilot';try{chosenAvatar=avatarById(localStorage.getItem('apex-rush-avatar')).id;}catch{}
-const avatarOk=id=>DEV_UNLOCK||skinUnlocked(avatarById(id),skinProgress(profile,playerLevel()));
+const avatarCtx=()=>({progress:skinProgress(profile,playerLevel()),cupTrophy:(id,cc)=>['gold','silver','bronze'].find(t=>profile.achievements.includes(`cup:${id}:${cc}:${t}`))||'none',bestTime:(id,cc)=>profile.records[id]?.[cc===80?'time':'time'+cc]?.bestTime??null});
+const avatarOk=id=>DEV_UNLOCK||avatarUnlocked(avatarById(id),avatarCtx());
+const avatarNeed=a=>avatarRequirement(a)||skinRequirement(a);
+let knownAvatars=null;function checkNewAvatars(){const now=AVATARS.filter(a=>avatarOk(a.id)).map(a=>a.id);if(knownAvatars){const fresh=now.filter(id=>!knownAvatars.includes(id));if(fresh.length)setTimeout(()=>toast('⭐ NEUER FAHRER FREIGESCHALTET: '+fresh.map(id=>avatarById(id).name.toUpperCase()).join(' · '),4600),3400);}knownAvatars=now;}
 const myAvatar=()=>avatarOk(chosenAvatar)?chosenAvatar:'pilot';
 let chosenWheel='standard';try{chosenWheel=wheelById(localStorage.getItem('apex-rush-wheel')).id;}catch{}
 const wheelOk=id=>DEV_UNLOCK||!careerOn||playerLevel()>=(wheelById(id).level||1);
 const myWheel=()=>wheelOk(chosenWheel)?chosenWheel:'standard';
-let knownSkins=null;
-function checkNewSkins(){const now=SKINS.filter(x=>skinOk(x.id)).map(x=>x.id);if(knownSkins&&account.user){const fresh=now.filter(id=>!knownSkins.includes(id));if(fresh.length)setTimeout(()=>toast('🎨 NEUER SKIN FREI: '+fresh.map(id=>skinById(id).name.toUpperCase()).join(' · ')+' · in der Garage',4200),2600);}knownSkins=now;}
+let knownSkins=null;knownAvatars=null;
+function checkNewSkins(){checkNewAvatars();const now=SKINS.filter(x=>skinOk(x.id)).map(x=>x.id);if(knownSkins&&account.user){const fresh=now.filter(id=>!knownSkins.includes(id));if(fresh.length)setTimeout(()=>toast('🎨 NEUER SKIN FREI: '+fresh.map(id=>skinById(id).name.toUpperCase()).join(' · ')+' · in der Garage',4200),2600);}knownSkins=now;}
 function saveAndCheck(){const ok=saveProfile(profile,accountStore);checkNewSkins();return ok;}
 function setCareer(on){careerOn=true;if(!kartUnlocked(chosenKart)){chosenKart='allround';core.setKart(chosenKart);}updatePlayerColor(chosenColor);if(!unlockedMaps(profile).includes(chosenMap))selectMap('coast');else renderGarage();toast(on?'KARRIERE AN · Level schaltet Strecken, Karts und Lacke frei':'KARRIERE AUS · alles frei, keine Aufträge',2400);}
 let chosenColor='#ee4b37';try{chosenColor=localStorage.getItem('apex-rush-color')||chosenColor;}catch{}
@@ -735,13 +738,13 @@ function homeStep(){const level=getLevel(profile.totalXP),a=avatarById(myAvatar(
   <div class="wiz-career">${careerCardHtml(level)}</div></div>`;}
 function modeStep(){return `${stepsBar()}${wizBack()}<h2 class="wiz-title">Was willst du fahren?</h2><div class="wiz-cards modes">${Object.entries(MODE_INFO).map(([id,[n,ic,d]])=>`<button class="wiz-card mode-${id} ${menuTab===id?'selected':''}" data-pickmode="${id}"><span class="wiz-icon">${ic}</span><b>${n}</b><small>${d}</small></button>`).join('')}<button class="wiz-card mode-editor" data-editor="new"><span class="wiz-icon">🛠</span><b>STRECKEN-EDITOR</b><small>Eigene Strecke zeichnen, testen und per Code teilen</small></button></div>`;}
 function driverStep(){const cur=myAvatar();
-  return `${stepsBar()}${wizBack()}<h2 class="wiz-title">Wer sitzt am Steuer?</h2><div class="avatar-grid">${AVATARS.map(a=>{const ok=avatarOk(a.id);return `<button class="avatar-card ${a.id===cur?'selected':''} ${ok?'':'locked'}" data-avatar="${a.id}" style="--av:${a.color}" aria-pressed="${a.id===cur}">${avatarPortrait(a.id)}<b>${a.name}</b><small>${ok?a.tag:'🔒 '+skinRequirement(a)}</small></button>`;}).join('')}</div>
+  return `${stepsBar()}${wizBack()}<h2 class="wiz-title">Wer sitzt am Steuer?</h2><div class="avatar-grid">${AVATARS.map(a=>{const ok=avatarOk(a.id);return `<button class="avatar-card ${a.id===cur?'selected':''} ${ok?'':'locked'} ${a.star?'star':''}" data-avatar="${a.id}" style="--av:${a.color}" aria-pressed="${a.id===cur}">${avatarPortrait(a.id)}<b>${a.name}</b><small>${ok?a.tag:'🔒 '+avatarNeed(a)}</small></button>`;}).join('')}</div>
   <div class="wiz-row">${garageCard()}<button class="primary wiz-next" data-step="next">${playStyle==='online'?'ZUR ONLINE-LOBBY':'WEITER'} <span>→</span></button></div>`;}
 function classStep(){const info={80:['Einsteiger','Entspannt fahren und die Strecken lernen'],100:['Fortgeschritten','Schneller, die Gegner fahren härter'],120:['Profi','Hohes Tempo, Bremsen vor Kurven lohnt sich'],150:['Wahnsinn','Volle Kanne – nur für Drift-Profis']};
   return `${stepsBar()}${wizBack()}<h2 class="wiz-title">Wie schnell?</h2><div class="wiz-cards classes">${SPEED_CLASSES.map((cc,i)=>`<button class="wiz-card cc-card ${cc===chosenClass?'selected':''}" data-cc="${cc}" style="--lvl:${(i+1)/SPEED_CLASSES.length}"><span class="cc-num">${cc}<small>KM/H</small></span><b>${info[cc][0].toUpperCase()}</b><small>${info[cc][1]}</small><span class="cc-gauge"><i></i></span></button>`).join('')}</div>`;}
 function trackLeft(locked){const a=avatarById(myAvatar()),k=kartById(chosenKart),M=(MODE_INFO[menuTab]||MODE_INFO.race)[0],g=menuTab==='time'&&chosenMap!==CUSTOM_ID?loadGhost(account.user?.name,chosenMap,chosenClass):null;
   return `<div class="garage-left wiz-left">${stepsBar()}${wizBack()}<div class="wiz-summary"><button data-step="mode"><small>MODUS</small><b>${M}</b></button><button data-step="driver" class="with-av">${avatarPortrait(a.id)}<span><small>FAHRER & KART</small><b>${a.name} · ${k.name}</b></span></button><button data-step="class"><small>KLASSE</small><b>${chosenClass} KM/H</b></button></div>
-  ${menuTab==='time'?`<div class="ghost-info">${g?`👻 GHOST: <b>${formatTime(g.time)}</b> · fährt mit dir mit`:'👻 Noch kein Ghost – deine erste Zielfahrt wird gespeichert und fährt danach mit.'}<br><span class="platinum">✦ PLATIN</span> = 8 % schneller als Gold</div>`:''}
+  ${menuTab==='time'?`<div class="ghost-info">${g?`👻 GHOST: <b>${formatTime(g.time)}</b> · fährt mit dir mit`:'👻 Noch kein Ghost – deine erste Zielfahrt wird gespeichert und fährt danach mit.'}<br><span class="platinum">✦ PLATIN</span> = 8 % schneller als Gold${(()=>{const m=MAPS.find(x=>x.id===chosenMap);if(!m)return '';const star=AVATARS.find(a=>a.need.diamond?.[0]===chosenMap&&a.need.diamond[1]===chosenClass);return `<br><span class="diamond">💎 DIAMANT</span> = unter <b>${formatTime(diamondPar(m,chosenClass))}</b>${star?` · schaltet <b>${star.name}</b> frei${avatarOk(star.id)?' ✓':''}`:''}`;})()}</div>`:''}
   <button class="primary" id="start" ${locked?'disabled':''}>${locked?'NOCH '+Math.max(0,MAP_XP[activeMap.id]-profile.totalXP)+' XP ZUM FREISCHALTEN':'RENNEN STARTEN'} <span>${locked?'⌑':'↗'}</span></button><div class="menu-keys"><kbd>WASD</kbd> Fahren <span>·</span> <kbd>E</kbd> Item <span>·</span> <kbd>SPACE</kbd> Drift</div></div>`;}
 function renderGarage(){
   if(chosenMode==='online'&&!onlineLobbyOpen){chosenMode='race';menuTab='race';menuStep='home';playStyle='offline';}
@@ -754,7 +757,7 @@ function menuNav(b){
   if(onlineLobbyOpen)return false;
   if(b.dataset.play){playStyle=b.dataset.play;menuStep=b.dataset.jump||(playStyle==='online'?'driver':'mode');renderGarage();audio.bleep('click');return true;}
   if(b.dataset.pickmode){const m=b.dataset.pickmode;menuTab=m;chosenMode=m==='cup'?'race':m;if(m!=='battle'&&isArena(chosenMap))selectMap(battleReturnMap||'coast');menuStep='driver';renderGarage();audio.bleep('click');return true;}
-  if(b.dataset.avatar){const id=b.dataset.avatar,av=avatarById(id);if(!avatarOk(id)){toast(av.name.toUpperCase()+' · '+skinRequirement(av));return true;}chosenAvatar=id;try{localStorage.setItem('apex-rush-avatar',id);}catch{}updatePlayerColor(chosenColor);renderGarage();audio.bleep('click');return true;}
+  if(b.dataset.avatar){const id=b.dataset.avatar,av=avatarById(id);if(!avatarOk(id)){toast(av.name.toUpperCase()+' · '+avatarNeed(av),3600);return true;}chosenAvatar=id;try{localStorage.setItem('apex-rush-avatar',id);}catch{}updatePlayerColor(chosenColor);renderGarage();audio.bleep('click');return true;}
   if(b.dataset.cc&&menuStep==='class'){chosenClass=+b.dataset.cc;try{localStorage.setItem('apex-rush-cc',String(chosenClass));}catch{}menuStep='track';renderGarage();audio.bleep('click');return true;}
   if(b.dataset.step){const order=stepOrder(),i=order.indexOf(menuStep);let s=b.dataset.step;
     if(s==='back')s=order[Math.max(0,i-1)];else if(s==='next'){if(playStyle==='online'&&menuStep==='driver'){openOnlineLobby();return true;}s=order[Math.min(order.length-1,i+1)];}
@@ -792,7 +795,7 @@ function lobbyRoute(st){return st.route==='server'?'ÜBER SERVER':st.route==='re
 // "Dein Fahrer": avatar, kart and paint can be changed right in the lobby; everyone sees it on the grid.
 function lobbyMePanel(){const a=avatarById(myAvatar()),k=kartById(chosenKart);
   const tabs=[['kart','KART'],['avatar','FAHRER'],['paint','LACK']].map(([id,n])=>`<button class="${lobbyPanel===id?'on':''}" data-online="panel" data-panel="${id}">${n}</button>`).join('');
-  const body=lobbyPanel==='avatar'?`<div class="lb-strip avatars">${AVATARS.map(x=>{const ok=avatarOk(x.id);return `<button class="lb-av ${x.id===a.id?'on':''} ${ok?'':'locked'}" data-online="avatar" data-id="${x.id}" style="--av:${x.color}" title="${x.name}${ok?'':' · 🔒 '+skinRequirement(x)}">${avatarPortrait(x.id)}<small>${ok?x.name:'🔒'}</small></button>`;}).join('')}</div>`
+  const body=lobbyPanel==='avatar'?`<div class="lb-strip avatars">${AVATARS.map(x=>{const ok=avatarOk(x.id);return `<button class="lb-av ${x.id===a.id?'on':''} ${ok?'':'locked'}" data-online="avatar" data-id="${x.id}" style="--av:${x.color}" title="${x.name}${ok?'':' · 🔒 '+avatarNeed(x)}">${avatarPortrait(x.id)}<small>${ok?x.name:'🔒'}</small></button>`;}).join('')}</div>`
     :lobbyPanel==='paint'?`<div class="lb-strip paints">${COLORS.map(([c,n])=>`<button class="lb-paint ${c===chosenColor?'on':''}" data-online="color" data-color="${c}" style="--swatch:${c}" title="${n}" aria-label="${n}"></button>`).join('')}</div><button class="lb-link" data-online="garage">Skins & Lack-Finish in der Garage ↗</button>`
     :`<div class="lb-strip karts">${KARTS.map(x=>{const ok=kartUnlocked(x.id);return `<button class="lb-kart ${x.id===chosenKart?'on':''} ${ok?'':'locked'}" data-online="kart" data-id="${x.id}"><b>${x.name}</b><small>${ok?x.tag:'🔒 LV '+KART_LEVEL[x.id]}</small></button>`;}).join('')}</div><button class="lb-link" data-online="garage">Kart in 3D ansehen · Garage ↗</button>`;
   return `<div class="lb-me" style="--pc:${chosenColor}"><div class="lb-me-top"><div class="lb-me-por">${avatarPortrait(a.id)}</div><div><small>DEIN FAHRER</small><b>${a.name}</b><span>${k.name} · <i style="background:${chosenColor}"></i> ${(COLORS.find(c=>c[0]===chosenColor)||['','EIGENE FARBE'])[1]}</span></div></div><div class="lb-tabs">${tabs}</div>${body}</div>`;}
@@ -860,7 +863,7 @@ async function runOnlineAction(button){
   if(action==='copy'){const field=$(button.dataset.target);if(!field?.value){toast('Der Verbindungscode ist noch nicht bereit.');return;}try{await navigator.clipboard.writeText(field.value);toast('Code kopiert. Jetzt an deinen Freund schicken.',1800);}catch{field.focus();field.select();toast('Code markiert – mit Strg+C kopieren.',2400);}return;}
   if(action==='leave'){leaveOnline();return;}
   if(action==='panel'){lobbyPanel=button.dataset.panel;refreshLobbyMe();audio.bleep('tick');return;}
-  if(action==='avatar'){const id=button.dataset.id,av=avatarById(id);if(!avatarOk(id)){toast(av.name.toUpperCase()+' · '+skinRequirement(av));return;}chosenAvatar=id;try{localStorage.setItem('apex-rush-avatar',id);}catch{}updatePlayerColor(chosenColor);refreshLobbyMe();audio.bleep('click');return;}
+  if(action==='avatar'){const id=button.dataset.id,av=avatarById(id);if(!avatarOk(id)){toast(av.name.toUpperCase()+' · '+avatarNeed(av),3600);return;}chosenAvatar=id;try{localStorage.setItem('apex-rush-avatar',id);}catch{}updatePlayerColor(chosenColor);refreshLobbyMe();audio.bleep('click');return;}
   if(action==='kart'){const id=button.dataset.id;if(!kartUnlocked(id)){toast(kartById(id).name+' wird mit Level '+KART_LEVEL[id]+' freigeschaltet.');return;}chosenKart=kartById(id).id;try{localStorage.setItem('apex-rush-kart',chosenKart);}catch{}core.setKart(chosenKart);updatePlayerColor(chosenColor);refreshLobbyMe();audio.bleep('click');return;}
   if(action==='color'){chosenColor=button.dataset.color;try{localStorage.setItem('apex-rush-color',chosenColor);}catch{}updatePlayerColor(chosenColor);refreshLobbyMe();audio.bleep('click');return;}
   if(action==='garage'){openGarage();return;}
@@ -940,7 +943,7 @@ window.addEventListener('beforeunload',()=>network.leave(true));
 // Debug handle for the browser console (e.g. __apex.core.player).
 globalThis.__apex={core,createCar,get renderer(){return renderer;},get network(){return network;},snap(){camY=core.player.y;snapCam=true;},get scene(){return scene;},get track(){return track;},get camera(){return camera;}};
 // ===================== Accounts: login screen =====================
-function afterLogin(){profile=loadProfile(accountStore);DEV_UNLOCK=!!account.user?.admin;careerOn=true;knownSkins=null;checkNewSkins();nickname=account.user.name;try{localStorage.setItem('apex-rush-name',nickname);}catch{}
+function afterLogin(){profile=loadProfile(accountStore);DEV_UNLOCK=!!account.user?.admin;careerOn=true;knownSkins=null;knownAvatars=null;checkNewSkins();nickname=account.user.name;try{localStorage.setItem('apex-rush-name',nickname);}catch{}
   if(!kartUnlocked(chosenKart)){chosenKart='allround';core.setKart(chosenKart);}updatePlayerColor(chosenColor);
   $('loginScreen')?.remove();renderAccountChip();if(!unlockedMaps(profile).includes(chosenMap))selectMap('coast');else renderGarage();
   toast(account.user.admin?'ADMIN '+account.user.name.toUpperCase()+' · ALLES FREI':'WILLKOMMEN, '+account.user.name.toUpperCase(),2200);syncGhosts().then(n=>{if(n&&!$('menuLayer').hidden)renderGarage();});}
@@ -948,7 +951,7 @@ function renderAccountChip(){let chip=$('accountChip');if(!account.user&&!accoun
   if(!account.user){chip.innerHTML='<i>○</i>GAST · ANMELDEN';chip.title='Du spielst als Gast · Fortschritt bleibt in diesem Browser';return;}
   chip.innerHTML=`<i>${account.user.admin?'★':'●'}</i>${escapeText(account.user.name)}`;chip.title=account.user.admin?'Admin-Konto':'Angemeldet';}
 // Without an account: the career is kept in this browser; you can log in any time with the chip at the top.
-function afterGuest(){playAsGuest();profile=loadProfile(accountStore);DEV_UNLOCK=false;careerOn=true;knownSkins=null;checkNewSkins();if(!kartUnlocked(chosenKart)){chosenKart='allround';core.setKart(chosenKart);}updatePlayerColor(chosenColor);$('loginScreen')?.remove();renderAccountChip();if(!unlockedMaps(profile).includes(chosenMap))selectMap('coast');else renderGarage();toast('DU SPIELST ALS GAST · FORTSCHRITT BLEIBT IN DIESEM BROWSER',2600);}
+function afterGuest(){playAsGuest();profile=loadProfile(accountStore);DEV_UNLOCK=false;careerOn=true;knownSkins=null;knownAvatars=null;checkNewSkins();if(!kartUnlocked(chosenKart)){chosenKart='allround';core.setKart(chosenKart);}updatePlayerColor(chosenColor);$('loginScreen')?.remove();renderAccountChip();if(!unlockedMaps(profile).includes(chosenMap))selectMap('coast');else renderGarage();toast('DU SPIELST ALS GAST · FORTSCHRITT BLEIBT IN DIESEM BROWSER',2600);}
 async function doLogout(){if(network.state.role!=='idle')leaveOnline();await logout();profile=loadProfile(accountStore);DEV_UNLOCK=false;renderAccountChip();showLogin();}
 function showLogin(message=''){
   let el=$('loginScreen');if(!el){el=document.createElement('div');el.id='loginScreen';el.className='login-screen';document.body.appendChild(el);}
