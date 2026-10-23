@@ -115,6 +115,41 @@ function mergeProfile(user, incoming) {
   return true;
 }
 
+// Time-trial ghosts: kept apart from the accounts (they are big), one small file per player on disk and one
+// Redis hash per player in the cloud ("apex-rush-ghosts:<name>", field "<map>:<cc>"). Only a faster run replaces one.
+const GHOST_DIR = join(DATA_DIR, 'ghosts'), GHOST_CLOUD = k => (process.env.GHOSTS_KEY || 'apex-rush-ghosts') + ':' + k;
+const ghostCache = new Map();
+const ghostFile = k => join(GHOST_DIR, Buffer.from(k).toString('hex') + '.json');
+async function ghostsOf(k) {
+  if (ghostCache.has(k)) return ghostCache.get(k);
+  let g = {};
+  try { g = JSON.parse(await readFile(ghostFile(k), 'utf8')) || {}; } catch {}
+  if (cloudOn) {
+    try {
+      const { result } = await cloud('/hgetall/' + encodeURIComponent(GHOST_CLOUD(k)));
+      for (let i = 0; i + 1 < (result || []).length; i += 2) { try { const v = JSON.parse(result[i + 1]); if (v?.time > 0 && !(g[result[i]]?.time <= v.time)) g[result[i]] = v; } catch {} }
+    } catch (e) { console.error('Ghosts aus dem Cloud-Speicher nicht ladbar:', e.message); }
+  }
+  ghostCache.set(k, g); return g;
+}
+const str = (v, n = 40) => typeof v === 'string' ? v.slice(0, n) : undefined;
+function cleanGhost(g) {
+  if (!g || typeof g !== 'object' || !Array.isArray(g.d)) return null;
+  const time = +g.time, step = +g.step || .1;
+  if (!(time > 0 && time < 3600) || !(step >= .02 && step <= 1)) return null;
+  if (g.d.length < 10 || g.d.length > 200000 || g.d.length % 5 || !g.d.every(n => Number.isInteger(n) && Math.abs(n) < 1e7)) return null;
+  return { time, step, kart: str(g.kart), skin: str(g.skin), avatar: str(g.avatar), color: str(g.color, 16), d: g.d };
+}
+async function saveGhost(k, field, ghost) {
+  const all = await ghostsOf(k);
+  if (all[field] && all[field].time <= ghost.time) return false;
+  all[field] = ghost;
+  try { await mkdir(GHOST_DIR, { recursive: true }); await writeFile(ghostFile(k), JSON.stringify(all)); } catch (e) { console.error('Ghost nicht gespeichert:', e.message); }
+  if (cloudOn) try { await cloud('/hset/' + encodeURIComponent(GHOST_CLOUD(k)) + '/' + encodeURIComponent(field), JSON.stringify(ghost)); } catch (e) { console.error('Ghost-Cloud-Speicher fehlgeschlagen:', e.message); }
+  return true;
+}
+const ghostField = (map, cc) => /^[a-z0-9_-]{1,40}$/i.test(String(map)) && Number.isInteger(+cc) && +cc > 0 && +cc < 1000 ? map + ':' + +cc : null;
+
 function body(req, limit = 256 * 1024) {
   return new Promise((resolve, reject) => {
     let size = 0, chunks = [];
@@ -154,7 +189,7 @@ export async function handleApi(req, res) {
       return send(res, 200, { token, user: publicUser(u), profile: u.profile }), true;
     }
     // everything below needs a session (header or, for sendBeacon, in the body)
-    let data = req.method === 'POST' || req.method === 'PUT' ? await body(req) : {};
+    let data = req.method === 'POST' || req.method === 'PUT' ? await body(req, url.pathname === '/api/ghost' ? 2 * 1024 * 1024 : undefined) : {};
     const user = userByToken(auth || data.token);
     if (!user) return send(res, 401, { error: 'Bitte neu anmelden.' }), true;
     if (route === 'GET /api/me') return send(res, 200, { user: publicUser(user), profile: user.profile || createProfile() }), true;
@@ -163,6 +198,21 @@ export async function handleApi(req, res) {
       if (!mergeProfile(user, data.profile)) return send(res, 400, { error: 'Fortschritt ungültig.' }), true;
       await persist();
       return send(res, 200, { ok: true, profile: user.profile }), true;
+    }
+    if (route === 'GET /api/ghosts') {
+      const all = await ghostsOf(keyOf(user.name)), ghosts = {};
+      for (const [f, g] of Object.entries(all)) ghosts[f] = g.time;
+      return send(res, 200, { ghosts }), true;
+    }
+    if (route === 'GET /api/ghost') {
+      const field = ghostField(url.searchParams.get('map'), url.searchParams.get('cc'));
+      if (!field) return send(res, 400, { error: 'Strecke ungültig.' }), true;
+      return send(res, 200, { ghost: (await ghostsOf(keyOf(user.name)))[field] || null }), true;
+    }
+    if (route === 'PUT /api/ghost' || route === 'POST /api/ghost') {
+      const field = ghostField(data.map, data.cc), ghost = cleanGhost(data.ghost);
+      if (!field || !ghost) return send(res, 400, { error: 'Ghost ungültig.' }), true;
+      return send(res, 200, { ok: true, stored: await saveGhost(keyOf(user.name), field, ghost) }), true;
     }
     if (route === 'POST /api/password') {
       if (typeof data.password !== 'string' || data.password.length < 6) return send(res, 400, { error: 'Passwort: mindestens 6 Zeichen.' }), true;

@@ -57,6 +57,33 @@ export async function flushProfile() {
   catch (e) { account.online = false; setTimeout(schedulePush, 5000); }
   finally { pushing = false; if (pending) { pending = false; schedulePush(); } }
 }
+// Time-trial ghosts belong to the account too: they live on the server (one entry per track + speed class)
+// and are cached in this browser, so the game can read them instantly.
+const GHOST_PREFIX = user => `apex-ghost:${String(user).toLowerCase()}:`;
+export async function uploadGhost(map, cc, ghost) {
+  if (!account.token || !ghost) return false;
+  try { const r = await api('/ghost', { method: 'PUT', body: { map, cc, ghost } }); return !!r.stored; } catch { return false; }
+}
+// After login: download ghosts that are better than (or missing in) this browser, upload the ones that are better here.
+export async function syncGhosts() {
+  if (!account.token || !account.user) return 0;
+  let index;
+  try { index = (await api('/ghosts')).ghosts || {}; } catch { return 0; }
+  const prefix = GHOST_PREFIX(account.user.name), local = {};
+  try { for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k?.startsWith(prefix)) { try { const g = JSON.parse(localStorage.getItem(k)); if (g?.time > 0) local[k.slice(prefix.length)] = g; } catch {} } } } catch {}
+  let changed = 0;
+  for (const [field, time] of Object.entries(index)) {
+    if (local[field] && local[field].time <= time) continue;
+    const [map, cc] = field.split(':');
+    try { const { ghost } = await api('/ghost?map=' + encodeURIComponent(map) + '&cc=' + encodeURIComponent(cc)); if (ghost) { local[field] = null; localStorage.setItem(prefix + field, JSON.stringify(ghost)); changed++; } } catch {}
+  }
+  for (const [field, g] of Object.entries(local)) {
+    if (!g || (index[field] && index[field] <= g.time)) continue;
+    const [map, cc] = field.split(':'); await uploadGhost(map, +cc, g);
+  }
+  return changed;
+}
+
 // Last chance when the tab closes.
 addEventListener('pagehide', () => {
   if (!account.token || !account.profile) return;

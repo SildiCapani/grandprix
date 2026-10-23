@@ -66,6 +66,7 @@ Lösung (kostenlos): eine **Upstash-Redis**-Datenbank.
 4. Speichern → Render startet neu. Im Log steht dann „Cloud-Speicher (Upstash) ist noch leer – die Konten werden ab jetzt dort gesichert.“
 
 Ab dann werden alle Konten (Passwörter nur als Hash) zusätzlich in Upstash gespeichert und beim Start von dort geladen.
+Auch die Zeitfahr-Ghosts hängen am Konto: Sie liegen pro Spieler als eigener Eintrag `apex-rush-ghosts:<name>` in Upstash (Feld `<strecke>:<cc>`) und werden nach dem Login mit dem Browser abgeglichen – nur eine schnellere Fahrt ersetzt einen Ghost.
 Konten, die vorher auf Render angelegt wurden, sind leider schon gelöscht und müssen einmal neu erstellt werden.
 
 ## Fahrzeuge
