@@ -763,7 +763,7 @@ function menuNav(b){
 }
 const COLORS=[['#ee4b37','RACING RED'],['#42c9cb','TURBO TÜRKIS'],['#edc44b','GOLDEN ENGINEER'],['#9b87e5','PURPLE PROTOTYPE'],['#3fbf5a','JUNGLE GREEN'],['#f2f2ea','ARCTIC WHITE'],['#2b2f38','CARBON BLACK'],['#ff7ac2','PINK PULSE']];
 // Stats as 0…100 % for the garage bars.
-function kartPct(k){const f=(v,lo,hi)=>Math.round(Math.max(.08,Math.min(1,(v-lo)/(hi-lo)))*100);return [['TEMPO',f(k.top,.94,1.04)],['BESCHLEUNIGUNG',f(k.accel,.7,1.4)],['HANDLING',f(2-k.turn,2-1.35,2-.68)],['GEWICHT',f(k.mass,.7,1.8)],['DRIFT',f(k.drift,.85,1.45)],['OFFROAD',f(k.offroad,.28,.9)]];}
+function kartPct(k){const f=(v,lo,hi)=>Math.round(Math.max(.08,Math.min(1,(v-lo)/(hi-lo)))*100);return [['TEMPO',f(k.top,.94,1.04)],['BESCHLEUNIGUNG',f(k.accel,.7,1.4)],['HANDLING',f(2-k.turn,2-1.5,2-.5)],['GEWICHT',f(k.mass,.7,1.8)],['DRIFT',f(k.drift,.85,1.45)],['OFFROAD',f(k.offroad,.28,.85)]];}
 function garageCard(){const k=kartById(chosenKart),col=COLORS.find(c=>c[0]===chosenColor)?.[1]||'';return `<div class="garage-card"><div class="gc-top"><i style="background:${chosenColor}"></i><div><small>DEIN FAHRZEUG</small><b>${k.name}</b><span>${k.tag} · ${col}</span></div></div><div class="kart-stats">${kartStats(k).map(([n,v])=>`<span><small>${n}</small><i>${'<em></em>'.repeat(v)}${'<u></u>'.repeat(5-v)}</i></span>`).join('')}</div><button class="garage-open" data-garage="open">🔧 ZUR GARAGE <small>Fahrzeug & Lackierung wählen</small></button></div>`;}
 // ===================== 3D garage =====================
 let garage=null,garageOpen=false,garageIndex=0;
