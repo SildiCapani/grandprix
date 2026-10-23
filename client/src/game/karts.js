@@ -5,20 +5,23 @@
 //  mass  – weight in collisions (heavy karts push light ones away)
 //  drift – how fast power drifts charge their mini-turbos
 //  offroad – share of top speed kept on rough ground (shortcuts) without a mushroom
-// Lap times on a mixed track end up within about ±1.5 %: the right kart depends on the track.
+// Balanced with the game's own AI as test driver (one flying lap per kart on all 18 tracks, 80–150 km/h):
+// averages stay within about ±1.5 % of the Apex GT, and every specialist has tracks where it is the fastest –
+// Bolide on fast tracks, Flitzer on twisty ones, Buggy wherever there are shortcuts. The GT is never the fastest
+// but never far off. The Brummer trades a little lap time for winning every shoving match.
 export const KARTS = Object.freeze([
   { id: 'allround', name: 'Apex GT', tag: 'ALLROUNDER', desc: 'Ausgewogen in allem. Der beste Einstieg.',
     top: 1, accel: 1, turn: 1, mass: 1, drift: 1, offroad: .4 },
-  { id: 'bolide', name: 'Thunder Bolide', tag: 'SPEED', desc: 'Höchste Endgeschwindigkeit. Träge in engen Kurven und beim Anfahren.',
-    top: 1.035, accel: .8, turn: 1.3, mass: 1.1, drift: .9, offroad: .32 },
-  { id: 'flitzer', name: 'Pixel Flitzer', tag: 'HANDLING', desc: 'Leicht und wendig, zieht blitzschnell los. Weniger Topspeed, wird leicht weggerammt.',
-    top: .97, accel: 1.35, turn: .72, mass: .75, drift: 1.1, offroad: .45 },
-  { id: 'brummer', name: 'Iron Brummer', tag: 'GEWICHT', desc: 'Schwerer Panzer: schiebt alle zur Seite. Langsam beim Beschleunigen.',
-    top: 1.02, accel: .75, turn: 1.12, mass: 1.75, drift: .95, offroad: .55 },
-  { id: 'drifter', name: 'Neon Drifter', tag: 'DRIFT', desc: 'Lädt Mini-Turbos viel schneller auf. Für Drift-Profis.',
-    top: .985, accel: 1.05, turn: .9, mass: .95, drift: 1.4, offroad: .38 },
-  { id: 'buggy', name: 'Rally Buggy', tag: 'OFFROAD', desc: 'Geländewagen mit Stollenreifen: fast volles Tempo im Gelände. Auf Asphalt etwas langsamer.',
-    top: .965, accel: 1.15, turn: .98, mass: 1.05, drift: .95, offroad: .88 },
+  { id: 'bolide', name: 'Thunder Bolide', tag: 'SPEED', desc: 'Höchste Endgeschwindigkeit, träge in engen Kurven und beim Anfahren. Stark auf schnellen Strecken: Küste, Sternenbahn, Wolkeninseln, Mondbasis.',
+    top: 1.018, accel: .78, turn: 1.33, mass: 1.1, drift: .85, offroad: .32 },
+  { id: 'flitzer', name: 'Pixel Flitzer', tag: 'HANDLING', desc: 'Leicht und superwendig, zieht blitzschnell los. Weniger Topspeed, wird leicht weggerammt. Stark auf kurvigen Strecken: Neon Boulevard, Gletscherpass, Galaxie.',
+    top: .993, accel: 1.35, turn: .52, mass: .75, drift: 1.1, offroad: .45 },
+  { id: 'brummer', name: 'Iron Brummer', tag: 'GEWICHT', desc: 'Schwerer Panzer: schiebt alle zur Seite und lässt sich kaum abdrängen. Langsam beim Anfahren, sonst solide. Die Wahl für Rempeleien und Battles.',
+    top: 1.003, accel: .78, turn: 1.12, mass: 1.75, drift: .95, offroad: .6 },
+  { id: 'drifter', name: 'Neon Drifter', tag: 'DRIFT', desc: 'Lädt Mini-Turbos viel schneller auf. Wer viel driftet, ist auf langen Kurven vorn, z. B. im Canyon.',
+    top: .99, accel: 1, turn: .98, mass: .95, drift: 1.45, offroad: .38 },
+  { id: 'buggy', name: 'Rally Buggy', tag: 'OFFROAD', desc: 'Geländewagen mit Stollenreifen: fast volles Tempo im Gelände, auf Asphalt langsamer. Unschlagbar auf Strecken mit Abkürzungen: Dschungel, Pilzwald, Drachenburg.',
+    top: .965, accel: 1.15, turn: .98, mass: 1.05, drift: .95, offroad: .8 },
 ].map(k => Object.freeze(k)));
 
 export const kartById = id => KARTS.find(k => k.id === id) || KARTS[0];
@@ -27,12 +30,12 @@ export const kartById = id => KARTS.find(k => k.id === id) || KARTS[0];
 export function kartStats(k) {
   const bar = (v, lo, hi) => Math.max(1, Math.min(5, Math.round(1 + (v - lo) / (hi - lo) * 4)));
   return [
-    ['TEMPO', bar(k.top, .97, 1.035)],
-    ['BESCHL.', bar(k.accel, .75, 1.35)],
-    ['HANDLING', bar(2 - k.turn, 2 - 1.3, 2 - .72)],
+    ['TEMPO', bar(k.top, .95, 1.025)],
+    ['BESCHL.', bar(k.accel, .7, 1.4)],
+    ['HANDLING', bar(2 - k.turn, 2 - 1.5, 2 - .5)],
     ['GEWICHT', bar(k.mass, .75, 1.75)],
-    ['DRIFT', bar(k.drift, .9, 1.4)],
-    ['OFFROAD', bar(k.offroad, .32, .88)],
+    ['DRIFT', bar(k.drift, .85, 1.45)],
+    ['OFFROAD', bar(k.offroad, .3, .85)],
   ];
 }
 

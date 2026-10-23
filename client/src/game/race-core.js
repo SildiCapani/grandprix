@@ -32,12 +32,16 @@ export const speedFactor = () => K;
 const MAX_ANY = 33;
 // Turning circle grows with speed: tight hairpins need braking, sweepers are flat out.
 // The kart's `turn` factor widens (>1) or tightens (<1) the circle at speed.
-const turnRadius = (v, turn = 1) => 5.1 + Math.abs(v) * 0.45 * turn;
+// Handling differences between karts shrink with the speed class: the turning circle grows with speed, so an equal
+// stat gap would decide far more at 150 km/h than at 80. Scaled this way a kart's edge stays about the same in every
+// class (tuned at 100 km/h, K = 1.25).
+const turnF = turn => 1 + (turn - 1) * 1.25 / K;
+const turnRadius = (v, turn = 1) => 5.1 + Math.abs(v) * 0.45 * turnF(turn);
 // Tyre grip: cornering harder than this (lateral m/s²) scrubs speed. Power drifts never scrub.
 const GRIP = 17, SCRUB = .3;
 const scrub = (c, yawRate, dt) => {
   if (c.drift || c.airT > 0 || c.rocketT > 0) return;
-  const lat = Math.abs(yawRate * c.speed), grip = GRIP * K / c.turn;
+  const lat = Math.abs(yawRate * c.speed), grip = GRIP * K / turnF(c.turn);
   if (lat > grip) c.speed -= Math.sign(c.speed) * (lat - grip) * SCRUB * dt;
 };
 
@@ -1291,9 +1295,9 @@ export class RaceCore {
       const near = Math.abs(this.track.curvature(lookT + 2 / L, 12)), far = Math.abs(this.track.curvature(lookT + 12 / L, 18));
       const bend = Math.max(near, far * 0.85);
       const brave = 0.92 + bot.corner * 0.16;
-      const tk = 0.45 * bot.turn, vNear = (12 / Math.max(near, 1e-3) * brave - 5.1) / tk, vFar = (18 / Math.max(far, 1e-3) * brave - 5.1) / tk + 6;
+      const tk = 0.45 * turnF(bot.turn), vNear = (12 / Math.max(near, 1e-3) * brave - 5.1) / tk, vFar = (18 / Math.max(far, 1e-3) * brave - 5.1) / tk + 6;
       // Grip limit: v² / R must stay near the kart's grip, or it scrubs speed.
-      const vGrip = Math.sqrt(GRIP * K / bot.turn * 12 / Math.max(near, 1e-3) * (1.15 + bot.corner * .2));
+      const vGrip = Math.sqrt(GRIP * K / turnF(bot.turn) * 12 / Math.max(near, 1e-3) * (1.15 + bot.corner * .2));
       let target = Math.min(bot.pace, Math.max(7, Math.min(vNear, vFar, vGrip)));
       target *= 1 + Math.sin(this.elapsed * 0.5 + bot.mood) * 0.02;
       if (bot.inkT > 0) target *= .86;
