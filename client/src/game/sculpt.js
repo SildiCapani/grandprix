@@ -48,9 +48,10 @@ function dist(o, x, y, z) {
 
 export function sculpt(shapes, opts = {}) {
   const key = JSON.stringify([shapes, opts]); if (cache.has(key)) return cache.get(key);
-  const K = opts.k ?? .25, solid = [], paint = [];
-  for (const s of shapes) (s.paint ? paint : solid).push(prep(s));
-  const field = (x, y, z) => { let d = 1e9; for (const o of solid) d = smin(d, dist(o, x, y, z), o.k ?? K); return d; };
+  const K = opts.k ?? .25, solid = [], paint = [], cut = [];
+  for (const s of shapes) (s.paint ? paint : s.sub ? cut : solid).push(prep(s));
+  // sub: true carves the shape out (smooth subtraction), e.g. eye sockets
+  const field = (x, y, z) => { let d = 1e9; for (const o of solid) d = smin(d, dist(o, x, y, z), o.k ?? K); for (const o of cut) d = -smin(-d, dist(o, x, y, z), o.k ?? K * .5); return d; };
   // grid over the bounding box of all solid shapes
   const lo = [1e9, 1e9, 1e9], hi = [-1e9, -1e9, -1e9];
   for (const o of solid) for (let i = 0; i < 3; i++) { lo[i] = Math.min(lo[i], o.box[i]); hi[i] = Math.max(hi[i], o.box[i + 3]); }
@@ -81,15 +82,19 @@ export function sculpt(shapes, opts = {}) {
   // unique vertices → indexed geometry with smooth normals from the field gradient and colours from the nearest shape
   const vid = new Map(), verts = [], index = [];
   for (const v of pos) { let id = vid.get(v); if (id === undefined) { id = verts.length; vid.set(v, id); verts.push(v); } index.push(id); }
-  const P = new Float32Array(verts.length * 3), N = new Float32Array(verts.length * 3), C = new Float32Array(verts.length * 3), h = cell * .5, col = new THREE.Color();
+  const P = new Float32Array(verts.length * 3), N = new Float32Array(verts.length * 3), C = new Float32Array(verts.length * 3), h = cell * .5, col = new THREE.Color(), pc = new THREE.Color(), soft = cell * (opts.soft ?? .9);
   verts.forEach((v, n) => {
     const [x, y, z] = v; P[n * 3] = x; P[n * 3 + 1] = y; P[n * 3 + 2] = z;
     let gx = field(x + h, y, z) - field(x - h, y, z), gy = field(x, y + h, z) - field(x, y - h, z), gz = field(x, y, z + h) - field(x, y, z - h); const gl = Math.hypot(gx, gy, gz) || 1;
     N[n * 3] = gx / gl; N[n * 3 + 1] = gy / gl; N[n * 3 + 2] = gz / gl;
-    let best = null, bd = 1e9;
-    for (const o of solid) { const d = dist(o, x, y, z); if (d < bd) { bd = d; best = o; } }
-    for (const o of paint) if (dist(o, x, y, z) < 0) best = o;
-    col.set(best.c).convertSRGBToLinear(); C[n * 3] = col.r; C[n * 3 + 1] = col.g; C[n * 3 + 2] = col.b;
+    let best = null, bd = 1e9, sec = null, sd = 1e9;
+    for (const o of solid) { const d = dist(o, x, y, z); if (d < bd) { sec = best; sd = bd; bd = d; best = o; } else if (d < sd) { sd = d; sec = o; } }
+    col.set(best.c).convertSRGBToLinear();
+    // where two differently coloured shapes meet, mix their colours over a narrow seam (no jagged border)
+    if (sec && sec.c !== best.c && sd - bd < soft * 2) { pc.set(sec.c).convertSRGBToLinear(); col.lerp(pc, .5 * (1 - (sd - bd) / (soft * 2))); }
+    // paint shapes blend in over a soft edge (about one grid cell) instead of a jagged triangle border
+    for (const o of paint) { const d = dist(o, x, y, z); if (d < soft) { pc.set(o.c).convertSRGBToLinear(); col.lerp(pc, Math.min(1, (soft - d) / (2 * soft))); } }
+    C[n * 3] = col.r; C[n * 3 + 1] = col.g; C[n * 3 + 2] = col.b;
   });
   // keep triangles facing outwards
   for (let t = 0; t < index.length; t += 3) {

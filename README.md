@@ -307,3 +307,8 @@ server/server.js      Statische Auslieferung + WebSocket-Relay /ws
 - **Online-Cup:** In der Lobby oben „🏆 Cup · 3 Rennen“ und einen Cup wählen. Nach jedem Rennen gibt es Cup-Punkte (15/12/10/8/…), der Gastgeber startet direkt das nächste Rennen. Am Ende zählen die Pokale wie offline (auch für Star-Fahrer).
 - **Team-Battle:** Bei einer Arena „Team-Battle“ einschalten. Rot gegen Blau, die Karts sind in Teamfarbe, Teamkollegen können sich nicht treffen, am Ende zählt die Team-Summe.
 - **Eigene Strecke online:** Der Gastgeber wählt „✏️ Eigene Strecke“ (vorher im Editor bauen). Der Strecken-Code wird automatisch an alle geschickt.
+
+## Fahrer & Freischalten
+- **10 Fahrer** mit modellierten Gesichtern, Frisuren und eigenen Rennanzügen: Marco Bellini (frei), Yuna Sato (Level 2), Jax Carter (Level 3), Lena Kraus (Level 4), Amara Okoye (5 Siege), Diego Ruiz (Level 6) und die Stars Sofia Reyes (Küsten-Cup Gold 100), Kenji Mori (Diamant-Zeit Neon 120), Viktor Stahl (Gipfel-Cup Gold 120) und Phantom (alle Cups Gold 150).
+- Die Porträts im Menü werden aus den 3D-Modellen gerendert.
+- Mit einem normalen Konto ist am Anfang nur das Nötigste frei. Alles Gesperrte ist **mit Ketten verschlossen**; fährt man mit der Maus darüber, steht dort, was man dafür tun muss.

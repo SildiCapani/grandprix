@@ -118,13 +118,13 @@ function rollItem(frac, lastTwo = false, rnd = Math.random) {
 //  aggr   – 0 clean racer … 1 rammer who blocks and leans on you
 //  itemIQ – how cleverly they time their items
 export const RIVAL_ROSTER = Object.freeze([
-  { name: 'Apex Phantom',      tag: 'PROFI',      color: 0x54e7c7, number: '03', pace: 22.9, corner: .85, aggr: .25, itemIQ: .9,  mass: 1.0 , kart: 'bolide' , avatar: 'robot' },
-  { name: 'Brutus Motorsport', tag: 'SCHWER',     color: 0xffcf4a, number: '12', pace: 22.0, corner: .55, aggr: .55, itemIQ: .5,  mass: 1.45 , kart: 'brummer' , avatar: 'knight' },
-  { name: 'Volt Hornets',      tag: 'HEISSSPORN', color: 0xbda0ff, number: '19', pace: 22.6, corner: .9,  aggr: .7,  itemIQ: .6,  mass: .95 , kart: 'flitzer' , avatar: 'fox' },
-  { name: 'Iron Ramblers',     tag: 'RAMMBOCK',   color: 0xff5a8a, number: '26', pace: 21.7, corner: .6,  aggr: .95, itemIQ: .4,  mass: 1.3 , kart: 'brummer' , avatar: 'dragon' },
-  { name: 'Kobalt Racing',     tag: 'TAKTIKER',   color: 0x7ad35a, number: '31', pace: 22.3, corner: .75, aggr: .35, itemIQ: 1,   mass: 1.0 , kart: 'drifter' , avatar: 'cat' },
-  { name: 'Nordlicht GP',      tag: 'VORSICHTIG', color: 0x5aa7ff, number: '44', pace: 21.2, corner: .45, aggr: .1,  itemIQ: .7,  mass: 1.05 , kart: 'allround' , avatar: 'penguin' },
-  { name: 'Comet Rookies',     tag: 'ROOKIE',     color: 0xff9a3d, number: '58', pace: 20.6, corner: .4,  aggr: .45, itemIQ: .3,  mass: .9 , kart: 'buggy' , avatar: 'frog' },
+  { name: 'Apex Phantom',      tag: 'PROFI',      color: 0x54e7c7, number: '03', pace: 22.9, corner: .85, aggr: .25, itemIQ: .9,  mass: 1.0 , kart: 'bolide' , avatar: 'phantom' },
+  { name: 'Brutus Motorsport', tag: 'SCHWER',     color: 0xffcf4a, number: '12', pace: 22.0, corner: .55, aggr: .55, itemIQ: .5,  mass: 1.45 , kart: 'brummer' , avatar: 'viktor' },
+  { name: 'Volt Hornets',      tag: 'HEISSSPORN', color: 0xbda0ff, number: '19', pace: 22.6, corner: .9,  aggr: .7,  itemIQ: .6,  mass: .95 , kart: 'flitzer' , avatar: 'kenji' },
+  { name: 'Iron Ramblers',     tag: 'RAMMBOCK',   color: 0xff5a8a, number: '26', pace: 21.7, corner: .6,  aggr: .95, itemIQ: .4,  mass: 1.3 , kart: 'brummer' , avatar: 'diego' },
+  { name: 'Kobalt Racing',     tag: 'TAKTIKER',   color: 0x7ad35a, number: '31', pace: 22.3, corner: .75, aggr: .35, itemIQ: 1,   mass: 1.0 , kart: 'drifter' , avatar: 'lena' },
+  { name: 'Nordlicht GP',      tag: 'VORSICHTIG', color: 0x5aa7ff, number: '44', pace: 21.2, corner: .45, aggr: .1,  itemIQ: .7,  mass: 1.05 , kart: 'allround' , avatar: 'yuna' },
+  { name: 'Comet Rookies',     tag: 'ROOKIE',     color: 0xff9a3d, number: '58', pace: 20.6, corner: .4,  aggr: .45, itemIQ: .3,  mass: .9 , kart: 'buggy' , avatar: 'jax' },
 ].map(r => Object.freeze(r)));
 
 export const GRID_SIZE = RIVAL_ROSTER.length + 1;

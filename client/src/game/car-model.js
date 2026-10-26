@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
-import { buildAvatarHead } from './avatars.js';
+import { buildDriver } from './drivers.js';
+import { avatarById } from './avatars.js';
+const DRIVER_SCALE = 1.05, avatarId = id => avatarById(id).id;
 import { applySkin } from './skins.js';
 import { wheelById, gliderById } from './karts.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
@@ -113,29 +115,13 @@ export function createCar(color = '#e34335', number = '07', kart = 'allround', f
   if (kart !== 'flitzer' && kart !== 'buggy') { for (const sd of [-1, 1]) rod(lean, chassis, [sd * .15, .38, -.6 * S], [sd * .17, .52, -.7 * S], .014); rbox(lean, paint, .62 * Wd, .035, .14, 0, .53, -.72 * S, .016); for (const sd of [-1, 1]) rbox(lean, darkPaint, .02, .1, .16, sd * .31 * Wd, .53, -.72 * S, .008); }
 
   // --- driver: suit, arms on the steering wheel, head (avatar or helmet) ---
-  const driver = new THREE.Group(); lean.add(driver); driver.position.set(0, -.04, -.17 * S); driver.scale.setScalar(1.28); // big chibi driver, well visible from the chase camera
-  capsule(driver, suit, .12, .14, 0, .44, 0).scale.set(1.05, 1, .85);
-  rbox(driver, darkPaint, .26, .05, .2, 0, .32, .02, .02);                  // belt
   const wheelGroup = new THREE.Group(); wheelGroup.position.set(0, .46, .26); wheelGroup.rotation.x = -.85; lean.add(wheelGroup);
   rod(lean, chassis, [0, .3, .45 * S], [0, .44, .3], .016);
   const sw = new THREE.Mesh(new THREE.TorusGeometry(.085, .016, 8, 22), chassis); sw.castShadow = true; wheelGroup.add(sw);
   const hub = new THREE.Mesh(new THREE.CylinderGeometry(.03, .03, .02, 10), paint); hub.rotation.x = Math.PI / 2; wheelGroup.add(hub);
-  for (const sd of [-1, 1]) {
-    const arm = new THREE.Group(); arm.position.set(sd * .17, .57, -.17 * S); arm.scale.setScalar(1.28); lean.add(arm);
-    const a = capsule(arm, suit, .042, .16, 0, 0, 0); a.position.set(-sd * .02, -.03, .11); a.rotation.x = 1.15; a.rotation.z = sd * .25;
-    ball(arm, glove, .045, -sd * .06, -.08, .22);
-  }
-  let head;
-  if (avatar && avatar !== 'pilot') { head = buildAvatarHead(avatar); head.position.set(0, .84, -.17 * S); head.scale.setScalar(1.5); head.name = 'avatar'; lean.add(head); }
-  else {
-    head = new THREE.Group(); head.position.set(0, .84, -.17 * S); head.scale.setScalar(1.3); lean.add(head);
-    const helmet = new THREE.MeshPhysicalMaterial({ color: '#f6cf42', roughness: .22, clearcoat: 1, clearcoatRoughness: .04 });
-    ball(head, helmet, .155, 0, 0, 0, 1, .96, 1.02);
-    const visor = new THREE.MeshPhysicalMaterial({ color: '#0c1820', roughness: .03, metalness: .7, clearcoat: 1, envMapIntensity: 1.6 });
-    const v = addMesh(head, new THREE.SphereGeometry(.158, 20, 10, -1, 2, 1.05, .7), visor); v.rotation.y = Math.PI / 2;
-    rbox(head, cream, .045, .012, .22, 0, .15, -.01, .006).rotation.x = -.1;
-    rbox(head, paint, .045, .013, .2, 0, .152, -.02, .006).position.x = .0;
-  }
+  // --- driver: a sculpted character in its own race suit (see drivers.js) ---
+  const driver = buildDriver(avatarId(avatar)); driver.position.set(0, -.13, -.15 * S); driver.scale.setScalar(DRIVER_SCALE); lean.add(driver);
+  const head = driver.userData.head; head.name = 'avatar';
   head.userData.base = head.position.y;
 
   // --- glider (opens over glider ramps): an arched parafoil in the kart colours on a light frame ---
