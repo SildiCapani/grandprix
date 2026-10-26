@@ -1,6 +1,22 @@
 // Four-player, host-authoritative WebRTC sessions. Signalling stays in the
 // invitation/answer codes; only car and race data travel over the data channels.
-const MAP_IDS = new Set(['coast', 'canyon', 'neon', 'volcano', 'glacier', 'stars', 'jungle', 'savanna', 'forest', 'sky', 'sakura', 'moon', 'pirate', 'candy', 'castle', 'arctic', 'rooftops', 'galaxy', 'arena', 'colosseum', 'icering']);
+const MAP_IDS = new Set(['coast', 'canyon', 'neon', 'volcano', 'glacier', 'stars', 'jungle', 'savanna', 'forest', 'sky', 'sakura', 'moon', 'pirate', 'candy', 'castle', 'arctic', 'rooftops', 'galaxy', 'arena', 'colosseum', 'icering', 'custom']);
+// Online cups (3 races, points per place), team battles (red vs blue) and shared custom tracks.
+const CUP_IDS = new Set(['kueste', 'wildnis', 'gipfel', 'sterne', 'abenteuer', 'kosmos']);
+const ID_RE = /^[a-zA-Z0-9_-]{1,64}$/, TRACK_RE = /^APX1-[A-Za-z0-9_-]{8,8000}$/;
+const trackCodeOf = v => typeof v === 'string' && TRACK_RE.test(v) ? v : '';
+function cleanCup(c) {
+  if (!c || !CUP_IDS.has(c.id) || !finite(c.idx)) return undefined;
+  const totals = {}, names = {};
+  if (c.totals && typeof c.totals === 'object') for (const [k, v] of Object.entries(c.totals).slice(0, 16)) if (ID_RE.test(k) && finite(v)) totals[k] = clamp(Math.round(v), 0, 200);
+  if (c.names && typeof c.names === 'object') for (const [k, v] of Object.entries(c.names).slice(0, 16)) if (ID_RE.test(k)) names[k] = nameOf(v);
+  return {id: c.id, idx: clamp(Math.floor(c.idx), 0, 2), totals, names};
+}
+function cleanTeams(t) {
+  if (!t || typeof t !== 'object') return undefined;
+  const out = {}; for (const [k, v] of Object.entries(t).slice(0, 16)) if (ID_RE.test(k) && (v === 0 || v === 1)) out[k] = v;
+  return Object.keys(out).length ? out : undefined;
+}
 const BATTLES = ['balloons', 'coins', 'crown'];
 const KART_IDS = new Set(['allround', 'bolide', 'flitzer', 'brummer', 'drifter', 'buggy']);
 const WHEEL_IDS = new Set(['standard', 'slick', 'studs', 'drift', 'light', 'monster', 'gold']);
@@ -108,7 +124,7 @@ export class MultiplayerSession {
     this._state = this._empty(); this._peers = new Map(); this._clockOffset = 0;
     this._timer = null; this._firstFinish = 0; this._lastPing = 0; this._disposed = false;
   }
-  _empty() { return {role: 'idle', status: 'idle', roomId: '', selfId: '', hostId: '', mapId: 'coast', players: [], race: null, error: ''}; }
+  _empty() { return {role: 'idle', status: 'idle', roomId: '', selfId: '', hostId: '', mapId: 'coast', trackCode: '', players: [], race: null, error: ''}; }
   get state() { return clone(this._state); }
   get isHost() { return this._state.role === 'host'; }
   get canStart() {
@@ -248,7 +264,7 @@ export class MultiplayerSession {
     for (const peer of this._peers.values()) if (peer.id !== except && peer.ready) this._send(peer, data, ephemeral);
   }
   _roster() {
-    this._broadcast({type: 'roster', players: this._state.players, mapId: this._state.mapId, status: this._state.status, race: this._state.race});
+    this._broadcast({type: 'roster', players: this._state.players, mapId: this._state.mapId, trackCode: this._state.mapId === 'custom' ? this._state.trackCode : undefined, status: this._state.status, race: this._state.race});
     this._change();
   }
   _message(peer, data) {
@@ -305,7 +321,7 @@ export class MultiplayerSession {
       const players = this._cleanRoster(data.players);
       if (!players || !MAP_IDS.has(data.mapId) || !players.some(p => p.id === this._state.selfId)) return;
       const was = this._state.status;
-      this._state.players = players; this._state.mapId = data.mapId; peer.ready = true;
+      this._state.players = players; this._state.mapId = data.mapId; this._state.trackCode = data.mapId === 'custom' ? trackCodeOf(data.trackCode) : ''; peer.ready = true;
       if (data.status === 'lobby') { this._state.status = 'lobby'; this._state.race = null; }
       this._state.error = ''; this._change();
       if (was === 'connecting') this._ping(peer);
@@ -314,7 +330,7 @@ export class MultiplayerSession {
     if (!peer.ready) return;
     if (data.type === 'start' && idOf(data.race?.id) && finite(data.race.startAt)) {
       if (this._state.race?.id === data.race.id) return;
-      this._state.status = 'racing'; this._state.race = {id: data.race.id, startAt: data.race.startAt, status: 'racing', cc: [80, 100, 120, 150, 200].includes(data.race.cc) ? data.race.cc : 80, battle: BATTLES.includes(data.race.battle) ? data.race.battle : undefined};
+      this._state.status = 'racing'; this._state.race = {id: data.race.id, startAt: data.race.startAt, status: 'racing', cc: [80, 100, 120, 150, 200].includes(data.race.cc) ? data.race.cc : 80, battle: BATTLES.includes(data.race.battle) ? data.race.battle : undefined, cup: cleanCup(data.race.cup), teams: cleanTeams(data.race.teams)};
       this._state.players.forEach(p => { p.progress = 0; p.finishedTime = null; p.dnf = false; });
       this._change(); this.onEvent({type: 'start', race: clone(this._state.race)}); return;
     }
@@ -372,14 +388,26 @@ export class MultiplayerSession {
     if (this.isHost) this._roster();
     else { this._send(this._peers.get(this._state.hostId), {type: 'look', look: this._look, color: color ? colorOf(color) : undefined}); this._change(); }
   }
+  // Host: race on a custom track (its share code travels with the roster).
+  setTrack(code) {
+    if (!this.isHost || this._state.status !== 'lobby' || !trackCodeOf(code)) return false;
+    this._state.trackCode = code; this._state.mapId = 'custom'; this._state.players.forEach(p => { p.ready = false; }); this._roster(); return true;
+  }
+  // Host: next race of an online cup – straight on, everyone who is still connected races again.
+  continueCup(mapId, extra = {}) {
+    if (!this.isHost || this._state.status !== 'results' || !MAP_IDS.has(mapId)) return null;
+    this._state.players = this._state.players.filter(p => p.connected).map(p => this._player(p.id, p.name, p.color, true, p.look));
+    this._state.mapId = mapId; this._state.status = 'lobby'; this._state.race = null; this._roster();
+    return this.startRace({...extra, cupNext: true});
+  }
   setMap(mapId) {
-    if (!this.isHost || this._state.status !== 'lobby' || !MAP_IDS.has(mapId)) return false;
+    if (!this.isHost || this._state.status !== 'lobby' || !MAP_IDS.has(mapId) || mapId === 'custom') return false;
     this._state.mapId = mapId; this._state.players.forEach(p => { p.ready = false; }); this._roster(); return true;
   }
   startRace(extra = {}) {
-    if (!this.canStart) throw new Error('Mindestens zwei verbundene Fahrer müssen bereit sein.');
+    if (!this.canStart && !(extra.cupNext && this.isHost && this._state.players.filter(p => p.connected).length >= 2)) throw new Error('Mindestens zwei verbundene Fahrer müssen bereit sein.');
     this._state.status = 'racing'; this._state.error = ''; this._firstFinish = 0;
-    this._state.race = {id: uid(), startAt: Date.now() + 4000, status: 'racing', cc: [80, 100, 120, 150, 200].includes(extra.cc) ? extra.cc : 80, battle: BATTLES.includes(extra.battle) ? extra.battle : undefined};
+    this._state.race = {id: uid(), startAt: Date.now() + 4000, status: 'racing', cc: [80, 100, 120, 150, 200].includes(extra.cc) ? extra.cc : 80, battle: BATTLES.includes(extra.battle) ? extra.battle : undefined, cup: cleanCup(extra.cup), teams: cleanTeams(extra.teams)};
     this._state.players.forEach(p => { p.progress = 0; p.finishedTime = null; p.dnf = false; delete p.finish; });
     // Offers without a completed handshake cannot join a race in progress.
     for (const [id, peer] of this._peers) if (!peer.ready) this._closePeer(id);

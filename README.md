@@ -302,3 +302,8 @@ server/server.js      Statische Auslieferung + WebSocket-Relay /ws
 - **200 km/h „Überschall“** (alle 6 Cups Gold auf 150 km/h): neue Klasse, mit eigener Weltrangliste und eigenen Pokalen.
 - **Tages- und Wochenaufgaben** im Karriere-Bereich: jeden Tag 3 neue, jede Woche 2 große (für alle gleich), mit Bonus-XP. Werden im Konto gespeichert.
 - **Gleiter (Kart-Baukasten):** Karosserie + Räder + Gleiter. Jeder Gleiter hat eine eigene Optik und verändert Flugzeit auf Gleiter-Rampen und leicht die Werte. Schaltet sich mit dem Level frei.
+
+## Online: Cups, Team-Battle, eigene Strecken
+- **Online-Cup:** In der Lobby oben „🏆 Cup · 3 Rennen“ und einen Cup wählen. Nach jedem Rennen gibt es Cup-Punkte (15/12/10/8/…), der Gastgeber startet direkt das nächste Rennen. Am Ende zählen die Pokale wie offline (auch für Star-Fahrer).
+- **Team-Battle:** Bei einer Arena „Team-Battle“ einschalten. Rot gegen Blau, die Karts sind in Teamfarbe, Teamkollegen können sich nicht treffen, am Ende zählt die Team-Summe.
+- **Eigene Strecke online:** Der Gastgeber wählt „✏️ Eigene Strecke“ (vorher im Editor bauen). Der Strecken-Code wird automatisch an alle geschickt.

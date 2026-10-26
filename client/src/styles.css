@@ -617,3 +617,13 @@ body.mirror #minimap{transform:scaleX(-1)}
 .challenges .mission.done{opacity:.6}.challenges .mission.done .mission-bar i{background:#5ad86a}
 .g-gliders .wheel-ico{width:40px;height:40px}
 .wiz-cards.classes .cc-card b{font-size:clamp(13px,1.45vw,20px);overflow-wrap:anywhere}
+
+/* online lobby: mode row, cups, teams */
+.lb-mode{display:flex;gap:6px;grid-column:1/-1;margin-bottom:4px}
+.lb-mode button{flex:1;padding:8px;border-radius:10px;border:1px solid #ffffff22;background:#ffffff08;color:#cfe0da;font-weight:900;font-size:11px;letter-spacing:.05em;cursor:pointer}
+.lb-mode button.on{background:#ff653d;border-color:#ff653d;color:#fff}
+.lb-map.lb-cup{border-left:4px solid var(--cup)}.lb-map.lb-cup b{color:var(--cup)}
+.lb-teams{grid-column:1/-1;display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:9px 12px;border-radius:10px;border:1px solid #ffffff22;background:#ffffff08;color:#cfe0da;cursor:pointer;margin-top:4px}
+.lb-teams.on{border-color:#ff4a4a;background:linear-gradient(90deg,#ff4a4a33,#3a8aff33)}.lb-teams small{color:#9fb4ad;font-size:10px}
+.cup-online{margin:12px 0}.team-score{display:flex;justify-content:space-between;gap:10px;margin:10px 0;font-weight:900;font-size:18px}
+.team-score .red{color:#ff6a6a}.team-score .blue{color:#6aa8ff}
