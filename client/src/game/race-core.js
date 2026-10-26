@@ -51,7 +51,10 @@ const CIRCLE_OFFSETS = [0.42, -0.34];
 const RESTITUTION = 0.32;
 
 // ---- items ----
-export const ITEM_TYPES = ['mushroom', 'mushroom2', 'mushroom3', 'banana', 'green', 'red', 'blue', 'star', 'rocket', 'spring', 'bubble', 'swap', 'ink', 'pump', 'giant'];
+export const ITEM_TYPES = ['mushroom', 'mushroom2', 'mushroom3', 'banana', 'green', 'red', 'blue', 'star', 'rocket', 'spring', 'bubble', 'swap', 'ink', 'pump', 'giant', 'boomerang', 'bolt', 'fire3', 'fire2', 'fire', 'magnet'];
+// New items: boomerang (flies out and comes back, hits up to everyone on its way), bolt (shrinks every rival),
+// fire balls (three hopping shots), magnet (pulls you to the car ahead and grabs item boxes / coins from afar).
+export const BOOM_SPEED = 30, BOOM_OUT = 1.15, FIRE_SPEED = 27, SHRINK_TIME = 4.5, MAGNET_TIME = 7;
 // New items: spring (jump), bubble (blocks one hit), swap (trade places with the car ahead), ink (blots the view of everyone ahead), pump (battle: +1 balloon).
 const BUBBLE_TIME = 12, INK_TIME = 4.5;
 // Blue shell: flies over everyone to the leader and explodes there. At most this many per race.
@@ -71,8 +74,8 @@ export const BATTLE_TIME = 150, BALLOONS = 3, MAX_BALLOONS = 5;
 export const BATTLE_TYPES = ['balloons', 'coins', 'crown'];
 export const COIN_TIME = 120, COIN_COUNT = 36, CROWN_GOAL = 20;
 function rollBattleItem(rnd = Math.random, type = 'balloons') {
-  const table = type === 'balloons' ? [['green', .26], ['red', .17], ['banana', .17], ['mushroom', .12], ['star', .08], ['bubble', .08], ['spring', .05], ['pump', .07]]
-    : [['green', .28], ['red', .2], ['banana', .18], ['mushroom', .14], ['star', .08], ['bubble', .07], ['spring', .05]];
+  const table = type === 'balloons' ? [['green', .22], ['red', .15], ['banana', .15], ['mushroom', .11], ['star', .07], ['bubble', .07], ['spring', .05], ['pump', .07], ['boomerang', .06], ['fire3', .05]]
+    : [['green', .24], ['red', .18], ['banana', .16], ['mushroom', .12], ['star', .07], ['bubble', .07], ['spring', .05], ['boomerang', .06], ['fire3', .05]];
   let x = rnd(); for (const [item, w] of table) { if ((x -= w) <= 0) return item; }
   return 'green';
 }
@@ -99,11 +102,11 @@ export function boostPadLayout(track) {
 }
 // Kart-style luck: the further back you are, the better the item.
 function rollItem(frac, lastTwo = false, rnd = Math.random) {
-  const table = lastTwo ? [['rocket', .2], ['star', .18], ['red', .1], ['mushroom3', .2], ['blue', .12], ['swap', .2]]
-    : frac < .2 ? [['banana', .38], ['green', .32], ['mushroom', .1], ['bubble', .14], ['spring', .06]]
-    : frac < .5 ? [['banana', .15], ['green', .22], ['red', .2], ['mushroom', .1], ['mushroom3', .07], ['bubble', .1], ['spring', .1], ['ink', .06]]
-    : frac < .8 ? [['green', .07], ['red', .22], ['mushroom', .12], ['mushroom3', .15], ['star', .08], ['blue', .08], ['swap', .12], ['ink', .1], ['spring', .06]]
-    : [['red', .2], ['mushroom3', .3], ['star', .24], ['blue', .1], ['swap', .16]];
+  const table = lastTwo ? [['rocket', .18], ['star', .16], ['red', .08], ['mushroom3', .18], ['blue', .1], ['swap', .16], ['bolt', .14]]
+    : frac < .2 ? [['banana', .32], ['green', .28], ['mushroom', .1], ['bubble', .12], ['spring', .06], ['boomerang', .07], ['magnet', .05]]
+    : frac < .5 ? [['banana', .13], ['green', .18], ['red', .17], ['mushroom', .08], ['mushroom3', .07], ['bubble', .08], ['spring', .08], ['ink', .06], ['boomerang', .07], ['fire3', .05], ['magnet', .03]]
+    : frac < .8 ? [['green', .05], ['red', .18], ['mushroom', .1], ['mushroom3', .13], ['star', .07], ['blue', .07], ['swap', .1], ['ink', .08], ['spring', .05], ['fire3', .07], ['magnet', .06], ['bolt', .04]]
+    : [['red', .16], ['mushroom3', .26], ['star', .2], ['blue', .08], ['swap', .12], ['bolt', .08], ['magnet', .1]];
   let x = rnd();
   for (const [item, w] of table) { if ((x -= w) <= 0) return item; }
   return table[table.length - 1][0];
@@ -457,6 +460,8 @@ export class RaceCore {
     c.starT = Math.max(0, c.starT - dt);
     c.bubbleT = Math.max(0, (c.bubbleT || 0) - dt); c.inkT = Math.max(0, (c.inkT || 0) - dt);
     c.shroomT = Math.max(0, c.shroomT - dt);
+    c.shrinkT = Math.max(0, (c.shrinkT || 0) - dt);
+    if (c.magnetT > 0) { c.magnetT = Math.max(0, c.magnetT - dt); this._magnet(c, dt); } else c.magnetPull = false;
     c.invuln = Math.max(0, c.invuln - dt);
     if (c.spinT > 0) { c.spinT = Math.max(0, c.spinT - dt); c.spinAngle += dt * TAU / SPIN_TIME * 1.5; if (c.spinT === 0) c.spinAngle = 0; }
     if (c.roulette > 0) { c.roulette -= dt; if (c.roulette <= 0) { c.roulette = 0; c.item = c.pending; c.pending = null; c.itemHold = 0; if (c === this.player) this.emit('itemready', { item: c.item }); } }
@@ -480,6 +485,11 @@ export class RaceCore {
     }
   }
   _capFor(c, drafting) {
+    const cap = this._capBase(c, drafting);
+    if (c.shrinkT > 0 && !(c.starT > 0) && !(c.rocketT > 0)) return cap * .72;
+    return c.magnetPull ? cap + 2.4 * K : cap;
+  }
+  _capBase(c, drafting) {
     if (c.rocketT > 0) return (ROCKET_SPEED * K);
     if (c.spinT > 0) return 4;
     if (c.shroomT > 0) return (MUSHROOM_SPEED * K);
@@ -908,6 +918,23 @@ export class RaceCore {
       this.shells.push({ id: this._uid++, type: 'blue', owner: c, prog, x: c.x, z: c.z, y: c.y + 1.5, vx: 0, vz: 0, arm: 0, life: 40, t: wrap(prog), target: null, boom: 0 });
     }
     else if (item === 'star') { c.starT = STAR_TIME; c.spinT = 0; c.spinAngle = 0; }
+    else if (item === 'magnet') { c.magnetT = MAGNET_TIME; }
+    else if (item === 'bolt') {
+      for (const f of this._field()) if (f.c !== c && !f.c.isNet) this._hit(f.c, 'bolt', c);
+      if (c === this.player || this.rivals.includes(c)) for (const e of this.externals) if (!e.star) this.emit('remotehit', { kind: 'bolt', target: e });
+      this.emit('bolt', { player: c === this.player, name: c.name });
+    }
+    else if (item === 'boomerang') {
+      const base = Math.max(0, c.speed), sp = BOOM_SPEED * K + base * .35, dir = backward ? -1 : 1;
+      this.shells.push({ id: this._uid++, type: 'boomerang', phase: 'out', outT: BOOM_OUT, x: c.x + hx * 1.6 * dir, z: c.z + hz * 1.6 * dir, y: c.y + .55, vx: hx * sp * dir, vz: hz * sp * dir,
+        owner: c, arm: 0, life: 5, t: c === this.player ? this._lastTrackT : (c.t ?? 0), target: null, hitSet: new Set() });
+    }
+    else if (item === 'fire3' || item === 'fire2' || item === 'fire') {
+      const base = Math.max(0, c.speed), sp = FIRE_SPEED * K + base * .3, dir = backward ? -1 : 1;
+      this.shells.push({ id: this._uid++, type: 'fire', straight: true, maxB: 3, x: c.x + hx * 1.6 * dir, z: c.z + hz * 1.6 * dir, y: c.y, vx: hx * sp * dir, vz: hz * sp * dir,
+        owner: c, arm: .3, life: 3.6, bounces: 0, t: c === this.player ? this._lastTrackT : (c.t ?? 0), target: null });
+      if (item === 'fire3') c.item = 'fire2'; else if (item === 'fire2') c.item = 'fire';
+    }
     else if (item === 'spring') this._spring(c);
     else if (item === 'bubble') c.bubbleT = BUBBLE_TIME;
     else if (item === 'pump') {
@@ -1078,7 +1105,45 @@ export class RaceCore {
     if (hit && kind === 'blue') this.emit('blueboom', { x: this.player.x, z: this.player.z, y: this.player.y, player: true });
     return hit;
   }
+  // Magnet: drags its holder towards the car ahead (a little extra pace while it is within reach).
+  _magnet(c, dt) {
+    const t = this._carAhead(c);
+    c.magnetPull = !!t && Math.hypot(t.x - c.x, t.z - c.z) < 28 && !(c.spinT > 0);
+    if (c.magnetPull) c.speed = Math.min(this._capFor(c, false), c.speed + 7 * K * dt);
+  }
+  // Boomerang: flies straight out, turns and chases its thrower back; every car it touches (once per car) spins.
+  _boomerangStep(s, dt, cars) {
+    s.life -= dt; if (s.life <= 0) return true;
+    const o = s.owner;
+    if (s.phase === 'out') { s.outT -= dt; if (s.outT <= 0) s.phase = 'back'; }
+    else {
+      const dx = o.x - s.x, dz = o.z - s.z, d = Math.hypot(dx, dz);
+      if (d < 1.7) { this.emit('boomcatch', { player: o === this.player }); return true; }
+      const sp = BOOM_SPEED * K + Math.max(0, o.speed || 0), want = Math.atan2(dx, dz), cur = Math.atan2(s.vx, s.vz), ang = cur + clamp(angleDiff(want, cur), -7 * dt, 7 * dt);
+      s.vx = Math.sin(ang) * sp; s.vz = Math.cos(ang) * sp;
+    }
+    s.x += s.vx * dt; s.z += s.vz * dt;
+    const road = this.track.nearestNear(s.x, s.z, s.t); s.t = road.t;
+    s.y += (this.track.heightAt(s.t) + .55 - s.y) * Math.min(1, dt * 8);
+    for (const c of cars) {
+      if (c === o || s.hitSet.has(c) || c.ghost > 0) continue;
+      if (Math.hypot(c.x - s.x, c.z - s.z) < 1.35 && Math.abs(c.y + .5 - s.y) < 1.8) { s.hitSet.add(c); this._hit(c, 'boomerang', o); }
+    }
+    for (const e of this.externals) {
+      if (s.hitSet.has(e.key)) continue;
+      if (Math.hypot(e.x - s.x, e.z - s.z) < 1.35 && Math.abs((e.y ?? s.y) + .5 - s.y) < 1.8) { s.hitSet.add(e.key); if (!e.star) this.emit('remotehit', { kind: 'boomerang', target: e }); }
+    }
+    return false;
+  }
   _hit(c, kind, by) {
+    if (kind === 'bolt') {
+      if (c.starT > 0 || c.rocketT > 0 || c.ghost > 0) return false;
+      if (c.bubbleT > 0) { c.bubbleT = 0; c.invuln = .6; this.emit('bubblepop', { x: c.x, z: c.z, y: c.y, player: c === this.player, name: c.name }); return false; }
+      c.shrinkT = SHRINK_TIME; c.spinT = Math.max(c.spinT, SPIN_TIME * .5); c.spinAngle = 0; c.speed *= .5;
+      if (c.trail) { c.item = null; c.trail = null; }
+      this.emit('itemhit', { kind, victim: c === this.player ? 'player' : c.name, by: by === this.player ? 'player' : by?.name || null, x: c.x, z: c.z, player: c === this.player || by === this.player });
+      return true;
+    }
     if (kind === 'ink') {
       if (c.ghost > 0 || c.rocketT > 0) return false;
       c.inkT = INK_TIME; if (c === this.player) this.emit('inked', {});
@@ -1102,8 +1167,9 @@ export class RaceCore {
       if (!b.active) { b.respawn -= dt; if (b.respawn <= 0) b.active = true; continue; }
       for (const c of cars) {
         if (c.ghost > 0) continue;
-        if (Math.abs(c.x - b.x) > BOX_RADIUS || Math.abs(c.z - b.z) > BOX_RADIUS || Math.abs(c.y - b.y) > 2.6) continue;
-        if (Math.hypot(c.x - b.x, c.z - b.z) > BOX_RADIUS) continue;
+        const BR = c.magnetT > 0 ? BOX_RADIUS * 3.5 : BOX_RADIUS;
+        if (Math.abs(c.x - b.x) > BR || Math.abs(c.z - b.z) > BR || Math.abs(c.y - b.y) > 2.6) continue;
+        if (Math.hypot(c.x - b.x, c.z - b.z) > BR) continue;
         b.active = false; b.respawn = BOX_RESPAWN;
         if (!c.item && c.roulette <= 0) {
           const frac = this._rankFrac(c), n = c === this.player && this.rankFrac ? (this.onlineCount || 2) : this._field().length;
@@ -1121,6 +1187,7 @@ export class RaceCore {
       const s = this.shells[i];
       if (s.type === 'blue') { if (this._blueStep(s, dt, cars)) this.shells.splice(i, 1); continue; }
       if (s.type === 'giant') { if (this._giantStep(s, dt, cars)) { this.shells.splice(i, 1); this.emit('shellbreak', { x: s.x, z: s.z, giant: true }); } continue; }
+      if (s.type === 'boomerang') { if (this._boomerangStep(s, dt, cars)) this.shells.splice(i, 1); continue; }
       s.life -= dt; s.arm -= dt;
       if (s.type === 'red' && !s.straight) {
         const road = this.track.nearestNear(s.x, s.z, s.t); s.t = road.t;
@@ -1145,7 +1212,7 @@ export class RaceCore {
         if (vn > 0) { s.vx -= 2 * vn * road.nx * side; s.vz -= 2 * vn * road.nz * side; }
         s.bounces++;
         this.emit('shellbounce', { x: s.x, z: s.z });
-        if (s.bounces > GREEN_BOUNCES) { this.shells.splice(i, 1); this.emit('shellbreak', { x: s.x, z: s.z }); continue; }
+        if (s.bounces > (s.maxB ?? GREEN_BOUNCES)) { this.shells.splice(i, 1); this.emit('shellbreak', { x: s.x, z: s.z }); continue; }
       }
       if (s.life <= 0) { this.shells.splice(i, 1); continue; }
       let gone = false;
@@ -1159,7 +1226,7 @@ export class RaceCore {
         if (c === s.owner && s.arm > 0) continue;
         if (c.ghost > 0) continue;
         if (Math.abs(c.x - s.x) > 1.2 || Math.abs(c.z - s.z) > 1.2 || Math.abs(c.y - s.y) > 1.3) continue;
-        if (Math.hypot(c.x - s.x, c.z - s.z) < 1.05) { this._hit(c, s.type === 'red' ? 'red' : 'green', s.owner); gone = true; break; }
+        if (Math.hypot(c.x - s.x, c.z - s.z) < 1.05) { this._hit(c, s.type === 'red' || s.type === 'fire' ? s.type : 'green', s.owner); gone = true; break; }
       }
       if (!gone) for (const e of this.externals) {
         if (Math.hypot(e.x - s.x, e.z - s.z) < 1.05 && Math.abs((e.y ?? s.y) - s.y) < 1.3) { gone = true; if (!e.star) this.emit('remotehit', { kind: s.type, target: e }); break; }
@@ -1237,6 +1304,9 @@ export class RaceCore {
     if (TRAILABLE.has(bot.item) && !bot.trail && iq >= .45 && hold > .6 && behind.length) bot.trail = bot.item;
     switch (bot.item) {
       case 'star': case 'rocket': use = hold > .3; break;
+      case 'boomerang': case 'fire3': case 'fire2': case 'fire': use = (ahead.length > 0 && hold > .4) || hold > 6; break;
+      case 'bolt': use = hold > 1.2; break;
+      case 'magnet': use = hold > .5; break;
       case 'blue': use = hold > 1; break;
       case 'mushroom3': case 'mushroom2':
       case 'mushroom': {
@@ -1480,6 +1550,8 @@ export class RaceCore {
       case 'mushroom': use = (ahead && hold > .3) || hold > 6; break;
       case 'bubble': case 'pump': use = hold > .4; break;
       case 'spring': use = hold > 2 + Math.random() * 3; break;
+      case 'boomerang': case 'fire3': case 'fire2': case 'fire': use = (near && hold > .4) || hold > 6; break;
+      case 'magnet': use = hold > .5; break;
     }
     if (use && Math.random() < .25 + bot.itemIQ * .6) this._useItem(bot);
   }

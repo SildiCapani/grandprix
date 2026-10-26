@@ -600,3 +600,8 @@ header.in-garage .top-actions{display:none}
 .p-results{display:flex;flex-direction:column;gap:4px;margin-top:6px}.p-results button{text-align:left;padding:7px 10px;border-radius:8px;border:1px solid #ffffff14;background:#ffffff08;color:#e8f2ef;cursor:pointer;font-weight:700}.p-results small{color:#9fb4ad;font-weight:600;margin-left:6px}
 .p-logout{margin-top:16px;width:100%;padding:10px;border-radius:10px;border:1px solid #ff653d66;background:#ff653d18;color:#ffb38f;font-weight:900;letter-spacing:.08em;cursor:pointer}
 @media (max-width:520px){.p-stats{grid-template-columns:repeat(2,1fr)}}
+
+#boltFlash{position:fixed;inset:0;pointer-events:none;z-index:40;background:radial-gradient(circle at 50% 30%,#fff8c0,#ffe14a88 40%,transparent 75%);opacity:0}
+#boltFlash.on{animation:boltFlash .7s ease-out}
+@keyframes boltFlash{0%{opacity:1}15%{opacity:.2}25%{opacity:.9}100%{opacity:0}}
+#menuLayer button:focus-visible,#profileOverlay button:focus-visible{outline:3px solid #ffd04a;outline-offset:2px}

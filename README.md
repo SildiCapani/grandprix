@@ -170,6 +170,10 @@ Alles läuft nach der Rennuhr ab, online sehen also alle dasselbe.
 | Tintenklecks | Alle vor dir bekommen 4,5 Sekunden Tintenkleckse auf den Bildschirm. Bots fahren dann langsamer und schlingern. Wirkt auch online. |
 | Ballonpumpe | Nur im Ballon-Battle: +1 Ballon (bis 5). |
 | Stachelpanzer | Nur für den Letzten (30 % aus der Itembox, höchstens einer gleichzeitig): ein riesiger Panzer mit Stacheln. Rollt wie ein grüner Panzer, prallt 5-mal von den Wänden ab und dreht **jeden** Fahrer, den er berührt. Bananen und kleine Panzer walzt er platt. |
+| Bumerang | Fliegt nach vorne (gehalten + Rückwärts: nach hinten), dreht um und kommt zum Werfer zurück. Trifft auf dem Hin- und Rückweg jeden Fahrer einmal. |
+| Blitz | Selten, eher hinten im Feld: alle anderen Fahrer schrumpfen 4,5 s, drehen sich kurz und sind langsamer. Stern, Rakete und Schutzblase schützen. |
+| 3× Feuerkugel | Drei hüpfende Feuerkugeln nacheinander, prallen bis zu 3-mal von den Wänden ab. |
+| Magnet | 7 s lang: zieht dich zum Vordermann (etwas mehr Tempo, solange er bis 28 m vor dir ist), Itemboxen und Münzen werden aus der Ferne eingesammelt. |
 
 ## Spielmodi
 | Modus | Worum es geht |
@@ -287,3 +291,8 @@ server/server.js      Statische Auslieferung + WebSocket-Relay /ws
 - **Weltrangliste (Zeitfahren):** Jede neue Bestzeit (mit Ghost) landet auf dem Server. Pro Strecke und Klasse gibt es eine Rangliste (Top 50 gespeichert, Top 5 im Menü).
   Mit **„Gegen Weltrekord“** fährt der Geist des Rekordhalters mit. Unrealistische Zeiten (über 35 % schneller als Gold) kommen nicht in die Liste.
 - **Profile:** Klick auf deinen Namen oben rechts oder auf einen Namen in der Rangliste. Zeigt Level, Statistiken, Cup-Pokale, Star-Fahrer und Ranglistenplätze; im eigenen Profil kann man andere Spieler suchen.
+
+## Emotes & Controller
+- **Emotes:** Tasten **1–4** (👍 GG · 😂 HAHA · 😱 NEIN! · 📣 HUP HUP!) – erscheinen als Sprechblase über dem Kart, online auch bei den anderen.
+- **Controller** (Xbox/PlayStation, Standard-Belegung): RT/A Gas · LT/B Bremse & rückwärts · RB/X Drift · LB/Y Item · D-Pad Emotes · Start Pause · Back Kamera.
+  In den Menüs: Stick/D-Pad wählt, A bestätigt, B zurück. Bei Treffern vibriert der Controller.

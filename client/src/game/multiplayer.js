@@ -60,18 +60,18 @@ function cleanCar(state) {
     avatar: typeof state.avatar === 'string' && /^[a-z]{2,12}$/.test(state.avatar) ? state.avatar : 'pilot',
     finish: ['standard', 'gold', 'chrome', 'neon'].includes(state.finish) ? state.finish : 'standard', mass: finite(state.mass) ? clamp(state.mass, .5, 2) : 1,
     trail: ['banana', 'green', 'red'].includes(state.trail) ? state.trail : null,
-    star: state.star === true, rocket: state.rocket === true, spinA: finite(state.spinA) ? clamp(state.spinA, 0, 40) : 0,
-    items: Array.isArray(state.items) ? state.items.slice(0, 12).filter(it => it && ['green', 'red', 'banana', 'blue', 'giant'].includes(it.type) && finite(it.x) && finite(it.z))
+    star: state.star === true, rocket: state.rocket === true, sh: state.sh === true, em: state.em && finite(state.em.n) && finite(state.em.i) ? {n: clamp(Math.floor(state.em.n), 0, 1e6), i: clamp(Math.floor(state.em.i), 0, 3)} : undefined, spinA: finite(state.spinA) ? clamp(state.spinA, 0, 40) : 0,
+    items: Array.isArray(state.items) ? state.items.slice(0, 12).filter(it => it && ['green', 'red', 'banana', 'blue', 'giant', 'boomerang', 'fire'].includes(it.type) && finite(it.x) && finite(it.z))
       .map(it => ({type: it.type, x: clamp(it.x, -400, 400), z: clamp(it.z, -400, 400), y: finite(it.y) ? clamp(it.y, -5, 80) : 0, b: it.b === 1 ? 1 : undefined})) : [],
     // Host-simulated AI drivers (online fill-up) and item hits that guests report on them.
     bots: Array.isArray(state.bots) ? state.bots.slice(0, 7).filter(b => b && ['x', 'z', 'a', 's', 'p'].every(k => finite(b[k]))).map(b => ({
       n: finite(b.n) ? clamp(Math.floor(b.n), 0, 6) : 0, x: clamp(b.x, -400, 400), z: clamp(b.z, -400, 400), y: finite(b.y) ? clamp(b.y, -60, 80) : 0, fa: finite(b.fa) ? clamp(b.fa, 0, 4) : 0, pi: finite(b.pi) ? clamp(b.pi, -1.2, 1.2) : 0, a: b.a % (Math.PI * 2), s: clamp(b.s, -60, 60), bu: b.bu === 1 ? 1 : undefined, gl: b.gl === 1 ? 1 : undefined,
       vx: finite(b.vx) ? clamp(b.vx, -70, 70) : 0, vz: finite(b.vz) ? clamp(b.vz, -70, 70) : 0, sp: finite(b.sp) ? clamp(b.sp, 0, 40) : 0, p: clamp(b.p, -.2, 4),
       st: b.st === true, rk: b.rk === true, tr: ['banana', 'green', 'red'].includes(b.tr) ? b.tr : undefined, b: b.b === true, dt: finite(b.dt) ? clamp(Math.floor(b.dt), 0, 3) : 0, dr: finite(b.dr) ? clamp(Math.sign(b.dr), -1, 1) : 0 })) : [],
-    hits: Array.isArray(state.hits) ? state.hits.slice(0, 8).filter(h => h && typeof h.id === 'string' && h.id.length < 30 && finite(h.bot) && ['green', 'red', 'banana', 'star', 'blue', 'ink', 'giant'].includes(h.k))
+    hits: Array.isArray(state.hits) ? state.hits.slice(0, 8).filter(h => h && typeof h.id === 'string' && h.id.length < 30 && finite(h.bot) && ['green', 'red', 'banana', 'star', 'blue', 'ink', 'giant', 'boomerang', 'fire', 'bolt'].includes(h.k))
       .map(h => ({id: h.id, bot: clamp(Math.floor(h.bot), 0, 6), k: h.k})) : [],
     // item hits on online players (sent by the shooter, applied by the victim)
-    phits: Array.isArray(state.phits) ? state.phits.slice(0, 8).filter(h => h && typeof h.id === 'string' && h.id.length < 30 && typeof h.to === 'string' && /^[a-zA-Z0-9_-]{1,64}$/.test(h.to) && ['green', 'red', 'banana', 'star', 'blue', 'giant'].includes(h.k))
+    phits: Array.isArray(state.phits) ? state.phits.slice(0, 8).filter(h => h && typeof h.id === 'string' && h.id.length < 30 && typeof h.to === 'string' && /^[a-zA-Z0-9_-]{1,64}$/.test(h.to) && ['green', 'red', 'banana', 'star', 'blue', 'giant', 'boomerang', 'fire', 'bolt'].includes(h.k))
       .map(h => ({id: h.id, to: h.to, k: h.k})) : [],
     boosting: state.boosting === true, drifting: state.drifting === true,
     // battle: own balloons, knocked out, how often we were hit (the host turns hits into dropped coins / crown)
