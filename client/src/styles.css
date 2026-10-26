@@ -747,3 +747,5 @@ body.mirror #minimap{transform:scaleX(-1)}
 .wizard-menu .wiz-card:not(.locked):hover{transform:translateY(-6px) scale(1.02);box-shadow:0 18px 40px #000a,0 0 0 1px #ffffff40}
 .wizard-menu .wiz-title{animation:tsIn .4s ease both}
 .wizard-menu .wiz-icon{display:inline-block;transition:transform .25s}.wizard-menu .wiz-card:hover .wiz-icon{transform:scale(1.25) rotate(-8deg)}
+.diamond{color:#c8f6ff!important;text-shadow:0 0 12px #6ae0ffaa}
+.res-medal.diamond span{filter:drop-shadow(0 0 14px #6ae0ff)}.res-medal.diamond small{color:#c8f6ff}

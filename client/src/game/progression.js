@@ -5,7 +5,7 @@ const LEGACY_KEY = 'apex-rush-legacy-record';
 // Tracks open up with the driver level (the XP is the level threshold: 500 = Lv 2, 1200 = Lv 3, 2200 = Lv 4, 3600 = Lv 5, 5500 = Lv 6, 8000 = Lv 7).
 const MAPS = [{ id: 'coast', xp: 0 }, { id: 'canyon', xp: 0 }, { id: 'neon', xp: 500 }, { id: 'volcano', xp: 2200 }, { id: 'glacier', xp: 3600 }, { id: 'stars', xp: 5500 }, { id: 'jungle', xp: 500 }, { id: 'savanna', xp: 1200 }, { id: 'forest', xp: 1200 }, { id: 'sky', xp: 3600 }, { id: 'sakura', xp: 2200 }, { id: 'moon', xp: 8000 }, { id: 'pirate', xp: 500 }, { id: 'candy', xp: 1200 }, { id: 'castle', xp: 2200 }, { id: 'arctic', xp: 1200 }, { id: 'rooftops', xp: 3600 }, { id: 'galaxy', xp: 5500 }];
 // Platinum only exists in time trial (the main menu passes a platinum par time there).
-const MEDALS = ['none', 'bronze', 'silver', 'gold', 'platinum'];
+const MEDALS = ['none', 'bronze', 'silver', 'gold', 'platinum', 'diamond'];
 const THRESHOLDS = [0, 500, 1200, 2200, 3600, 5500, 8000];
 const TITLES = ['Rookie', 'Kurven-Talent', 'Drift-Pilot', 'Rennprofi', 'Apex-Jäger', 'Grand-Prix-Champion', 'Legende'];
 // Records are kept per speed class: 'race' = 80 km/h, 'race100', 'race120', 'race150' …
@@ -92,7 +92,7 @@ const CH_DAY = [
   { id: 'drift', label: 'Drifte insgesamt 45 Sekunden', goal: 45, xp: 150, gain: r => Math.floor(r.driftSeconds || 0) },
   { id: 'clean', label: 'Beende ein Rennen ohne Wandkontakt', goal: 1, xp: 200, gain: r => !r.collisions && !r.resets && r.position < 99 ? 1 : 0 },
   { id: 'fast', label: 'Fahre 2 Rennen mit 120 km/h oder mehr', goal: 2, xp: 150, gain: r => r.cc >= 120 ? 1 : 0 },
-  { id: 'gold', label: 'Hol eine Gold-Zeit', goal: 1, xp: 200, gain: r => r.medal === 'gold' || r.medal === 'platinum' ? 1 : 0 },
+  { id: 'gold', label: 'Hol eine Gold-Zeit', goal: 1, xp: 200, gain: r => r.medal === 'gold' || r.medal === 'platinum' || r.medal === 'diamond' ? 1 : 0 },
   { id: 'jumps', label: 'Spring 12× über Rampen', goal: 12, xp: 150, gain: r => r.jumps || 0 },
   { id: 'online', label: 'Fahre ein Online-Rennen', goal: 1, xp: 200, gain: r => r.mode === 'online' || r.online ? 1 : 0 },
   { id: 'map', label: 'Beende ein Rennen auf {map}', goal: 1, xp: 180, gain: (r, c) => r.mapId === c.map ? 1 : 0 },
@@ -102,8 +102,8 @@ const CH_WEEK = [
   { id: 'wcups', label: 'Gewinne 2 Cups mit Gold', goal: 2, xp: 1200, gain: r => r.cupGold || 0 },
   { id: 'whits', label: 'Triff 40 Gegner mit Items', goal: 40, xp: 900, gain: r => r.hitsDealt || 0 },
   { id: 'wcoins', label: 'Sammle 250 Turbo-Chips', goal: 250, xp: 800, gain: r => r.coins || 0 },
-  { id: 'wgold', label: 'Hol 5 Gold-Zeiten', goal: 5, xp: 1000, gain: r => r.medal === 'gold' || r.medal === 'platinum' ? 1 : 0 },
-  { id: 'wplat', label: 'Hol 2 Platin-Zeiten im Zeitfahren', goal: 2, xp: 1200, gain: r => r.medal === 'platinum' ? 1 : 0 },
+  { id: 'wgold', label: 'Hol 5 Gold-Zeiten', goal: 5, xp: 1000, gain: r => r.medal === 'gold' || r.medal === 'platinum' || r.medal === 'diamond' ? 1 : 0 },
+  { id: 'wplat', label: 'Hol 2 Platin-Zeiten im Zeitfahren', goal: 2, xp: 1200, gain: r => r.medal === 'platinum' || r.medal === 'diamond' ? 1 : 0 },
   { id: 'wfast', label: 'Fahre 8 Rennen mit 150 km/h oder mehr', goal: 8, xp: 1000, gain: r => r.cc >= 150 ? 1 : 0 },
 ];
 const CH_MAPS = ['coast', 'canyon', 'neon', 'jungle', 'pirate'];
@@ -171,7 +171,7 @@ export function applyMissions(value, race) {
   const gain = {
     wins: competitive && race.position === 1 ? 1 : 0, podium: competitive && race.position <= 3 ? 1 : 0,
     overtakes: race.overtakes || 0, drift: race.driftSeconds || 0, hits: race.hitsDealt || 0, jumps: race.jumps || 0, coins: race.coins || 0,
-    clean: !race.collisions && !race.resets ? 1 : 0, gold: race.medal === 'gold' || race.medal === 'platinum' ? 1 : 0, fast: race.cc >= 120 ? 1 : 0, finish: 1,
+    clean: !race.collisions && !race.resets ? 1 : 0, gold: race.medal === 'gold' || race.medal === 'platinum' || race.medal === 'diamond' ? 1 : 0, fast: race.cc >= 120 ? 1 : 0, finish: 1,
   };
   for (const m of profile.missions) {
     if (m.id === 'maps') m.progress = Math.min(m.goal, profile.missionMaps.length);
@@ -264,6 +264,8 @@ export function getMedal(map, time) {
   const raceTime = seconds(time);
   if (raceTime === null) return 'none';
   const pars = map?.parTimes;
+  const dia = seconds(pars?.diamond);
+  if (dia !== null && raceTime <= dia) return 'diamond';
   const plat = seconds(pars?.platinum);
   if (plat !== null && raceTime <= plat) return 'platinum';
   for (const [index, medal] of ['gold', 'silver', 'bronze'].entries()) {
@@ -295,24 +297,24 @@ export function calculateResult({ map, mode = 'race', time, bestLap, position = 
   const medal = finished ? getMedal(map, raceTime) : 'none';
   const clean = finished && safeStats.collisions === 0 && safeStats.resets === 0;
   const podiumPoints = competitive ? [0, 500, 350, 250, 160, 100, 60, 30, 10][place] : 0;
-  const medalPoints = { none: 0, bronze: 100, silver: 220, gold: 350, platinum: 600 }[medal];
+  const medalPoints = { none: 0, bronze: 100, silver: 220, gold: 350, platinum: 600, diamond: 900 }[medal];
   const driftPoints = Math.floor(safeStats.driftSeconds * 25);
   const breakdown = finished ? [
     { label: 'Rennen beendet', points: 1000 },
     ...(competitive ? [{ label: `Platz ${place}`, points: podiumPoints }] : []),
-    ...(medalPoints ? [{ label: `${{ platinum: 'Platin', gold: 'Gold', silver: 'Silber', bronze: 'Bronze' }[medal]}-Zeit`, points: medalPoints }] : []),
+    ...(medalPoints ? [{ label: `${{ diamond: 'Diamant', platinum: 'Platin', gold: 'Gold', silver: 'Silber', bronze: 'Bronze' }[medal]}-Zeit`, points: medalPoints }] : []),
     ...(clean ? [{ label: 'Saubere Fahrt', points: 200 }] : []),
     ...(driftPoints ? [{ label: 'Drift-Stil · maximal 8 s', points: driftPoints }] : []),
     ...(safeCoins ? [{ label: `${safeCoins} Turbo-Chips`, points: safeCoins * 25 }] : []),
   ] : [];
   const points = breakdown.reduce((sum, entry) => sum + entry.points, 0);
-  const xp = finished ? 400 + ({ none: 0, bronze: 20, silver: 40, gold: 65, platinum: 110 }[medal])
+  const xp = finished ? 400 + ({ none: 0, bronze: 20, silver: 40, gold: 65, platinum: 110, diamond: 160 }[medal])
     + (competitive ? [0, 60, 40, 25, 15, 8, 4, 0, 0][place] : 0)
     + (clean ? 25 : 0) + Math.floor(safeStats.driftSeconds * 2.5) + safeCoins : 0;
   const challenges = [
     { id: `${mapId}:finish`, label: 'Erster Zieleinlauf', complete: finished },
     { id: `${mapId}:clean`, label: 'Ohne Kratzer ins Ziel', complete: clean },
-    { id: `${mapId}:gold`, label: 'Gold-Zeit geknackt', complete: finished && (medal === 'gold' || medal === 'platinum') },
+    { id: `${mapId}:gold`, label: 'Gold-Zeit geknackt', complete: finished && (medal === 'gold' || medal === 'platinum' || medal === 'diamond') },
     { id: `${mapId}:win`, label: 'Grand Prix gewonnen', complete: finished && competitive && place === 1 },
   ];
   return {
