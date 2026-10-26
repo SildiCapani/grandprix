@@ -49,8 +49,9 @@ const sph = new THREE.SphereGeometry(1, 20, 14), cone = new THREE.ConeGeometry(1
 
 // Portraits: the real 3D driver rendered once into a small image (head and shoulders), cached per driver.
 let studio = null; const portraits = new Map();
-function portraitURL(id) {
-  if (portraits.has(id)) return portraits.get(id);
+function portraitURL(id, big = false) {
+  const key = id + (big ? ':big' : '');
+  if (portraits.has(key)) return portraits.get(key);
   let url = '';
   try {
     if (!studio) {
@@ -63,13 +64,16 @@ function portraitURL(id) {
       studio = { r, scene, cam };
     }
     const d = buildDriver(id); d.userData.head.rotation.y = .18; studio.scene.add(d);
+    const S = big ? 360 : 192; studio.r.setSize(S, S, false);
+    if (big) { studio.cam.fov = 30; studio.cam.position.set(.32, .82, 1.25); studio.cam.lookAt(0, .66, 0); } else { studio.cam.fov = 22; studio.cam.position.set(.18, .86, .78); studio.cam.lookAt(0, .76, 0); }
+    studio.cam.updateProjectionMatrix();
     studio.r.render(studio.scene, studio.cam); url = studio.r.domElement.toDataURL('image/png');
     studio.scene.remove(d);
   } catch { url = ''; }
-  portraits.set(id, url); return url;
+  portraits.set(key, url); return url;
 }
 // Small round portrait for menus and the standings.
-export function avatarPortrait(id) {
-  const a = avatarById(id), url = portraitURL(a.id);
-  return `<span class="avatar-svg avatar-img" style="--av:${a.color}">${url ? `<img src="${url}" alt="${a.name}">` : ''}</span>`;
+export function avatarPortrait(id, big = false) {
+  const a = avatarById(id), url = portraitURL(a.id, big);
+  return `<figure class="avatar-svg avatar-img${big ? ' big' : ''}" style="--av:${a.color}">${url ? `<img src="${url}" alt="${a.name}">` : ''}</figure>`;
 }
