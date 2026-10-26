@@ -1,5 +1,5 @@
 import { getTrack, RAMP_H, RAMP_LEN } from './tracks.js';
-import { kartById, wheelById, withWheels } from './karts.js';
+import { kartById, wheelById, withWheels, gliderById, withParts } from './karts.js';
 import { buildObstacles, hazardsAt } from './obstacles.js';
 
 // Compact, dependency-free arcade physics. Units are metres and seconds.
@@ -27,7 +27,7 @@ const DRAFT_BONUS = 1.5;
 // Speed class: 80 / 100 / 120 / 150 km/h. Every speed in the game scales by K = class / 80,
 // so items, turbos, pads and AI stay exactly as strong relative to the base speed.
 let K = 1;
-export const SPEED_CLASSES = [80, 100, 120, 150];
+export const SPEED_CLASSES = [80, 100, 120, 150, 200];
 export const speedFactor = () => K;
 const MAX_ANY = 33;
 // Turning circle grows with speed: tight hairpins need braking, sweepers are flat out.
@@ -140,7 +140,7 @@ export function gridPlacement(track, slot) {
 }
 
 // Kart stats copied onto a body (player, bots).
-const kartFields = (id, wheel = 'standard') => { const k = withWheels(kartById(id), wheel); return { kart: k.id, top: k.top, accel: k.accel, turn: k.turn, mass: k.mass, driftRate: k.drift, offroadF: k.offroad }; };
+const kartFields = (id, wheel = 'standard', glider = 'standard') => { const k = withParts(kartById(id), wheel, glider); return { kart: k.id, top: k.top, accel: k.accel, turn: k.turn, mass: k.mass, driftRate: k.drift, offroadF: k.offroad, hang: k.hang }; };
 function makeBody(extra) {
   return { speed: 0, steer: 0, vx: 0, vz: 0, slide: 0, spin: 0, ghost: 0, y: 0, pitch: 0, airT: 0, airDur: 0, airY0: 0, airH: 0,
     trail: null, trailT: 0, top: 1, accel: 1, turn: 1, driftRate: 1, offroadF: .4, offroad: false, scY: 0, route: 0, scSeen: -1, kart: 'allround',
@@ -168,7 +168,7 @@ export class RaceCore {
   constructor(options = {}) {
     this.onEvent = options.onEvent || (() => {});
     this.track = getTrack(options.mapId);
-    this.kartId = 'allround'; this.wheelId = 'standard';
+    this.kartId = 'allround'; this.wheelId = 'standard'; this.gliderId = 'standard';
     this.reset();
   }
 
@@ -200,7 +200,7 @@ export class RaceCore {
     this.position = 1;
     this.checkpointCount = 0;
     this.nextCheckpoint = 1;
-    this.player = makeBody({ x: s.x, z: s.z, y: s.y, angle: s.angle, drifting: false, boosting: false, name: 'DU', isPlayer: true, ...kartFields(this.kartId, this.wheelId) });
+    this.player = makeBody({ x: s.x, z: s.z, y: s.y, angle: s.angle, drifting: false, boosting: false, name: 'DU', isPlayer: true, ...kartFields(this.kartId, this.wheelId, this.gliderId) });
     this.rivals = [];
     // Other online players (positions from the network). Each client resolves its own car
     // against them, so both sides bounce off each other.
@@ -227,8 +227,9 @@ export class RaceCore {
     return this;
   }
 
-  setKart(id) { this.kartId = kartById(id).id; Object.assign(this.player, kartFields(this.kartId, this.wheelId)); return this; }
-  setWheels(id) { this.wheelId = wheelById(id).id; Object.assign(this.player, kartFields(this.kartId, this.wheelId)); return this; }
+  setKart(id) { this.kartId = kartById(id).id; Object.assign(this.player, kartFields(this.kartId, this.wheelId, this.gliderId)); return this; }
+  setWheels(id) { this.wheelId = wheelById(id).id; Object.assign(this.player, kartFields(this.kartId, this.wheelId, this.gliderId)); return this; }
+  setGlider(id) { this.gliderId = gliderById(id).id; Object.assign(this.player, kartFields(this.kartId, this.wheelId, this.gliderId)); return this; }
 
   start(mode = 'race', mapId = this.track.id, { items, cc, kart, battle } = {}) {
     this.battleType = BATTLE_TYPES.includes(battle) ? battle : 'balloons';
@@ -739,7 +740,7 @@ export class RaceCore {
       const lg = 1 / (T.gravity || 1), hang = Math.sqrt(lg);
       if (j.glide) {
         // Glider ramp: the kart opens its glider, climbs, then sails slowly over the whole gap (steerable).
-        c.airDur = ((j.gap + 12) / v) * 1.25 * hang; c.airT = c.airDur; c.glide = true;
+        c.airDur = ((j.gap + 12) / v) * 1.25 * hang * (c.hang || 1); c.airT = c.airDur; c.glide = true;
         c.airY0 = T.heightAt(j.t) + RAMP_H; c.airH = (6 + j.gap * .04) * lg; c.drift = 0; c.driftT = 0; c.drifting = false;
         if (c === this.player) this.emit('glide', { gap: j.gap });
         continue;

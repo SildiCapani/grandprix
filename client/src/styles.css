@@ -593,7 +593,7 @@ header.in-garage .top-actions{display:none}
 .p-lv{color:#ffd04a;font-size:12px}.p-bar{height:6px;border-radius:3px;background:#ffffff14;margin-top:6px;width:220px;max-width:100%}.p-bar i{display:block;height:100%;border-radius:3px;background:linear-gradient(90deg,#ff653d,#ffd04a)}
 .p-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:14px}
 .p-stats div{background:#ffffff08;border-radius:10px;padding:8px 10px}.p-stats small{display:block;font-size:9px;color:#9fb4ad;letter-spacing:.08em}.p-stats b{font-size:18px}
-.p-cups{display:grid;grid-template-columns:1.6fr repeat(4,1fr);gap:3px;font-size:11px;text-align:center}
+.p-cups{display:grid;grid-template-columns:1.6fr repeat(5,1fr);gap:3px;font-size:11px;text-align:center}
 .p-cups .h{color:#9fb4ad;font-size:9px}.p-cups .n{text-align:left;font-weight:800}.p-cups .t{background:#ffffff08;border-radius:6px;padding:2px 0}.p-cups .t.none{opacity:.35}
 .p-stars{display:flex;flex-wrap:wrap;gap:4px}.p-stars span .avatar-svg{width:34px;height:34px;filter:grayscale(1) brightness(.45)}.p-stars span.ok .avatar-svg{filter:none}
 #pSearch{width:100%;box-sizing:border-box;padding:9px 12px;border-radius:10px;border:1px solid #ffffff22;background:#ffffff0c;color:#fff;font:inherit}
@@ -605,3 +605,15 @@ header.in-garage .top-actions{display:none}
 #boltFlash.on{animation:boltFlash .7s ease-out}
 @keyframes boltFlash{0%{opacity:1}15%{opacity:.2}25%{opacity:.9}100%{opacity:0}}
 #menuLayer button:focus-visible,#profileOverlay button:focus-visible{outline:3px solid #ffd04a;outline-offset:2px}
+
+/* mirror mode: the 3D view and the minimap are flipped, steering is swapped in code */
+body.mirror canvas:not(#minimap):not(.no-mirror){transform:scaleX(-1)}
+body.mirror #minimap{transform:scaleX(-1)}
+.mirror-toggle{display:flex;align-items:center;gap:10px;margin:14px auto 0;padding:10px 18px;border-radius:12px;border:1px solid #ffffff26;background:#ffffff0a;color:#e8f2ef;cursor:pointer;font:inherit}
+.mirror-toggle span{font-size:22px}.mirror-toggle b{font-size:13px;letter-spacing:.06em}.mirror-toggle small{color:#9fb4ad;font-size:11px}
+.mirror-toggle.on{border-color:#5ad8ff;background:#5ad8ff22;box-shadow:0 0 0 2px #5ad8ff44}
+.mirror-toggle.locked{opacity:.6}
+.cc-card.locked{filter:grayscale(.8) brightness(.7)}
+.challenges .mission.done{opacity:.6}.challenges .mission.done .mission-bar i{background:#5ad86a}
+.g-gliders .wheel-ico{width:40px;height:40px}
+.wiz-cards.classes .cc-card b{font-size:clamp(13px,1.45vw,20px);overflow-wrap:anywhere}

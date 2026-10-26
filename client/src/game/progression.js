@@ -1,4 +1,4 @@
-import { WHEELS } from './karts.js';
+import { WHEELS, GLIDERS } from './karts.js';
 // Career data stays local to this browser. No accounts, timers or daily streaks.
 export const STORAGE_KEY = 'apex-rush-career-v1';
 const LEGACY_KEY = 'apex-rush-legacy-record';
@@ -9,7 +9,7 @@ const MEDALS = ['none', 'bronze', 'silver', 'gold', 'platinum'];
 const THRESHOLDS = [0, 500, 1200, 2200, 3600, 5500, 8000];
 const TITLES = ['Rookie', 'Kurven-Talent', 'Drift-Pilot', 'Rennprofi', 'Apex-Jäger', 'Grand-Prix-Champion', 'Legende'];
 // Records are kept per speed class: 'race' = 80 km/h, 'race100', 'race120', 'race150' …
-const MODES = ['race', 'time', 'online', 'race100', 'time100', 'online100', 'race120', 'time120', 'online120', 'race150', 'time150', 'online150'];
+const MODES = ['race', 'time', 'online', 'race100', 'time100', 'online100', 'race120', 'time120', 'online120', 'race150', 'time150', 'online150', 'race200', 'time200', 'online200'];
 const baseMode = m => String(m).replace(/\d+$/, '');
 let resultCounter = 0;
 
@@ -23,7 +23,7 @@ const normalizeMode = value => MODES.includes(value) ? value : 'race';
 const stringList = value => Array.isArray(value) ? [...new Set(value.filter(item => typeof item === 'string' && item.length > 0 && item.length <= 160))] : [];
 
 export function createProfile() {
-  return { version: 2, totalXP: 0, totalPoints: 0, races: 0, wins: 0, records: {}, achievements: [], recentRaceIds: [], missions: [], missionSeq: 0, missionMaps: [] };
+  return { version: 2, totalXP: 0, totalPoints: 0, races: 0, wins: 0, records: {}, achievements: [], recentRaceIds: [], missions: [], missionSeq: 0, missionMaps: [], challenges: emptyChallenges() };
 }
 
 // ---------- career rewards (only when the career switch is on) ----------
@@ -43,6 +43,7 @@ export function rewardsForLevel(level, names = {}) {
   for (const [id, lv] of Object.entries(KART_LEVEL)) if (lv > 1 && lv === level) out.push({ kind: 'kart', id, name: names[id] || id });
   for (const f of FINISHES) if (f.level > 1 && f.level === level) out.push({ kind: 'finish', id: f.id, name: 'Lack ' + f.name });
   for (const w of WHEELS) if (w.level > 1 && w.level === level) out.push({ kind: 'wheel', id: w.id, name: 'Räder ' + w.name });
+  for (const g of GLIDERS) if (g.level > 1 && g.level === level) out.push({ kind: 'glider', id: g.id, name: 'Gleiter ' + g.name });
   return out;
 }
 // The next level that brings something new (or null when everything is open).
@@ -81,6 +82,86 @@ function fillMissions(profile) {
 }
 export function missionLabel(m) { return (MISSION_POOL.find(p => p.id === m.id)?.label || (() => m.id))(m.goal); }
 export function activeMissions(value) { return fillMissions(sanitizeProfile(value)).missions; }
+// ---------- daily & weekly challenges ----------
+// Three new daily and two weekly tasks, the same for everyone (picked from the date). `gain` reads one finished race.
+const CH_DAY = [
+  { id: 'wins', label: 'Gewinne 2 Rennen', goal: 2, xp: 250, gain: r => r.mode !== 'time' && r.position === 1 ? 1 : 0 },
+  { id: 'podium', label: 'Fahre 3× aufs Podest', goal: 3, xp: 200, gain: r => r.mode !== 'time' && r.position <= 3 ? 1 : 0 },
+  { id: 'coins', label: 'Sammle 40 Turbo-Chips', goal: 40, xp: 150, gain: r => r.coins || 0 },
+  { id: 'hits', label: 'Triff 6 Gegner mit Items', goal: 6, xp: 200, gain: r => r.hitsDealt || 0 },
+  { id: 'drift', label: 'Drifte insgesamt 45 Sekunden', goal: 45, xp: 150, gain: r => Math.floor(r.driftSeconds || 0) },
+  { id: 'clean', label: 'Beende ein Rennen ohne Wandkontakt', goal: 1, xp: 200, gain: r => !r.collisions && !r.resets && r.position < 99 ? 1 : 0 },
+  { id: 'fast', label: 'Fahre 2 Rennen mit 120 km/h oder mehr', goal: 2, xp: 150, gain: r => r.cc >= 120 ? 1 : 0 },
+  { id: 'gold', label: 'Hol eine Gold-Zeit', goal: 1, xp: 200, gain: r => r.medal === 'gold' || r.medal === 'platinum' ? 1 : 0 },
+  { id: 'jumps', label: 'Spring 12× über Rampen', goal: 12, xp: 150, gain: r => r.jumps || 0 },
+  { id: 'online', label: 'Fahre ein Online-Rennen', goal: 1, xp: 200, gain: r => r.mode === 'online' || r.online ? 1 : 0 },
+  { id: 'map', label: 'Beende ein Rennen auf {map}', goal: 1, xp: 180, gain: (r, c) => r.mapId === c.map ? 1 : 0 },
+];
+const CH_WEEK = [
+  { id: 'wwins', label: 'Gewinne 10 Rennen', goal: 10, xp: 1200, gain: r => r.mode !== 'time' && r.position === 1 ? 1 : 0 },
+  { id: 'wcups', label: 'Gewinne 2 Cups mit Gold', goal: 2, xp: 1200, gain: r => r.cupGold || 0 },
+  { id: 'whits', label: 'Triff 40 Gegner mit Items', goal: 40, xp: 900, gain: r => r.hitsDealt || 0 },
+  { id: 'wcoins', label: 'Sammle 250 Turbo-Chips', goal: 250, xp: 800, gain: r => r.coins || 0 },
+  { id: 'wgold', label: 'Hol 5 Gold-Zeiten', goal: 5, xp: 1000, gain: r => r.medal === 'gold' || r.medal === 'platinum' ? 1 : 0 },
+  { id: 'wplat', label: 'Hol 2 Platin-Zeiten im Zeitfahren', goal: 2, xp: 1200, gain: r => r.medal === 'platinum' ? 1 : 0 },
+  { id: 'wfast', label: 'Fahre 8 Rennen mit 150 km/h oder mehr', goal: 8, xp: 1000, gain: r => r.cc >= 150 ? 1 : 0 },
+];
+const CH_MAPS = ['coast', 'canyon', 'neon', 'jungle', 'pirate'];
+function emptyChallenges() { return { day: '', dp: {}, dd: [], week: '', wp: {}, wd: [] }; }
+const pad2 = n => String(n).padStart(2, '0');
+export const dayKey = (d = new Date()) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+export function weekKey(d = new Date()) {
+  const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())), wd = t.getUTCDay() || 7;
+  t.setUTCDate(t.getUTCDate() + 4 - wd); const y = t.getUTCFullYear(), w = Math.ceil(((t - Date.UTC(y, 0, 1)) / 864e5 + 1) / 7);
+  return `${y}-W${pad2(w)}`;
+}
+function seeded(key) { let h = 2166136261; for (const ch of key) h = Math.imul(h ^ ch.charCodeAt(0), 16777619); return () => { h = Math.imul(h ^ (h >>> 15), 2246822507); h = Math.imul(h ^ (h >>> 13), 3266489909); return ((h ^= h >>> 16) >>> 0) / 4294967296; }; }
+function pick(pool, n, key) { const r = seeded(key), list = [...pool], out = []; while (out.length < n && list.length) out.push(list.splice(Math.floor(r() * list.length), 1)[0]); return out; }
+// Today's / this week's tasks with progress (`now` lets tests pick a date).
+export function activeChallenges(profile, now = new Date()) {
+  const ch = profile?.challenges || emptyChallenges(), d = dayKey(now), w = weekKey(now);
+  const map = CH_MAPS[Math.floor(seeded('map' + d)() * CH_MAPS.length)];
+  const view = (c, prog, done, extra) => ({ id: c.id, label: c.label, goal: c.goal, xp: c.xp, ...extra, progress: Math.min(c.goal, prog[c.id] || 0), done: done.includes(c.id) });
+  const sameD = ch.day === d, sameW = ch.week === w;
+  const tomorrow = new Date(now); tomorrow.setHours(24, 0, 0, 0);
+  return {
+    day: pick(CH_DAY, 3, 'day' + d).map(c => view(c, sameD ? ch.dp : {}, sameD ? ch.dd : [], c.id === 'map' ? { map } : {})),
+    week: pick(CH_WEEK, 2, 'week' + w).map(c => view(c, sameW ? ch.wp : {}, sameW ? ch.wd : [], {})),
+    resetHours: Math.max(1, Math.ceil((tomorrow - now) / 36e5)),
+  };
+}
+// Counts a race (or a cup result: { cupGold: 1 }) towards the challenges. Mutates the profile, returns what was completed.
+export function applyChallenges(profile, race, now = new Date()) {
+  const d = dayKey(now), w = weekKey(now), ch = profile.challenges ||= emptyChallenges(), done = [];
+  if (ch.day !== d) Object.assign(ch, { day: d, dp: {}, dd: [] });
+  if (ch.week !== w) Object.assign(ch, { week: w, wp: {}, wd: [] });
+  const act = activeChallenges(profile, now);
+  for (const [list, prog, fin, pool, tag] of [[act.day, ch.dp, ch.dd, CH_DAY, 'TAGESAUFGABE'], [act.week, ch.wp, ch.wd, CH_WEEK, 'WOCHENAUFGABE']]) {
+    for (const c of list) {
+      if (fin.includes(c.id)) continue;
+      const def = pool.find(x => x.id === c.id), g = def.gain(race, c) || 0; if (!g) continue;
+      prog[c.id] = Math.min(c.goal, (prog[c.id] || 0) + g);
+      if (prog[c.id] >= c.goal) { fin.push(c.id); done.push({ id: c.id, label: tag + ': ' + c.label, xp: c.xp, map: c.map }); profile.totalXP = Math.min(Number.MAX_SAFE_INTEGER, profile.totalXP + c.xp); }
+    }
+  }
+  return done;
+}
+function sanitizeChallenges(v) {
+  const c = emptyChallenges(); if (!object(v)) return c;
+  const prog = o => { const r = {}; if (object(o)) for (const [k, n] of Object.entries(o)) if (/^[a-z]{2,12}$/.test(k)) r[k] = Math.min(1e5, count(n)); return r; };
+  if (/^\d{4}-\d{2}-\d{2}$/.test(v.day)) { c.day = v.day; c.dp = prog(v.dp); c.dd = stringList(v.dd).slice(0, 10); }
+  if (/^\d{4}-W\d{2}$/.test(v.week)) { c.week = v.week; c.wp = prog(v.wp); c.wd = stringList(v.wd).slice(0, 10); }
+  return c;
+}
+function mergeChallenges(a, b) {
+  const out = sanitizeChallenges(b);
+  if (a.day > out.day) Object.assign(out, { day: a.day, dp: { ...a.dp }, dd: [...a.dd] });
+  else if (a.day === out.day) { for (const [k, n] of Object.entries(a.dp)) out.dp[k] = Math.max(n, out.dp[k] || 0); out.dd = [...new Set([...a.dd, ...out.dd])]; }
+  if (a.week > out.week) Object.assign(out, { week: a.week, wp: { ...a.wp }, wd: [...a.wd] });
+  else if (a.week === out.week) { for (const [k, n] of Object.entries(a.wp)) out.wp[k] = Math.max(n, out.wp[k] || 0); out.wd = [...new Set([...a.wd, ...out.wd])]; }
+  return out;
+}
+
 // Counts one finished race towards the missions. `race` = { position, mode, mapId, cc, medal, coins, collisions, resets,
 // overtakes, hitsDealt, jumps, driftSeconds }. Returns the updated profile, completed missions and the XP they paid.
 export function applyMissions(value, race) {
@@ -103,6 +184,7 @@ export function applyMissions(value, race) {
   });
   if (done.some(m => m.id === 'maps')) profile.missionMaps = [];
   profile.totalXP = Math.min(Number.MAX_SAFE_INTEGER, profile.totalXP + xp);
+  for (const c of applyChallenges(profile, race)) { done.push(c); xp += c.xp; }
   return { profile: fillMissions(profile), done, xp };
 }
 const sanitizeMissions = value => Array.isArray(value) ? value.filter(m => object(m) && MISSION_POOL.some(p => p.id === m.id)).slice(0, 3)
@@ -132,6 +214,7 @@ export function sanitizeProfile(value) {
   profile.missions = sanitizeMissions(value.missions);
   profile.missionSeq = count(value.missionSeq);
   profile.missionMaps = stringList(value.missionMaps).filter(validMap);
+  profile.challenges = sanitizeChallenges(value.challenges);
   if (object(value.records)) for (const map of MAPS) {
     const modes = value.records[map.id];
     if (!object(modes)) continue;
@@ -325,6 +408,7 @@ function keepProgress(current, incoming) {
   incoming.achievements = [...new Set([...current.achievements, ...incoming.achievements])];
   incoming.recentRaceIds = [...new Set([...current.recentRaceIds, ...incoming.recentRaceIds])].slice(-20);
   // Missions move forward only: keep whichever side is further along the sequence.
+  incoming.challenges = mergeChallenges(current.challenges || emptyChallenges(), incoming.challenges);
   if (current.missionSeq > incoming.missionSeq) { incoming.missions = current.missions; incoming.missionSeq = current.missionSeq; incoming.missionMaps = current.missionMaps; }
   for (const map of MAPS) for (const mode of MODES) {
     const old = current.records[map.id]?.[mode];

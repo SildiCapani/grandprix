@@ -296,3 +296,9 @@ server/server.js      Statische Auslieferung + WebSocket-Relay /ws
 - **Emotes:** Tasten **1–4** (👍 GG · 😂 HAHA · 😱 NEIN! · 📣 HUP HUP!) – erscheinen als Sprechblase über dem Kart, online auch bei den anderen.
 - **Controller** (Xbox/PlayStation, Standard-Belegung): RT/A Gas · LT/B Bremse & rückwärts · RB/X Drift · LB/Y Item · D-Pad Emotes · Start Pause · Back Kamera.
   In den Menüs: Stick/D-Pad wählt, A bestätigt, B zurück. Bei Treffern vibriert der Controller.
+
+## Spiegelmodus, 200 km/h, Aufgaben & Gleiter
+- **Spiegelmodus** (alle 6 Cups Gold auf 120 km/h): Schalter im Schritt „Klasse“. Alle Strecken seitenverkehrt (Bild und Minikarte gespiegelt, Lenkung angepasst), nur offline.
+- **200 km/h „Überschall“** (alle 6 Cups Gold auf 150 km/h): neue Klasse, mit eigener Weltrangliste und eigenen Pokalen.
+- **Tages- und Wochenaufgaben** im Karriere-Bereich: jeden Tag 3 neue, jede Woche 2 große (für alle gleich), mit Bonus-XP. Werden im Konto gespeichert.
+- **Gleiter (Kart-Baukasten):** Karosserie + Räder + Gleiter. Jeder Gleiter hat eine eigene Optik und verändert Flugzeit auf Gleiter-Rampen und leicht die Werte. Schaltet sich mit dem Level frei.

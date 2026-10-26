@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { buildAvatarHead } from './avatars.js';
 import { applySkin } from './skins.js';
-import { wheelById } from './karts.js';
+import { wheelById, gliderById } from './karts.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { contactShadow } from './surfaces.js';
 let shadowGeo, shadowMat;
@@ -70,7 +70,7 @@ function makeWheel(r, w, paint, rubber, chrome, cream, knobbly, side, spokes = 5
   return g;
 }
 
-export function createCar(color = '#e34335', number = '07', kart = 'allround', finish = 'standard', skin = 'none', avatar = 'pilot', wheelId = 'standard') {
+export function createCar(color = '#e34335', number = '07', kart = 'allround', finish = 'standard', skin = 'none', avatar = 'pilot', wheelId = 'standard', gliderId = 'standard') {
   const L = LAYOUT[kart] || LAYOUT.allround, WL = wheelById(wheelId).look;
   const car = new THREE.Group(); car.name = `Mini Formula ${number}`; car.rotation.order = 'YXZ';
   const body = new THREE.Group(); body.position.y = L.lift; car.add(body);
@@ -140,12 +140,12 @@ export function createCar(color = '#e34335', number = '07', kart = 'allround', f
 
   // --- glider (opens over glider ramps): an arched parafoil in the kart colours on a light frame ---
   const glider = new THREE.Group(); glider.visible = false; glider.position.set(0, .55, -.1 * S); glider.rotation.x = .42; lean.add(glider);
-  { const cols = [paint, cream, paint, cream, paint, cream, paint], n = cols.length, span = 1.9, R = 2.1;
+  { const GL = gliderById(gliderId).look, sailA = GL.a === 'paint' ? paint : new THREE.MeshStandardMaterial({ color: GL.a, roughness: .5 }), sailB = new THREE.MeshStandardMaterial({ color: GL.b, roughness: .5 });
+    const cols = [sailA, sailB, sailA, sailB, sailA, sailB, sailA], n = cols.length, span = 1.9, R = 2.1;
     for (let i = 0; i < n; i++) { const g = new THREE.CylinderGeometry(R, R, 1.6, 4, 1, true, -span / 2 + span * i / n, span / n); g.rotateX(-Math.PI / 2); addMesh(glider, g, cols[i], 0, 1.35 - R, 0); }
     const frameMat = chassis; for (const sd of [-1, 1]) { rod(glider, frameMat, [sd * .12, -.02, 0], [sd * Math.sin(span / 2) * R * .98, 1.35 - R + Math.cos(span / 2) * R * .98, 0], .012); rod(glider, frameMat, [sd * .12, -.02, 0], [sd * .55, 1.3, .2], .01); }
     rod(glider, frameMat, [0, -.05, 0], [0, 1.3, .1], .02); }
-  const sail = new Map([[paint, paint.clone()], [cream, cream.clone()]]); sail.forEach(m => { m.side = THREE.DoubleSide; });
-  glider.traverse(o => { if (o.isMesh) { o.castShadow = false; if (sail.has(o.material)) o.material = sail.get(o.material); } });
+  { const ds = new Map(); glider.traverse(o => { if (!o.isMesh) return; o.castShadow = false; if (o.material === chassis) return; if (!ds.has(o.material)) { const m = o.material.clone(); m.side = THREE.DoubleSide; ds.set(o.material, m); } o.material = ds.get(o.material); }); }
 
   // --- wheels ---
   const wheels = [], frontWheels = [], knob = WL.knob ?? (kart === 'buggy' || kart === 'brummer');
@@ -196,7 +196,7 @@ export function createCar(color = '#e34335', number = '07', kart = 'allround', f
   car.userData.exhaust = exhaust;
   car.userData.body = body; car.userData.lean = lean; car.userData.head = head; car.userData.steeringWheel = wheelGroup; car.userData.glider = glider;
   car.userData.materials = { paint, darkPaint, carbon: chassis, rubber, rim: chrome, cream };
-  car.userData.kart = kart; car.userData.wheel = wheelId; car.userData.skin = skin || 'none'; car.userData.avatar = avatar || 'pilot';
+  car.userData.kart = kart; car.userData.wheel = wheelId; car.userData.gliderId = gliderId || 'standard'; car.userData.skin = skin || 'none'; car.userData.avatar = avatar || 'pilot';
   car.userData.animationTime = Math.random() * 10; car.userData.lift = L.lift;
   return car;
 }

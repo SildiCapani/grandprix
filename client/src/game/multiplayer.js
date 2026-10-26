@@ -4,6 +4,7 @@ const MAP_IDS = new Set(['coast', 'canyon', 'neon', 'volcano', 'glacier', 'stars
 const BATTLES = ['balloons', 'coins', 'crown'];
 const KART_IDS = new Set(['allround', 'bolide', 'flitzer', 'brummer', 'drifter', 'buggy']);
 const WHEEL_IDS = new Set(['standard', 'slick', 'studs', 'drift', 'light', 'monster', 'gold']);
+const GLIDER_IDS = new Set(['standard', 'parasol', 'wing', 'kite', 'jet', 'butterfly', 'gold']);
 const DEFAULT_COLOR = '#ee4b37';
 const CAR_COLORS = ['#ee4b37', '#42c9cb', '#edc44b', '#9b87e5'];
 const PREFIX = 'APX1-';
@@ -16,7 +17,7 @@ const nameOf = v => String(v || 'Rookie Pilot').replace(/[\u0000-\u001f\u007f]/g
 const colorOf = v => /^#[\da-f]{6}$/i.test(v || '') ? v.toLowerCase() : DEFAULT_COLOR;
 const word = (v, d) => typeof v === 'string' && /^[a-z]{2,12}$/.test(v) ? v : d;
 // What a driver looks like in the lobby (kart, driver avatar, paint skin, finish).
-const lookOf = v => ({kart: KART_IDS.has(v?.kart) ? v.kart : 'allround', wheel: WHEEL_IDS.has(v?.wheel) ? v.wheel : 'standard', avatar: word(v?.avatar, 'pilot'), skin: word(v?.skin, 'none'),
+const lookOf = v => ({kart: KART_IDS.has(v?.kart) ? v.kart : 'allround', wheel: WHEEL_IDS.has(v?.wheel) ? v.wheel : 'standard', glider: GLIDER_IDS.has(v?.glider) ? v.glider : 'standard', avatar: word(v?.avatar, 'pilot'), skin: word(v?.skin, 'none'),
   finish: ['standard', 'gold', 'chrome', 'neon'].includes(v?.finish) ? v.finish : 'standard'});
 const idOf = v => typeof v === 'string' && /^[a-zA-Z0-9_-]{5,64}$/.test(v);
 const clone = v => JSON.parse(JSON.stringify(v));
@@ -55,7 +56,7 @@ function cleanCar(state) {
     bubble: state.bubble === true, ink: finite(state.ink) ? clamp(Math.floor(state.ink), 0, 999) : 0,
     y: finite(state.y) ? clamp(state.y, -60, 80) : 0, fallT: finite(state.fallT) ? clamp(state.fallT, 0, 4) : 0, pitch: finite(state.pitch) ? clamp(state.pitch, -1.2, 1.2) : 0,
     kart: KART_IDS.has(state.kart) ? state.kart : 'allround',
-    wheel: WHEEL_IDS.has(state.wheel) ? state.wheel : 'standard', glide: state.glide === true,
+    wheel: WHEEL_IDS.has(state.wheel) ? state.wheel : 'standard', glider: GLIDER_IDS.has(state.glider) ? state.glider : 'standard', glide: state.glide === true,
     skin: typeof state.skin === 'string' && /^[a-z]{2,12}$/.test(state.skin) ? state.skin : 'none',
     avatar: typeof state.avatar === 'string' && /^[a-z]{2,12}$/.test(state.avatar) ? state.avatar : 'pilot',
     finish: ['standard', 'gold', 'chrome', 'neon'].includes(state.finish) ? state.finish : 'standard', mass: finite(state.mass) ? clamp(state.mass, .5, 2) : 1,
@@ -313,7 +314,7 @@ export class MultiplayerSession {
     if (!peer.ready) return;
     if (data.type === 'start' && idOf(data.race?.id) && finite(data.race.startAt)) {
       if (this._state.race?.id === data.race.id) return;
-      this._state.status = 'racing'; this._state.race = {id: data.race.id, startAt: data.race.startAt, status: 'racing', cc: [80, 100, 120, 150].includes(data.race.cc) ? data.race.cc : 80, battle: BATTLES.includes(data.race.battle) ? data.race.battle : undefined};
+      this._state.status = 'racing'; this._state.race = {id: data.race.id, startAt: data.race.startAt, status: 'racing', cc: [80, 100, 120, 150, 200].includes(data.race.cc) ? data.race.cc : 80, battle: BATTLES.includes(data.race.battle) ? data.race.battle : undefined};
       this._state.players.forEach(p => { p.progress = 0; p.finishedTime = null; p.dnf = false; });
       this._change(); this.onEvent({type: 'start', race: clone(this._state.race)}); return;
     }
@@ -378,7 +379,7 @@ export class MultiplayerSession {
   startRace(extra = {}) {
     if (!this.canStart) throw new Error('Mindestens zwei verbundene Fahrer müssen bereit sein.');
     this._state.status = 'racing'; this._state.error = ''; this._firstFinish = 0;
-    this._state.race = {id: uid(), startAt: Date.now() + 4000, status: 'racing', cc: [80, 100, 120, 150].includes(extra.cc) ? extra.cc : 80, battle: BATTLES.includes(extra.battle) ? extra.battle : undefined};
+    this._state.race = {id: uid(), startAt: Date.now() + 4000, status: 'racing', cc: [80, 100, 120, 150, 200].includes(extra.cc) ? extra.cc : 80, battle: BATTLES.includes(extra.battle) ? extra.battle : undefined};
     this._state.players.forEach(p => { p.progress = 0; p.finishedTime = null; p.dnf = false; delete p.finish; });
     // Offers without a completed handshake cannot join a race in progress.
     for (const [id, peer] of this._peers) if (!peer.ready) this._closePeer(id);

@@ -63,3 +63,21 @@ export function withWheels(k, wheelId) {
   const m = wheelById(wheelId).mod;
   return { ...k, top: k.top * (m.top || 1), accel: k.accel * (m.accel || 1), turn: k.turn * (m.turn || 1), mass: k.mass * (m.mass || 1), drift: k.drift * (m.drift || 1), offroad: Math.min(.95, k.offroad + (m.offroad || 0)) };
 }
+
+// Gliders (kart construction kit): open over glider ramps. `hang` stretches the glide (longer, flatter flights),
+// the other fields work like the wheel mods. look: a / b = the two stripe colours ('paint' = kart colour).
+export const GLIDERS = Object.freeze([
+  { id: 'standard', name: 'Standard-Schirm', tag: 'AUSGEWOGEN', desc: 'Der Serien-Gleiter in deiner Kartfarbe.', level: 1, mod: {}, look: { a: 'paint', b: '#f6f1e2' } },
+  { id: 'parasol', name: 'Sonnenschirm', tag: 'GLEITEN', desc: 'Bleibt lange in der Luft und zieht danach flott los.', level: 2, mod: { hang: 1.15, accel: 1.02 }, look: { a: '#ff6ac8', b: '#ffffff' } },
+  { id: 'wing', name: 'Segelflügel', tag: 'TEMPO', desc: 'Flach und schnell: kürzere Flüge, minimal mehr Topspeed.', level: 3, mod: { hang: .9, top: 1.006 }, look: { a: '#e8ecf0', b: '#3a6ae8' } },
+  { id: 'kite', name: 'Drachen', tag: 'HANDLING', desc: 'Leicht wie ein Papierdrachen: etwas wendiger am Boden.', level: 4, mod: { hang: 1.08, turn: .98 }, look: { a: '#3ab8ff', b: '#ffd400' } },
+  { id: 'jet', name: 'Turbo-Flügel', tag: 'TEMPO', desc: 'Schwer und stromlinienförmig: kurze Flüge, mehr Tempo, langsamer beim Anfahren.', level: 6, mod: { hang: .88, top: 1.01, accel: .98, mass: 1.05 }, look: { a: '#2a2f38', b: '#ff4a2a' } },
+  { id: 'butterfly', name: 'Schmetterling', tag: 'DRIFT', desc: 'Schwebt am längsten und lädt Mini-Turbos etwas schneller.', level: 7, mod: { hang: 1.22, drift: 1.04 }, look: { a: '#b46aff', b: '#ffe14a' } },
+  { id: 'gold', name: 'Goldflügel', tag: 'LEGENDE', desc: 'Für Champions: ein bisschen besser in allem.', level: 9, mod: { hang: 1.1, top: 1.004, accel: 1.02, drift: 1.02 }, look: { a: '#f2c040', b: '#fff4c0' } },
+].map(g => Object.freeze(g)));
+export const gliderById = id => GLIDERS.find(g => g.id === id) || GLIDERS[0];
+// Kart stats with wheels and glider on (the whole construction kit).
+export function withParts(k, wheelId, gliderId) {
+  const w = withWheels(k, wheelId), m = gliderById(gliderId).mod;
+  return { ...w, top: w.top * (m.top || 1), accel: w.accel * (m.accel || 1), turn: w.turn * (m.turn || 1), mass: w.mass * (m.mass || 1), drift: w.drift * (m.drift || 1), hang: m.hang || 1 };
+}
