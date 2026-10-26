@@ -1072,6 +1072,12 @@ export class RaceCore {
     for (let j = this.shells.length - 1; j >= 0; j--) { const o = this.shells[j]; if (o !== s && o.type !== 'blue' && o.type !== 'giant' && Math.hypot(o.x - s.x, o.z - s.z) < GIANT_R + .3) { this.shells.splice(j, 1); this.emit('shellbreak', { x: o.x, z: o.z }); } }
     return false;
   }
+  // Online: another player's item hit us (their game saw it hit; ours sees their item a moment late).
+  netHitPlayer(kind, by) {
+    const hit = this._hit(this.player, kind, by ? { name: by } : null);
+    if (hit && kind === 'blue') this.emit('blueboom', { x: this.player.x, z: this.player.z, y: this.player.y, player: true });
+    return hit;
+  }
   _hit(c, kind, by) {
     if (kind === 'ink') {
       if (c.ghost > 0 || c.rocketT > 0) return false;

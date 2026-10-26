@@ -70,6 +70,9 @@ function cleanCar(state) {
       st: b.st === true, rk: b.rk === true, tr: ['banana', 'green', 'red'].includes(b.tr) ? b.tr : undefined, b: b.b === true, dt: finite(b.dt) ? clamp(Math.floor(b.dt), 0, 3) : 0, dr: finite(b.dr) ? clamp(Math.sign(b.dr), -1, 1) : 0 })) : [],
     hits: Array.isArray(state.hits) ? state.hits.slice(0, 8).filter(h => h && typeof h.id === 'string' && h.id.length < 30 && finite(h.bot) && ['green', 'red', 'banana', 'star', 'blue', 'ink', 'giant'].includes(h.k))
       .map(h => ({id: h.id, bot: clamp(Math.floor(h.bot), 0, 6), k: h.k})) : [],
+    // item hits on online players (sent by the shooter, applied by the victim)
+    phits: Array.isArray(state.phits) ? state.phits.slice(0, 8).filter(h => h && typeof h.id === 'string' && h.id.length < 30 && typeof h.to === 'string' && /^[a-zA-Z0-9_-]{1,64}$/.test(h.to) && ['green', 'red', 'banana', 'star', 'blue', 'giant'].includes(h.k))
+      .map(h => ({id: h.id, to: h.to, k: h.k})) : [],
     boosting: state.boosting === true, drifting: state.drifting === true,
     // battle: own balloons, knocked out, how often we were hit (the host turns hits into dropped coins / crown)
     bal: finite(state.bal) ? clamp(Math.floor(state.bal), 0, 5) : undefined, out: state.out === true, hn: finite(state.hn) ? clamp(Math.floor(state.hn), 0, 9999) : 0,
