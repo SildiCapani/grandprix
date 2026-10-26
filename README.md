@@ -282,3 +282,8 @@ server/server.js      Statische Auslieferung + WebSocket-Relay /ws
 | E (halten) | Banane/Panzer hinten ans Kart hängen: blockt Panzer von hinten. Loslassen wirft nach hinten |
 | R | zurücksetzen |
 | C | Kamera wechseln |
+
+## Weltrangliste & Profile
+- **Weltrangliste (Zeitfahren):** Jede neue Bestzeit (mit Ghost) landet auf dem Server. Pro Strecke und Klasse gibt es eine Rangliste (Top 50 gespeichert, Top 5 im Menü).
+  Mit **„Gegen Weltrekord“** fährt der Geist des Rekordhalters mit. Unrealistische Zeiten (über 35 % schneller als Gold) kommen nicht in die Liste.
+- **Profile:** Klick auf deinen Namen oben rechts oder auf einen Namen in der Rangliste. Zeigt Level, Statistiken, Cup-Pokale, Star-Fahrer und Ranglistenplätze; im eigenen Profil kann man andere Spieler suchen.

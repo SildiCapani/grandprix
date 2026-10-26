@@ -567,3 +567,36 @@ header.in-garage .top-actions{display:none}
 .ghost-info .diamond{color:#9ff0ff;font-weight:900;text-shadow:0 0 8px #5ad8ff88}
 .avatar-card.star{border-color:#ffd04a55;background:radial-gradient(circle at 50% 30%,color-mix(in srgb,var(--av) 38%,transparent),#ffd04a0d 70%)}
 .avatar-card.star b::after{content:' ★';color:#ffd04a}
+
+/* world ranking (time trial) */
+.board-box{margin:10px 0 12px;padding:10px 12px;border-radius:12px;background:#0c1b20cc;border:1px solid #ffd04a33;font-size:12px}
+.board-head{font-weight:900;letter-spacing:.06em;color:#ffd04a;margin-bottom:6px;display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.board-head small{color:#9fb4ad;font-weight:600;letter-spacing:0}
+.board-empty{color:#9fb4ad;font-size:12px;padding:4px 0}
+.board-row{display:flex;align-items:center;gap:8px;padding:3px 0;border-top:1px solid #ffffff10}
+.board-row b{width:26px;text-align:center}.board-row span{margin-left:auto;font-variant-numeric:tabular-nums;font-weight:800}
+.board-row .grow{margin-left:0;flex:1;font-weight:600}
+.board-row button{background:none;border:0;color:#e8f2ef;font:inherit;font-weight:700;padding:0;cursor:pointer;text-align:left}
+.board-row button:hover{color:#ffd04a;text-decoration:underline}
+.board-row.me{color:#ffb38f}.board-row.me button{color:#ffb38f}
+.board-vs{display:flex;gap:6px;margin-top:8px}
+.board-vs button{flex:1;padding:6px 4px;border-radius:8px;border:1px solid #ffffff22;background:#ffffff08;color:#cfe0da;font-size:10px;font-weight:900;letter-spacing:.04em;cursor:pointer}
+.board-vs button.on{background:#ffd04a;color:#1a1408;border-color:#ffd04a}
+/* player profile */
+.profile-overlay{position:fixed;inset:0;z-index:80;background:#050c0ecc;backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;padding:16px}
+.profile-card{position:relative;width:min(560px,100%);max-height:92vh;overflow:auto;background:linear-gradient(160deg,#13272c,#0b1719);border:1px solid #ffffff22;border-radius:18px;padding:20px;color:#e8f2ef;box-shadow:0 30px 80px #000a}
+.profile-card h3{font-size:11px;letter-spacing:.12em;color:#9fb4ad;margin:16px 0 6px}
+.p-x{position:absolute;top:10px;right:10px;width:32px;height:32px;border-radius:50%;border:1px solid #ffffff33;background:#ffffff10;color:#fff;cursor:pointer}
+.p-top{display:flex;gap:14px;align-items:center}
+.p-por .avatar-svg{width:84px;height:84px;filter:drop-shadow(0 0 14px color-mix(in srgb,var(--av) 60%,transparent))}
+.p-top small{color:#9fb4ad;font-size:10px;letter-spacing:.08em}.p-top h2{margin:2px 0;font-size:28px;font-style:italic}
+.p-lv{color:#ffd04a;font-size:12px}.p-bar{height:6px;border-radius:3px;background:#ffffff14;margin-top:6px;width:220px;max-width:100%}.p-bar i{display:block;height:100%;border-radius:3px;background:linear-gradient(90deg,#ff653d,#ffd04a)}
+.p-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:14px}
+.p-stats div{background:#ffffff08;border-radius:10px;padding:8px 10px}.p-stats small{display:block;font-size:9px;color:#9fb4ad;letter-spacing:.08em}.p-stats b{font-size:18px}
+.p-cups{display:grid;grid-template-columns:1.6fr repeat(4,1fr);gap:3px;font-size:11px;text-align:center}
+.p-cups .h{color:#9fb4ad;font-size:9px}.p-cups .n{text-align:left;font-weight:800}.p-cups .t{background:#ffffff08;border-radius:6px;padding:2px 0}.p-cups .t.none{opacity:.35}
+.p-stars{display:flex;flex-wrap:wrap;gap:4px}.p-stars span .avatar-svg{width:34px;height:34px;filter:grayscale(1) brightness(.45)}.p-stars span.ok .avatar-svg{filter:none}
+#pSearch{width:100%;box-sizing:border-box;padding:9px 12px;border-radius:10px;border:1px solid #ffffff22;background:#ffffff0c;color:#fff;font:inherit}
+.p-results{display:flex;flex-direction:column;gap:4px;margin-top:6px}.p-results button{text-align:left;padding:7px 10px;border-radius:8px;border:1px solid #ffffff14;background:#ffffff08;color:#e8f2ef;cursor:pointer;font-weight:700}.p-results small{color:#9fb4ad;font-weight:600;margin-left:6px}
+.p-logout{margin-top:16px;width:100%;padding:10px;border-radius:10px;border:1px solid #ff653d66;background:#ff653d18;color:#ffb38f;font-weight:900;letter-spacing:.08em;cursor:pointer}
+@media (max-width:520px){.p-stats{grid-template-columns:repeat(2,1fr)}}

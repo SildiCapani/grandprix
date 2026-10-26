@@ -8,7 +8,8 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
-import { createProfile, sanitizeProfile, saveProfile, STORAGE_KEY } from '../client/src/game/progression.js';
+import { createProfile, sanitizeProfile, saveProfile, getLevel, STORAGE_KEY } from '../client/src/game/progression.js';
+import { MAPS } from '../client/src/game/tracks.js';
 
 const scrypt = promisify(scryptCb);
 const HERE = fileURLToPath(new URL('.', import.meta.url));
@@ -148,6 +149,25 @@ async function saveGhost(k, field, ghost) {
   if (cloudOn) try { await cloud('/hset/' + encodeURIComponent(GHOST_CLOUD(k)) + '/' + encodeURIComponent(field), JSON.stringify(ghost)); } catch (e) { console.error('Ghost-Cloud-Speicher fehlgeschlagen:', e.message); }
   return true;
 }
+// World ranking (time trial): the best run of every player per track + speed class, top 50 kept.
+// Fed by ghost uploads, so every entry also has a ghost others can race against.
+const BOARD_MAX = 50;
+const peekBoard = field => db.boards?.[field] || [];
+function boardOf(field) { db.boards ??= {}; return db.boards[field] ??= []; }
+function boardEnter(field, name, time) {
+  const list = boardOf(field), k = keyOf(name), old = list.find(e => keyOf(e.n) === k);
+  if (old && old.t <= time) return false;
+  if (old) Object.assign(old, { t: time, at: Date.now() }); else list.push({ n: name, t: time, at: Date.now() });
+  list.sort((a, b) => a.t - b.t); list.length = Math.min(list.length, BOARD_MAX);
+  return true;
+}
+// Rough cheat filter: nobody drives 3 laps 35 % under the gold time, and the recording must match the time.
+function plausible(map, cc, ghost) {
+  const m = MAPS.find(x => x.id === map); if (!m?.parTimes?.gold) return false;
+  if (ghost.time < m.parTimes.gold * (80 / cc) * .65) return false;
+  const dur = ghost.d.length / 5 * ghost.step;
+  return Math.abs(dur - ghost.time) < 3;
+}
 const ghostField = (map, cc) => /^[a-z0-9_-]{1,40}$/i.test(String(map)) && Number.isInteger(+cc) && +cc > 0 && +cc < 1000 ? map + ':' + +cc : null;
 
 function body(req, limit = 256 * 1024) {
@@ -188,6 +208,36 @@ export async function handleApi(req, res) {
       const token = newSession(u); await persist();
       return send(res, 200, { token, user: publicUser(u), profile: u.profile }), true;
     }
+    // ---- public: world ranking, record ghosts, player profiles ----
+    if (route === 'GET /api/board') {
+      const field = ghostField(url.searchParams.get('map'), url.searchParams.get('cc'));
+      if (!field) return send(res, 400, { error: 'Strecke ungültig.' }), true;
+      const list = peekBoard(field), me = keyOf(url.searchParams.get('me') || '');
+      const mine = me ? list.findIndex(e => keyOf(e.n) === me) : -1;
+      return send(res, 200, { top: list.slice(0, 10).map(e => ({ name: e.n, time: e.t })), total: list.length, me: mine >= 0 ? { rank: mine + 1, time: list[mine].t } : null }), true;
+    }
+    if (route === 'GET /api/board/ghost') {
+      const field = ghostField(url.searchParams.get('map'), url.searchParams.get('cc'));
+      const name = url.searchParams.get('name') || (field ? peekBoard(field)[0]?.n : null);
+      if (!field || !name || !db.users[keyOf(name)]) return send(res, 404, { error: 'Kein Geist.' }), true;
+      const ghost = (await ghostsOf(keyOf(name)))[field] || null;
+      return send(res, 200, { name: db.users[keyOf(name)].name, ghost }), true;
+    }
+    if (route === 'GET /api/player') {
+      const u = db.users[keyOf(url.searchParams.get('name') || '')];
+      if (!u) return send(res, 404, { error: 'Spieler nicht gefunden.' }), true;
+      const p = u.profile || createProfile(), ranks = [];
+      for (const [field, list] of Object.entries(db.boards || {})) { const i = list.findIndex(e => keyOf(e.n) === keyOf(u.name)); if (i >= 0) ranks.push({ field, rank: i + 1, time: list[i].t, of: list.length }); }
+      ranks.sort((a, b) => a.rank - b.rank);
+      return send(res, 200, { player: { name: u.name, admin: !!u.admin, since: u.createdAt || null, look: u.look || null, level: getLevel(p.totalXP).level,
+        totalXP: p.totalXP, races: p.races, wins: p.wins, achievements: p.achievements, records: p.records, ranks: ranks.slice(0, 30) } }), true;
+    }
+    if (route === 'GET /api/players') {
+      const q = keyOf(url.searchParams.get('q') || '');
+      const list = Object.values(db.users).filter(u => !q || keyOf(u.name).includes(q)).map(u => ({ name: u.name, level: getLevel(u.profile?.totalXP || 0).level, wins: u.profile?.wins || 0 }))
+        .sort((a, b) => b.level - a.level || b.wins - a.wins).slice(0, 30);
+      return send(res, 200, { players: list }), true;
+    }
     // everything below needs a session (header or, for sendBeacon, in the body)
     let data = req.method === 'POST' || req.method === 'PUT' ? await body(req, url.pathname === '/api/ghost' ? 2 * 1024 * 1024 : undefined) : {};
     const user = userByToken(auth || data.token);
@@ -196,6 +246,7 @@ export async function handleApi(req, res) {
     if (route === 'POST /api/logout') { user.sessions = (user.sessions || []).filter(s => s.token !== (auth || data.token)); await persist(); return send(res, 200, { ok: true }), true; }
     if (route === 'PUT /api/profile' || route === 'POST /api/profile') {
       if (!mergeProfile(user, data.profile)) return send(res, 400, { error: 'Fortschritt ungültig.' }), true;
+      if (data.look && typeof data.look === 'object') { const w = (v, re) => typeof v === 'string' && re.test(v) ? v : undefined; user.look = { avatar: w(data.look.avatar, /^[a-z]{2,12}$/), kart: w(data.look.kart, /^[a-z0-9-]{2,16}$/), color: w(data.look.color, /^#[0-9a-f]{6}$/i) }; }
       await persist();
       return send(res, 200, { ok: true, profile: user.profile }), true;
     }
@@ -212,7 +263,10 @@ export async function handleApi(req, res) {
     if (route === 'PUT /api/ghost' || route === 'POST /api/ghost') {
       const field = ghostField(data.map, data.cc), ghost = cleanGhost(data.ghost);
       if (!field || !ghost) return send(res, 400, { error: 'Ghost ungültig.' }), true;
-      return send(res, 200, { ok: true, stored: await saveGhost(keyOf(user.name), field, ghost) }), true;
+      const stored = await saveGhost(keyOf(user.name), field, ghost);
+      let rank = 0;
+      if (plausible(data.map, +data.cc, ghost)) { if (boardEnter(field, user.name, ghost.time)) await persist(); rank = boardOf(field).findIndex(e => keyOf(e.n) === keyOf(user.name)) + 1; }
+      return send(res, 200, { ok: true, stored, rank }), true;
     }
     if (route === 'POST /api/password') {
       if (typeof data.password !== 'string' || data.password.length < 6) return send(res, 400, { error: 'Passwort: mindestens 6 Zeichen.' }), true;

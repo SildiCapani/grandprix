@@ -53,7 +53,7 @@ export async function flushProfile() {
   if (!account.token || !account.profile) return;
   if (pushing) { pending = true; return; }
   pushing = true;
-  try { const r = await api('/profile', { method: 'PUT', body: { profile: account.profile } }); if (r.profile) account.profile = r.profile; account.online = true; }
+  try { const r = await api('/profile', { method: 'PUT', body: { profile: account.profile, look: account.look || undefined } }); if (r.profile) account.profile = r.profile; account.online = true; }
   catch (e) { account.online = false; setTimeout(schedulePush, 5000); }
   finally { pushing = false; if (pending) { pending = false; schedulePush(); } }
 }
@@ -62,7 +62,7 @@ export async function flushProfile() {
 const GHOST_PREFIX = user => `apex-ghost:${String(user).toLowerCase()}:`;
 export async function uploadGhost(map, cc, ghost) {
   if (!account.token || !ghost) return false;
-  try { const r = await api('/ghost', { method: 'PUT', body: { map, cc, ghost } }); return !!r.stored; } catch { return false; }
+  try { const r = await api('/ghost', { method: 'PUT', body: { map, cc, ghost } }); return r.rank || !!r.stored; } catch { return false; }
 }
 // After login: download ghosts that are better than (or missing in) this browser, upload the ones that are better here.
 export async function syncGhosts() {
@@ -83,6 +83,15 @@ export async function syncGhosts() {
   }
   return changed;
 }
+
+// World ranking, record ghosts and public player profiles (no login needed).
+const q = o => Object.entries(o).filter(([, v]) => v != null && v !== '').map(([k, v]) => k + '=' + encodeURIComponent(v)).join('&');
+export const fetchBoard = (map, cc) => api('/board?' + q({ map, cc, me: account.user?.name }));
+export const fetchRecordGhost = (map, cc, name) => api('/board/ghost?' + q({ map, cc, name }));
+export const fetchPlayer = name => api('/player?' + q({ name }));
+export const searchPlayers = text => api('/players?' + q({ q: text }));
+// What the driver looks like on the profile page (sent along with the career).
+export function setLook(look) { const s = JSON.stringify(look); if (s === JSON.stringify(account.look)) return; account.look = look; if (account.token && account.profile) schedulePush(); }
 
 // Last chance when the tab closes.
 addEventListener('pagehide', () => {
