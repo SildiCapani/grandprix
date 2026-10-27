@@ -26,11 +26,11 @@ export const MISSIONS = [
 
   // ---------- 2 · Sonnenküste ----------
   { id: 'c2a', ch: 'beach', kind: 'collect', name: 'Sternenstrand', icon: '⭐', line: 'Sammle alle Sterne, auch die in der Luft.',
-    area: { x: 460, z: 470, r: 110 }, count: 16, air: 5, time: 58, start: ['beach', [290, 560], 1] },
+    area: { x: 460, z: 470, r: 110 }, count: 16, air: 5, time: 58, start: ['beach', [540, 490], 1] },
   { id: 'c2b', ch: 'beach', kind: 'rings', name: 'Küstenpromenade', icon: '🏁', line: 'Am Strand entlang und die Küste hoch.',
     route: [['beach', [290, 560], [600, 420]], ['ring', [590, 385], [672, -60]]], spacing: 60, tight: 1.05 },
   { id: 'c2c', ch: 'beach', kind: 'escape', name: 'Drohnenalarm', icon: '🛸', line: 'Drei Phantom-Drohnen jagen dich. Halte 45 Sekunden durch.',
-    area: { x: 470, z: 450, r: 170 }, time: 45, drones: 3, start: ['ring', [430, 525], 1] },
+    area: { x: 470, z: 450, r: 170 }, time: 45, drones: 3, start: ['ring', [590, 385], 1] },
   { id: 'c2x', ch: 'beach', kind: 'boss', boss: 'kraken', name: 'KRAKE', title: 'Schrecken der Bucht', icon: '🐙', line: 'Sammle Torpedos aus den Kisten und triff den Kopf, wenn er auftaucht.',
     arena: { x: 444, z: 528, r: 50 } },
 
@@ -38,7 +38,7 @@ export const MISSIONS = [
   { id: 'c3a', ch: 'jungle', kind: 'rings', name: 'Dschungelpfad', icon: '🏁', line: 'Die Schleife durch den Urwald, gegen die Uhr.',
     route: [['west', [-200, 50], [-420, 140]], ['jungle', [-420, 140], [-480, 215], 'fw']], spacing: 50, tight: 1.06 },
   { id: 'c3b', ch: 'jungle', kind: 'smash', name: 'Phantom-Totems', icon: '🗿', line: 'Zehn Totems stecken im Wald. Find und ramm sie alle.',
-    area: { x: -520, z: 130, r: 150 }, count: 10, time: 95, offroad: true, start: ['west', [-420, 140], 1] },
+    area: { x: -520, z: 130, r: 150 }, count: 10, time: 95, offroad: true, start: ['jungle', [-560, -40], 1] },
   { id: 'c3c', ch: 'jungle', kind: 'chase', name: 'Der Schmuggler', icon: '🎯', line: 'Der Schmuggler-Buggy ist schnell im Gelände. Dreimal rammen.',
     loop: [['jungle', 0, .995, 'fw']],
     hits: 3, time: 80, target: { kart: 'buggy', avatar: 'diego', color: '#3ad070', speed: .95 } },
@@ -49,7 +49,7 @@ export const MISSIONS = [
   { id: 'c4a', ch: 'canyon', kind: 'rings', name: 'Canyon-Lauf', icon: '🏁', line: 'Durch die Schlucht, während Felsen herabstürzen.',
     route: [['east', [220, -25], [672, -60]], ['ring', [672, -60], [665, 160]]], spacing: 55, tight: 1.05, hazard: 'rocks' },
   { id: 'c4b', ch: 'canyon', kind: 'collect', name: 'Wüstenschätze', icon: '⭐', line: 'Sterne zwischen den Tafelbergen.',
-    area: { x: 560, z: -60, r: 140 }, count: 16, air: 3, time: 70, start: ['east', [400, -95], 1] },
+    area: { x: 560, z: -60, r: 140 }, count: 16, air: 3, time: 70, start: ['east', [540, -30], 1] },
   { id: 'c4c', ch: 'canyon', kind: 'chase', name: 'Wüstenfuchs', icon: '🎯', line: 'Der Wüstenfuchs fährt Bestzeit. Dreimal rammen.',
     loop: [['east', [400, -95], [672, -60]], ['ring', [672, -60], [610, -230]], ['ring', [610, -230], [480, -190]]],
     hits: 3, time: 80, open: true, target: { kart: 'drifter', avatar: 'lena', color: '#ff8a2a', speed: .97 } },
