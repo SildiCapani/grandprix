@@ -2,6 +2,9 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { sculpt } from '../game/sculpt.js';
 import { person } from '../game/critters.js';
+import { createScenery } from './scenery.js';
+import { footprintDistance, overlapsHeight } from './collision.js';
+import { createLandmarks } from './landmarks.js';
 
 // Apex-Insel: the open world of the story mode. One big island (about 1.6 × 1.6 km) with seven zones,
 // a road network, a harbour city, a volcano with a crater, a glacier with a frozen lake, a jungle, a canyon and a beach.
@@ -233,6 +236,9 @@ export function createIsland() {
       if (Math.hypot(x - LAKE.x, z - LAKE.z) < LAKE.r) c.setRGB(.72, .88, .96);
       if (ROADD[k] < 4 && ROADD[k] > -2) c.multiplyScalar(.82); // shoulder
       c.multiplyScalar(.9 + n2 * .14);
+      // Zone palettes are authored as display colours, just like hex materials.
+      // Store linear colours so sunlight does not wash the grass/rock to pastels.
+      c.convertSRGBToLinear();
       col[k * 3] = c.r; col[k * 3 + 1] = c.g; col[k * 3 + 2] = c.b;
     }
     geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
@@ -245,8 +251,30 @@ export function createIsland() {
     for (let y = 0; y < 256; y++) for (let x = 0; x < 256; x++) { const fx = x / 256 * TAU, fy = y / 256 * TAU, dx = Math.cos(fx * 3 + fy * 2) * .5 + Math.cos(fx * 7 - fy * 5) * .25 + Math.cos(fx * 13 + fy * 11) * .12, dy = Math.cos(fy * 4 - fx) * .5 + Math.cos(fy * 9 + fx * 6) * .25 + Math.cos(fy * 15 - fx * 12) * .12, i = (y * 256 + x) * 4; img.data[i] = 128 + dx * 60; img.data[i + 1] = 128 + dy * 60; img.data[i + 2] = 255; img.data[i + 3] = 255; }
     g.putImageData(img, 0, 0); const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(90, 90); return t; })();
   const sea = new THREE.Mesh(new THREE.PlaneGeometry(6000, 6000), new THREE.MeshStandardMaterial({ color: 0x1aa0c8, roughness: .1, metalness: .1, normalMap: waveTex, normalScale: new THREE.Vector2(.5, .5), transparent: true, opacity: .86 }));
+  // Depth-coloured lagoons and moving foam follow the actual baked shoreline.
+  const depths = new Uint8Array(N * N * 4);
+  for (let k = 0; k < H.length; k++) { const d = clamp((SEA - H[k]) / 32, 0, 1) * 255; depths[k * 4] = depths[k * 4 + 1] = depths[k * 4 + 2] = d; depths[k * 4 + 3] = 255; }
+  const depthTex = new THREE.DataTexture(depths, N, N); depthTex.minFilter = depthTex.magFilter = THREE.LinearFilter; depthTex.needsUpdate = true;
+  const waterTime = { value: 0 };
+  sea.material.color.set(0xffffff); sea.material.roughness = .22; sea.material.opacity = .94;
+  sea.material.onBeforeCompile = shader => {
+    shader.uniforms.shoreDepth = { value: depthTex }; shader.uniforms.waterTime = waterTime;
+    shader.vertexShader = shader.vertexShader.replace('#include <common>', '#include <common>\nvarying vec2 vSeaXZ;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvSeaXZ = (modelMatrix * vec4(position, 1.)).xz;');
+    shader.fragmentShader = shader.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec2 vSeaXZ; uniform sampler2D shoreDepth; uniform float waterTime;')
+      .replace('#include <color_fragment>', `#include <color_fragment>
+        vec2 shoreUV = (vSeaXZ + 900.) / 1800.;
+        float depth = texture2D(shoreDepth, clamp(shoreUV, 0., 1.)).r * 32.;
+        float inIsland = step(0., shoreUV.x) * step(shoreUV.x, 1.) * step(0., shoreUV.y) * step(shoreUV.y, 1.);
+        depth = mix(32., depth, inIsland);
+        vec3 water = mix(vec3(.16,.70,.66), vec3(.015,.25,.42), smoothstep(0.,24.,depth));
+        float ripple = sin(vSeaXZ.x * .17 + sin(vSeaXZ.y * .13) + waterTime * 1.2);
+        float foam = pow(.5 + .5 * sin(depth * 3.8 - waterTime * 1.4 + ripple * .55), 8.);
+        foam *= (1. - smoothstep(.2, 2.8, depth)) * smoothstep(.02, .22, depth);
+        diffuseColor.rgb *= mix(water, vec3(.87,.98,.91), foam * .8);`);
+  };
   sea.rotation.x = -Math.PI / 2; sea.position.y = SEA; sea.receiveShadow = true; group.add(sea);
-  updaters.push((dt, t) => waveTex.offset.set(t * .004, t * .007));
+  updaters.push((dt, t) => { waveTex.offset.set(t * .004, t * .007); waterTime.value = t; });
 
   // ----- road meshes -----
   const asphalt = (() => { const c = document.createElement('canvas'); c.width = 64; c.height = 256; const g = c.getContext('2d');
@@ -336,9 +364,35 @@ export function createIsland() {
   const batches = new Map();
   const m4 = new THREE.Matrix4(), q4 = new THREE.Quaternion(), e4 = new THREE.Euler(), v4 = new THREE.Vector3(), s4 = new THREE.Vector3();
   const M = (x, y, z, sx = 1, sy = sx, sz = sx, ry = 0, rx = 0, rz = 0) => { e4.set(rx, ry, rz); q4.setFromEuler(e4); return m4.compose(v4.set(x, y, z), q4, s4.set(sx, sy, sz)).clone(); };
-  function inst(geo, mat, m, cast = true) { const k = geo.uuid + mat.uuid; if (!batches.has(k)) batches.set(k, { geo, mat, list: [], cast }); batches.get(k).list.push(m); }
+  const propBounds = new THREE.Box3();
+  function inst(geo, mat, m, cast = true) {
+    if (!geo.boundingBox) geo.computeBoundingBox();
+    propBounds.copy(geo.boundingBox).applyMatrix4(m);
+    const b = propBounds;
+    if (!roadFootprintClear({ x: (b.min.x + b.max.x) / 2, z: (b.min.z + b.max.z) / 2,
+      hx: (b.max.x - b.min.x) / 2, hz: (b.max.z - b.min.z) / 2, ang: 0, minY: b.min.y, maxY: b.max.y }, .45)) return false;
+    const k = geo.uuid + mat.uuid; if (!batches.has(k)) batches.set(k, { geo, mat, list: [], cast }); batches.get(k).list.push(m);
+    return true;
+  }
   const colliders = [], colGrid = new Map(), CC = 24;
-  function addCol(c) { colliders.push(c); const R = c.r ?? Math.hypot(c.hx, c.hz); for (let i = Math.floor((c.x - R) / CC); i <= Math.floor((c.x + R) / CC); i++) for (let j = Math.floor((c.z - R) / CC); j <= Math.floor((c.z + R) / CC); j++) { const k = key(i, j); if (!colGrid.has(k)) colGrid.set(k, []); colGrid.get(k).push(c); } }
+  // Inspect every nearby road, including intersecting roads and both edges.
+  // A centre-point-only check misses long fences, rotated houses and boulders.
+  function roadFootprintClear(c, margin = 1.5) {
+    const R = (c.r ?? Math.hypot(c.hx, c.hz)) + 10 + margin;
+    const ci = Math.floor(c.x / CELL), cj = Math.floor(c.z / CELL), reach = Math.ceil(R / CELL);
+    for (let i = -reach; i <= reach; i++) for (let j = -reach; j <= reach; j++) for (const { p, rd } of roadGrid.get(key(ci + i, cj + j)) || []) {
+      if (c.minY > p.y + 3.3 || c.maxY < p.y - .6) continue;
+      if (footprintDistance(c, p.x, p.z) < rd.hw + margin + .3) return false;
+    }
+    return true;
+  }
+  function addCol(c) {
+    c.minY ??= terrainAt(c.x, c.z) - .5; c.maxY ??= c.minY + 10;
+    if (!roadFootprintClear(c)) return false;
+    colliders.push(c); const R = c.r ?? Math.hypot(c.hx, c.hz);
+    for (let i = Math.floor((c.x - R) / CC); i <= Math.floor((c.x + R) / CC); i++) for (let j = Math.floor((c.z - R) / CC); j <= Math.floor((c.z + R) / CC); j++) { const k = key(i, j); if (!colGrid.has(k)) colGrid.set(k, []); colGrid.get(k).push(c); }
+    return true;
+  }
   const freeSpot = (x, z, clear) => { if (inField(x, z, clear)) return false; for (const C of CLEARINGS) if (Math.hypot(x - C.x, z - C.z) < C.r + clear * .5) return false; const nr = nearestRoad(x, z, clear + 8); if (nr && nr.d < clear) return false; if (rampHeight(x, z) > -1e8) return false; for (const R of ramps) if (Math.hypot(R.x - x, R.z - z) < R.len + clear) return false; return true; };
   const std = (color, o = {}) => new THREE.MeshStandardMaterial({ color, roughness: .85, ...o });
   const puffGeo = (() => { const g = sculpt([{ e: [0, -.1, 0], r: [.78, .7, .78], c: 0xffffff }, { e: [.5, .05, .15], r: [.5, .48, .5], c: 0xffffff }, { e: [-.45, .1, -.2], r: [.52, .5, .52], c: 0xffffff }, { e: [.05, .2, .5], r: [.48, .46, .48], c: 0xffffff }, { e: [-.1, .2, -.5], r: [.46, .44, .46], c: 0xffffff }, { e: [0, .5, 0], r: [.52, .45, .52], c: 0xffffff }], { k: .3, res: 18 }).clone(); g.deleteAttribute('color'); g.computeBoundingBox(); const b = g.boundingBox, s = 2 / Math.max(b.max.x - b.min.x, b.max.z - b.min.z); g.translate(0, -(b.min.y + b.max.y) / 2, 0); g.scale(s, s, s); g.computeVertexNormals(); return g; })();
@@ -348,17 +402,63 @@ export function createIsland() {
     rock: std(0x8a8078, { flatShading: true }), darkRock: std(0x2e2626, { flatShading: true }), redRock: std(0xb06a44, { flatShading: true }), ice: std(0xbfeaff, { roughness: .15, metalness: .1, transparent: true, opacity: .85, flatShading: true }),
     white: std(0xf4f2ec), red: std(0xe03a30), steel: std(0x6a7280, { metalness: .5, roughness: .5 }), wood: std(0x8a6440), yellow: std(0xffc83a),
   };
+  // Curved, feathered palm fronds replace the old rectangular leaf bars.
+  const palmFrond = (() => {
+    const pos = [], colors = [];
+    const triangle = (a, b, c, shade) => { pos.push(...a, ...b, ...c); for (let i = 0; i < 3; i++) colors.push(shade * .84, shade, shade * .68); };
+    const center = f => [f * 4.9, Math.sin(f * Math.PI) * .65 - f * f * 1.65, 0];
+    for (let k = 0; k < 16; k++) {
+      const f = (k + 1) / 17, a = center(f), b = center(f + .05), width = Math.sin(f * Math.PI) * .85 + .08;
+      for (const s of [-1, 1]) {
+        const tip = [a[0] - .55, a[1] - .22, s * width];
+        triangle(a, b, tip, .78 + f * .22);
+        triangle(b, [tip[0] + .22, tip[1] - .03, tip[2] * .82], tip, .75 + f * .2);
+      }
+      triangle([a[0], a[1] + .025, -.045], [b[0], b[1] + .025, 0], [a[0], a[1] + .025, .045], 1.1);
+    }
+    const geometry = new THREE.BufferGeometry(); geometry.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3)); geometry.computeVertexNormals(); return geometry;
+  })();
+  const palmLeaf = std(0x71a64b, { vertexColors: true, side: THREE.DoubleSide });
+  const bark = (() => {
+    const canvas = document.createElement('canvas'); canvas.width = 128; canvas.height = 256;
+    const ctx = canvas.getContext('2d'), random = rng(9281);
+    ctx.fillStyle = '#bba48c'; ctx.fillRect(0, 0, 128, 256);
+    for (let k = 0; k < 100; k++) {
+      const x = random() * 128, y = random() * 256;
+      ctx.strokeStyle = k % 3 ? '#897461' : '#e0c6a2'; ctx.globalAlpha = .2 + random() * .4; ctx.lineWidth = .8 + random() * 2;
+      ctx.beginPath(); ctx.moveTo(x, y); ctx.bezierCurveTo(x - 5, y + 12, x + 6, y + 28, x + 2, y + 45); ctx.stroke();
+    }
+    const texture = new THREE.CanvasTexture(canvas); texture.wrapS = texture.wrapT = THREE.RepeatWrapping; texture.colorSpace = THREE.SRGBColorSpace; texture.anisotropy = 4; return texture;
+  })();
+  MAT.trunk.map = bark;
+  const crownDetail = new THREE.IcosahedronGeometry(1, 1);
   const tree = {
     palm(x, y, z, hgt = 9) { const lean = (r() - .5) * .4, dir = r() * TAU;
       for (let k = 0; k < 5; k++) { const f = k / 5, yy = hgt * (f + .1); inst(CYLLOW, MAT.palmTrunk, M(x + Math.cos(dir) * lean * yy, y + yy, z + Math.sin(dir) * lean * yy, .32 - f * .1, hgt / 5 + .05, .32 - f * .1, 0, Math.sin(dir) * lean, -Math.cos(dir) * lean)); }
       const tx = x + Math.cos(dir) * lean * hgt, tz = z + Math.sin(dir) * lean * hgt;
-      for (let k = 0; k < 8; k++) { const a = k / 8 * TAU + r() * .3; inst(BOX, k % 2 ? MAT.leaf : MAT.leaf2, M(tx + Math.cos(a) * 1.9, y + hgt + .1, tz + Math.sin(a) * 1.9, 4, .06, .85, -a, 0, -.45)); }
-      addCol({ x, z, r: .6 }); marks.trees.push([x, z, 1.9, 0]); },
-    broad(x, y, z, s = 1) { inst(CYLLOW, MAT.trunk, M(x, y + 2.5 * s, z, .45 * s, 5 * s, .45 * s)); inst(puffGeo, r() < .5 ? MAT.jungle : MAT.jungle2, M(x, y + 6.5 * s, z, 3.4 * s, 2.6 * s, 3.4 * s, r() * TAU)); addCol({ x, z, r: .7 * s }); marks.trees.push([x, z, 3.4 * s, 1]); },
-    pine(x, y, z, s = 1, snowy = false) { inst(CYLLOW, MAT.trunk, M(x, y + 1.2 * s, z, .35 * s, 2.4 * s, .35 * s)); for (let k = 0; k < 3; k++) { inst(CONE, MAT.pine, M(x, y + (3 + k * 2.2) * s, z, (2.8 - k * .7) * s, 3.2 * s, (2.8 - k * .7) * s)); if (snowy) inst(CONE, MAT.snow, M(x, y + (3.7 + k * 2.2) * s, z, (1.6 - k * .4) * s, 1.6 * s, (1.6 - k * .4) * s)); } addCol({ x, z, r: .6 * s }); marks.trees.push([x, z, 2.6 * s, snowy ? 3 : 2]); },
-    cactus(x, y, z, s = 1) { inst(CYL, MAT.cactus, M(x, y + 2.5 * s, z, .55 * s, 5 * s, .55 * s)); for (const sd of [-1, 1]) if (r() < .8) { const hh = (1.5 + r() * 1.5) * s; inst(CYL, MAT.cactus, M(x + sd * 1.1 * s, y + hh + 1, z, .4 * s, 1.8 * s, .4 * s)); inst(CYL, MAT.cactus, M(x + sd * .6 * s, y + hh, z, .35 * s, .35 * s, 1.1 * s, 0, 0, Math.PI / 2)); } addCol({ x, z, r: .7 * s }); marks.trees.push([x, z, 1.2 * s, 4]); },
-    dead(x, y, z, s = 1) { inst(CYLLOW, MAT.dead, M(x, y + 2.5 * s, z, .35 * s, 5 * s, .35 * s, 0, (r() - .5) * .3, (r() - .5) * .3)); for (let k = 0; k < 3; k++) inst(CYLLOW, MAT.dead, M(x + (r() - .5) * 1.5, y + (3 + r() * 2) * s, z + (r() - .5) * 1.5, .15 * s, 2.2 * s, .15 * s, r() * TAU, 0, .9)); addCol({ x, z, r: .5 * s }); marks.trees.push([x, z, 1.2 * s, 5]); },
-    rock(x, y, z, s, mat = MAT.rock) { inst(ROCK, mat, M(x, y + s * .25, z, s, s * (.6 + r() * .5), s * (.8 + r() * .4), r() * TAU, r(), r())); addCol({ x, z, r: s * .85 }); marks.trees.push([x, z, s * .9, mat === MAT.darkRock ? 7 : mat === MAT.redRock ? 8 : 6]); },
+      for (let k = 0; k < 8; k++) { const variation = r(), a = k / 8 * TAU + variation * .3, s = .85 + variation * .25; inst(palmFrond, palmLeaf, M(tx, y + hgt + .1, tz, s, s, s, -a, 0, k % 3 === 0 ? .24 : 0)); }
+      for (let k = 0; k < 3; k++) inst(ROCK, MAT.wood, M(tx + Math.cos(k * 2.1) * .35, y + hgt - .3, tz + Math.sin(k * 2.1) * .35, .24, .32, .24));
+      addCol({ x, z, r: .6, minY: y, maxY: y + hgt }); marks.trees.push([x, z, 1.9, 0]); },
+    broad(x, y, z, s = 1) {
+      inst(CYLLOW, MAT.trunk, M(x, y + 2.5 * s, z, .45 * s, 5 * s, .45 * s));
+      const material = r() < .5 ? MAT.jungle : MAT.jungle2, angle = r() * TAU;
+      inst(puffGeo, material, M(x, y + 6.5 * s, z, 3.4 * s, 2.6 * s, 3.4 * s, angle));
+      for (const side of [-1, 1]) {
+        const dx = Math.cos(angle) * side, dz = Math.sin(angle) * side;
+        inst(CYLLOW, MAT.trunk, M(x + dx * .6 * s, y + 4 * s, z + dz * .6 * s, .16 * s, 2.3 * s, .16 * s, -angle, 0, side * .6));
+        inst(crownDetail, side < 0 ? MAT.jungle : MAT.leaf, M(x + dx * 2 * s, y + 7 * s, z + dz * 2 * s, 1.7 * s, 1.6 * s, 1.7 * s, angle));
+      }
+      addCol({ x, z, r: .7 * s, minY: y, maxY: y + 6 * s }); marks.trees.push([x, z, 3.4 * s, 1]);
+    },
+    pine(x, y, z, s = 1, snowy = false) { inst(CYLLOW, MAT.trunk, M(x, y + 1.2 * s, z, .35 * s, 2.4 * s, .35 * s)); for (let k = 0; k < 3; k++) { inst(CONE, MAT.pine, M(x, y + (3 + k * 2.2) * s, z, (2.8 - k * .7) * s, 3.2 * s, (2.8 - k * .7) * s)); if (snowy) inst(CONE, MAT.snow, M(x, y + (3.7 + k * 2.2) * s, z, (1.6 - k * .4) * s, 1.6 * s, (1.6 - k * .4) * s)); } addCol({ x, z, r: .6 * s, minY: y, maxY: y + 9 * s }); marks.trees.push([x, z, 2.6 * s, snowy ? 3 : 2]); },
+    cactus(x, y, z, s = 1) { inst(CYL, MAT.cactus, M(x, y + 2.5 * s, z, .55 * s, 5 * s, .55 * s)); for (const sd of [-1, 1]) if (r() < .8) { const hh = (1.5 + r() * 1.5) * s; inst(CYL, MAT.cactus, M(x + sd * 1.1 * s, y + hh + 1, z, .4 * s, 1.8 * s, .4 * s)); inst(CYL, MAT.cactus, M(x + sd * .6 * s, y + hh, z, .35 * s, .35 * s, 1.1 * s, 0, 0, Math.PI / 2)); } addCol({ x, z, r: .7 * s, minY: y, maxY: y + 6 * s }); marks.trees.push([x, z, 1.2 * s, 4]); },
+    dead(x, y, z, s = 1) { inst(CYLLOW, MAT.dead, M(x, y + 2.5 * s, z, .35 * s, 5 * s, .35 * s, 0, (r() - .5) * .3, (r() - .5) * .3)); for (let k = 0; k < 3; k++) inst(CYLLOW, MAT.dead, M(x + (r() - .5) * 1.5, y + (3 + r() * 2) * s, z + (r() - .5) * 1.5, .15 * s, 2.2 * s, .15 * s, r() * TAU, 0, .9)); addCol({ x, z, r: .5 * s, minY: y, maxY: y + 6 * s }); marks.trees.push([x, z, 1.2 * s, 5]); },
+    rock(x, y, z, s, mat = MAT.rock) {
+      const transform = M(x, y + s * .25, z, s, s * (.6 + r() * .5), s * (.8 + r() * .4), r() * TAU, r(), r());
+      if (!inst(ROCK, mat, transform)) return;
+      const bounds = new THREE.Box3().copy(ROCK.boundingBox).applyMatrix4(transform);
+      addCol({ x, z, r: s * .85, minY: bounds.min.y, maxY: bounds.max.y }); marks.trees.push([x, z, s * .9, mat === MAT.darkRock ? 7 : mat === MAT.redRock ? 8 : 6]);
+    },
   };
   const scatter = (n, zoneId, minClear, fn, tries = 10) => {
     const Z = ZONES[ZI[zoneId]]; let placed = 0;
@@ -401,11 +501,12 @@ export function createIsland() {
       const y = terrainAt(x, z); if (y < SEA + 2.5 || !freeSpot(x, z, 13)) continue;
       const w = 12 + r() * 9, d = 12 + r() * 9, dc = Math.hypot(x, z - 480), hgt = Math.max(8, (70 - dc * .25) * (.5 + r() * .7) + (z > 620 ? -30 : 0));
       if (Math.abs(x - 210) < 40 && Math.abs(z - 690) < 40) continue;
+      if (!roadFootprintClear({ x, z, hx: w / 2 + 1, hz: d / 2 + 1, ang: 0 })) continue;
       const g = new THREE.BoxGeometry(w, hgt, d); const uvA = g.attributes.uv, nA = g.attributes.normal;
       for (let k = 0; k < uvA.count; k++) { const ny = Math.abs(nA.getY(k)), nx = Math.abs(nA.getX(k)); if (ny > .5) uvA.setXY(k, 0, 0); else uvA.setXY(k, uvA.getX(k) * (nx > .5 ? d : w) / 8, uvA.getY(k) * hgt / 8); }
       const colA = new Float32Array(uvA.count * 3), cc = new THREE.Color(palette[Math.floor(r() * palette.length)]); for (let k = 0; k < uvA.count; k++) { const roof = Math.abs(nA.getY(k)) > .5; colA[k * 3] = roof ? .5 : cc.r; colA[k * 3 + 1] = roof ? .5 : cc.g; colA[k * 3 + 2] = roof ? .52 : cc.b; }
       g.setAttribute('color', new THREE.BufferAttribute(colA, 3)); g.translate(x, y + hgt / 2 - .5, z); geos.push(g); marks.houses.push([x, z, w, d, 0, '#' + cc.getHexString(), hgt]); marks.roofs.push([x, y + hgt - .5, z, w, d]);
-      addCol({ x, z, hx: w / 2 + .3, hz: d / 2 + .3, ang: 0 });
+      addCol({ x, z, hx: w / 2 + .3, hz: d / 2 + .3, ang: 0, minY: y - .5, maxY: y + hgt });
       if (r() < .3 && hgt > 30) inst(CYLLOW, MAT.steel, M(x, y + hgt + 3, z, .2, 6, .2));
     }
     const city = new THREE.Mesh(mergeGeometries(geos), new THREE.MeshStandardMaterial({ map: winTex, vertexColors: true, roughness: .55, metalness: .1 }));
@@ -454,7 +555,7 @@ export function createIsland() {
     scatter(150, 'canyon', 4, (x, y, z) => tree.cactus(x, y, z, .7 + r() * .6));
     scatter(90, 'canyon', 5, (x, y, z) => tree.rock(x, y, z, 1.5 + r() * 3.5, MAT.redRock));
     const p = roads.find(q => q.id === 'east').pts, a = p[Math.floor(p.length * .72)];
-    const arch = new THREE.Mesh(new THREE.TorusGeometry(13, 3.4, 8, 24, Math.PI), std(0xb0603a, { flatShading: true })); arch.position.set(a.x, a.y - 1, a.z); arch.rotation.y = a.angle + Math.PI / 2; arch.scale.set(1, 1.2, 1); arch.castShadow = true; group.add(arch);
+    const arch = new THREE.Mesh(new THREE.TorusGeometry(13, 3.4, 8, 24, Math.PI), std(0xb0603a, { flatShading: true })); arch.name = 'Canyon-Felsbogen'; arch.position.set(a.x, a.y - 1, a.z); arch.rotation.y = a.angle; arch.scale.set(1, 1.2, 1); arch.castShadow = true; group.add(arch);
     for (const sd of [-1, 1]) addCol({ x: a.x + a.nx * sd * 13, z: a.z + a.nz * sd * 13, r: 3.4 });
     marks.pois.push({ x: a.x, z: a.z, icon: '🌉', name: 'Felsbogen' });
   }
@@ -512,12 +613,10 @@ export function createIsland() {
     }));
   }
 
-  // ----- clouds -----
-  {
-    const cloudTex = glowTex('rgba(255,255,255,.95)', 'rgba(255,255,255,0)');
-    for (let k = 0; k < 60; k++) { const g = new THREE.Group(); for (let q = 0; q < 6; q++) { const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: cloudTex, transparent: true, depthWrite: false, opacity: .8, fog: false })); s.scale.set(60 + r() * 60, 26 + r() * 20, 1); s.position.set((r() - .5) * 90, (r() - .5) * 10, (r() - .5) * 40); g.add(s); }
-      const a = r() * TAU, d = 200 + r() * 1100; g.position.set(Math.cos(a) * d, 230 + r() * 120, Math.sin(a) * d); group.add(g); updaters.push((dt) => { g.position.x += dt * 3; if (g.position.x > 1400) g.position.x = -1400; }); }
-  }
+  // Clouds are rendered in the sky shader, without hundreds of blended sprites.
+  // Advance the legacy cloud random samples so all later houses/props retain
+  // their positions (60 clouds, six sprites with five samples, three for origin).
+  for (let k = 0; k < 60 * (6 * 5 + 3); k++) r();
 
   // ----- birds over the sea -----
   {
@@ -535,7 +634,7 @@ export function createIsland() {
         const L = (fu1 - fu0) * FW + (fv1 - fv0) * FD, n = Math.round(L / 3.2), gap = Math.floor(r() * n);
         for (let k = 0; k <= n; k++) { if (Math.abs(k - gap) < 3) continue; const f = k / n, [x, z] = fieldXZ(i, j, fu0 + (fu1 - fu0) * f, fv0 + (fv1 - fv0) * f), key = Math.round(x / 2) + ',' + Math.round(z / 2);
           if (seen.has(key) || !fieldOk(x, z) || roadDAt(x, z) < 6) continue; seen.add(key); const y = terrainAt(x, z), s = 1.3 + r() * .6;
-          inst(ROCK, r() < .5 ? hedge : hedge2, M(x, y + s * .55, z, s * 1.1, s * .9, s * 1.1, r() * TAU)); addCol({ x, z, r: s * .8 }); marks.trees.push([x, z, s, 1]); } }
+          inst(ROCK, r() < .5 ? hedge : hedge2, M(x, y + s * .55, z, s * 1.1, s * .9, s * 1.1, r() * TAU)); addCol({ x, z, r: s * .8, minY: y - s * .35, maxY: y + s * 1.45 }); marks.trees.push([x, z, s, 1]); } }
       if (r() < .3) { const [x, z] = fieldXZ(i, j, .3 + r() * .4, .3 + r() * .4), y = terrainAt(x, z);
         inst(CYLLOW, MAT.wood, M(x, y + 1.2, z, .1, 2.4, .1)); inst(BOX, MAT.wood, M(x, y + 1.8, z, 1.8, .1, .1, r())); inst(BOX, MAT.red, M(x, y + 1.6, z, .7, .9, .45)); inst(CONE, MAT.yellow, M(x, y + 2.45, z, .6, .5, .6)); addCol({ x, z, r: .5 }); }
     }
@@ -558,7 +657,9 @@ export function createIsland() {
         const gx = x - p.nx * s * (d / 2 + 3.5), gz = z - p.nz * s * (d / 2 + 3.5), tx = x + Math.cos(ang) * (w / 2 + 3.5), tz = z - Math.sin(ang) * (w / 2 + 3.5);
         if (r() < .6 && freeSpot(tx, tz, 3)) tree.broad(tx, terrainAt(tx, tz), tz, .6 + r() * .3);
         for (let q = -3; q <= 3; q++) { const fx = gx + Math.cos(ang) * q * 1.6, fz = gz - Math.sin(ang) * q * 1.6; if (roadDAt(fx, fz) < 2.5) continue; inst(BOX, MAT.white, M(fx, terrainAt(fx, fz) + .5, fz, .14, 1, .14)); }
-        inst(BOX, MAT.white, M(gx, terrainAt(gx, gz) + .8, gz, 9.6, .12, .08, ang)); inst(BOX, MAT.white, M(gx, terrainAt(gx, gz) + .4, gz, 9.6, .12, .08, ang)); } }
+        if (roadFootprintClear({ x: gx, z: gz, hx: 4.8, hz: .1, ang })) {
+          inst(BOX, MAT.white, M(gx, terrainAt(gx, gz) + .8, gz, 9.6, .12, .08, ang)); inst(BOX, MAT.white, M(gx, terrainAt(gx, gz) + .4, gz, 9.6, .12, .08, ang));
+        } } }
   }
 
   // -- road dressing: red-white kerbs in the bends, street lamps, zone gates, sidewalks in the city --
@@ -594,8 +695,10 @@ export function createIsland() {
     const gateMats = new Map(), gm = Z => { if (!gateMats.has(Z.id)) gateMats.set(Z.id, new THREE.MeshBasicMaterial({ map: gateTex(Z) })); return gateMats.get(Z.id); };
     for (const rd of roads) { if (rd.id.startsWith('city') || rd.id === 'docks') continue;
       for (let k = 4; k < rd.pts.length; k += 2) { const p = rd.pts[k], A = zoneAt(rd.pts[k - 4].x, rd.pts[k - 4].z), B = zoneAt(p.x, p.z); if (A === B || p.bridge || rampHeight(p.x, p.z) > -1e8) continue;
-        if (gates.some(G => Math.hypot(G.x - p.x, G.z - p.z) < 140)) continue; gates.push({ x: p.x, z: p.z });
-        const g = new THREE.Group(), W = rd.w + 4, col = std(new THREE.Color(B === ZONES[6] ? A.color : B.color).getHex(), { roughness: .5 });
+        if (gates.some(G => Math.hypot(G.x - p.x, G.z - p.z) < 140)) continue;
+        if ([-1, 1].some(sd => !roadFootprintClear({ x: p.x + p.nx * sd * (rd.hw + 3.5), z: p.z + p.nz * sd * (rd.hw + 3.5), r: 1.1 }))) continue;
+        gates.push({ x: p.x, z: p.z });
+        const g = new THREE.Group(), W = rd.w + 7, col = std(new THREE.Color(B === ZONES[6] ? A.color : B.color).getHex(), { roughness: .5 });
         for (const sd of [-1, 1]) { const pl = new THREE.Mesh(BOX, col); pl.scale.set(1.3, 8.4, 1.3); pl.position.set(sd * W / 2, 4.2, 0); pl.castShadow = true; g.add(pl); const cap = new THREE.Mesh(BOX, MAT.white); cap.scale.set(1.6, .4, 1.6); cap.position.set(sd * W / 2, 8.6, 0); g.add(cap); addCol({ x: p.x + p.nx * sd * W / 2, z: p.z + p.nz * sd * W / 2, r: 1.1 }); }
         const bar = new THREE.Mesh(BOX, new THREE.MeshStandardMaterial({ color: 0x12171c })); bar.scale.set(W, 2.9, .5); bar.position.y = 6.9; bar.castShadow = true; g.add(bar);
         for (const [Z, ry] of [[B, Math.PI], [A, 0]]) { const pn = new THREE.Mesh(new THREE.PlaneGeometry(W - .4, 2.6), gm(Z)); pn.position.set(0, 6.9, ry ? -.27 : .27); pn.rotation.y = ry; g.add(pn); }
@@ -661,13 +764,24 @@ export function createIsland() {
       const ix = clamp(Math.round((x + HALF) / STEP), 0, N - 1), iz = clamp(Math.round((z + HALF) / STEP), 0, N - 1), q = (iz * N + ix) * 3;
       cc.setRGB(TCOL[q] * 1.1, TCOL[q + 1] * 1.15, TCOL[q + 2] * 1.05);
       add('g', x, h - .05, z, .9 + r() * .9, cc);
-      if ((Z === 'plains' || Z === 'jungle' || Z === 'city' || Z === 'glacier') && fbm(x * .06 + 9, z * .06 - 3, 2) > .28 && r() < .6) add('f', x + (r() - .5), h - .05, z + (r() - .5), .8 + r() * .5, cc.setHex(FLOW[Math.floor(hash(Math.floor(x / 9), Math.floor(z / 9)) * FLOW.length)]));
+      if ((Z === 'plains' || Z === 'jungle' || Z === 'city' || Z === 'glacier') && fbm(x * .06 + 9, z * .06 - 3, 2) > .12 && r() < .75) add('f', x + (r() - .5), h - .05, z + (r() - .5), .8 + r() * .5, cc.setHex(FLOW[Math.floor(hash(Math.floor(x / 9), Math.floor(z / 9)) * FLOW.length)]));
     }
     const meshes = [];
     for (const C of chunks.values()) for (const [kind, geo, mat] of [['g', tuft, grassM], ['f', bloom, flowerM]]) { const [L, CL] = C[kind]; if (!CL.length) continue;
       const im = new THREE.InstancedMesh(geo, mat, CL.length / 3); im.instanceMatrix.array.set(L); im.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(CL), 3); im.computeBoundingSphere(); im.receiveShadow = true; group.add(im); meshes.push({ im, x: C.x, z: C.z }); }
     updaters.push((dt, t, cam) => { if (!cam) return; const px = cam.position.x, pz = cam.position.z; for (const m of meshes) m.im.visible = Math.hypot(m.x - px, m.z - pz) < 230; });
   }
+
+  // Reject overlaps with existing houses/trees as well as roads and boss arenas.
+  const occupied = (x, z, radius) => {
+    const ci = Math.floor(x / CC), cj = Math.floor(z / CC), reach = Math.ceil(radius / CC) + 1;
+    for (let i = -reach; i <= reach; i++) for (let j = -reach; j <= reach; j++) for (const c of colGrid.get(key(ci + i, cj + j)) || []) {
+      if (Math.hypot(x - c.x, z - c.z) < radius + (c.r ?? Math.hypot(c.hx, c.hz))) return true;
+    }
+    return false;
+  };
+  createScenery({ group, roads, terrainAt, zoneAt, freeSpot, occupied, addCol, marks, updaters, roadFootprintClear });
+  createLandmarks({ group, roads, terrainAt, roadFootprintClear, addCol, marks, updaters });
 
   // ----- build instanced batches -----
   for (const { geo, mat, list, cast } of batches.values()) { const im = new THREE.InstancedMesh(geo, mat, list.length); list.forEach((m, i) => im.setMatrixAt(i, m)); im.castShadow = cast; im.receiveShadow = true; im.computeBoundingSphere(); group.add(im); }
@@ -677,8 +791,9 @@ export function createIsland() {
     let hit = 0; const ci = Math.floor(b.x / CC), cj = Math.floor(b.z / CC), seen = new Set();
     for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) for (const c of colGrid.get(key(ci + i, cj + j)) || []) {
       if (seen.has(c)) continue; seen.add(c);
+      if (!overlapsHeight(b, c)) continue;
       let nx, nz, pen;
-      if (c.r != null) { const dx = b.x - c.x, dz = b.z - c.z, d = Math.hypot(dx, dz), R = c.r + radius; if (d >= R || d < 1e-6) continue; nx = dx / d; nz = dz / d; pen = R - d; }
+      if (c.r != null) { const dx = b.x - c.x, dz = b.z - c.z, d = Math.hypot(dx, dz), R = c.r + radius; if (d >= R) continue; if (d < 1e-6) { const speed = Math.hypot(b.vx, b.vz); nx = speed > .01 ? -b.vx / speed : 1; nz = speed > .01 ? -b.vz / speed : 0; } else { nx = dx / d; nz = dz / d; } pen = R - d; }
       else { const sa = Math.sin(c.ang), ca = Math.cos(c.ang), dx = b.x - c.x, dz = b.z - c.z, lx = dx * ca - dz * sa, lz = dx * sa + dz * ca;
         const px = clamp(lx, -c.hx, c.hx), pz = clamp(lz, -c.hz, c.hz); let ex = lx - px, ez = lz - pz, d = Math.hypot(ex, ez);
         if (d >= radius) continue;

@@ -1,12 +1,13 @@
 import * as THREE from 'three';
 import { createIsland, ZONES, SEA, glowTex, VOLCANO } from './island.js';
 import * as DRIVE from './drive.js';
-import { makeCar, stepCar, aiStep, turbo, spinOut, TOP, angleDiff } from './drive.js';
+import { makeCar, stepCar, aiStep, turbo, spinOut, TOP, angleDiff, canUseBoostPad } from './drive.js';
 import { CHAPTERS, MISSIONS, missionById, chapterMissions, openChapters, missionOpen, buildRoute, routeAt, routeProgress, routeSpeed, calibrate, missionStart, XP, storyDone } from './missions.js';
 import { BOSS_CLASSES, droneModel, targetModel, starModel, itemBoxModel, rocketModel, projModel, wormModel, avalancheModel } from './bosses.js';
 import { createCar, animateCar } from '../game/car-model.js';
 import { createKartFx } from '../game/kart-fx.js';
 import { createGuide } from './guide.js';
+import { createIslandSky } from './sky.js';
 
 // =====================================================================================================================
 // Story mode "Apex-Insel": free roam on an open island, missions with stars, boss races, boss fights and chases.
@@ -47,19 +48,15 @@ export function createStory(opts) {
     built = true;
     scene = new THREE.Scene(); scene.background = new THREE.Color(0xcfe1ea); scene.fog = new THREE.Fog(0xcfe1ea, 260, 1500);
     camera = new THREE.PerspectiveCamera(64, innerWidth / innerHeight, .3, 3200); camera.rotation.order = 'YXZ';
-    hemi = new THREE.HemisphereLight(0xdcefff, 0x8a8a6a, .95); scene.add(hemi);
-    sun = new THREE.DirectionalLight(0xfff1d8, 3.3); sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048);
+    hemi = new THREE.HemisphereLight(0xdcefff, 0x798761, 1.25); scene.add(hemi);
+    sun = new THREE.DirectionalLight(0xffe8c8, 3.1); sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048);
     Object.assign(sun.shadow.camera, { left: -60, right: 60, top: 60, bottom: -60, near: 1, far: 400 }); sun.shadow.bias = -.0004; sun.shadow.normalBias = .05;
     scene.add(sun, sun.target);
     const fill = new THREE.DirectionalLight(0xd6ecff, .7); fill.position.set(-200, 120, -150); scene.add(fill);
     // sky dome
-    sky = new THREE.Mesh(new THREE.SphereGeometry(2800, 32, 16), new THREE.ShaderMaterial({ side: THREE.BackSide, depthWrite: false, fog: false,
-      uniforms: { top: { value: new THREE.Color(0x2f74d6) }, horizon: { value: new THREE.Color(0xd8ebf5) }, ground: { value: new THREE.Color(0x2a8ab0) }, sunDir: { value: new THREE.Vector3(.5, .55, .35).normalize() }, sunColor: { value: new THREE.Color(0xfff4dc) } },
-      vertexShader: 'varying vec3 vDir;void main(){vDir=normalize(position);gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}',
-      fragmentShader: 'uniform vec3 top,horizon,ground,sunColor,sunDir;varying vec3 vDir;void main(){vec3 d=normalize(vDir);float y=d.y;vec3 c=y>0.?mix(horizon,top,pow(y,.45)):mix(horizon,ground,pow(min(1.,-y*3.),.5));float s=max(dot(d,normalize(sunDir)),0.);c+=sunColor*(pow(s,1400.)*7.+pow(s,40.)*.4+pow(s,5.)*.14);gl_FragColor=vec4(c,1.);\n#include <tonemapping_fragment>\n#include <colorspace_fragment>\n}' }));
-    sky.frustumCulled = false; sky.renderOrder = -10; scene.add(sky);
+    sky = createIslandSky(); scene.add(sky);
     // reflections from the sky
-    const pm = new THREE.PMREMGenerator(renderer), envScene = new THREE.Scene(); envScene.add(sky.clone()); scene.environment = pm.fromScene(envScene, .02).texture; scene.environmentIntensity = .8;
+    const pm = new THREE.PMREMGenerator(renderer), envScene = new THREE.Scene(); envScene.add(sky.clone()); scene.environment = pm.fromScene(envScene, .02).texture; scene.environmentIntensity = .8; pm.dispose();
 
     isl = createIsland(); scene.add(isl.group);
     fx = createKartFx(scene);
@@ -360,6 +357,7 @@ export function createStory(opts) {
   // cards, missions start / end
   let nearBeacon = null;
   function openCard(b) {
+    Object.assign(player, { speed: 0, vx: 0, vz: 0, turboT: 0, drift: 0, driftT: 0 });
     cardFor = b.m; mode = 'card'; const m = b.m, ch = CHAPTERS.find(c => c.id === m.ch), st = state.done[m.id] || 0, best = state.best[m.id];
     const kind = { rings: 'ZEITRENNEN', smash: 'ZERSTÖREN', collect: 'SAMMELN', chase: 'VERFOLGUNG', escape: 'FLUCHT', race: 'BOSSRENNEN', avalanche: 'FLUCHT', worm: 'BOSS-VERFOLGUNGSJAGD', boss: 'BOSSKAMPF' }[m.kind];
     const c = $('stCard'); c.style.setProperty('--cc', m.boss ? '#ff3a4a' : ch.color);
@@ -829,7 +827,7 @@ export function createStory(opts) {
           if (tsPress != null && tsPress >= .4 && tsPress <= 1.25) { turbo(player, tsPress >= .6 && tsPress <= 1 ? 1.4 : .8, TOP * 1.15); toast(tsPress >= .6 && tsPress <= 1 ? 'PERFEKTER TURBO-START!' : 'TURBO-START!', 1000); } } }
       if (mode === 'card') ctl = { throttle: 0, steer: 0, brake: true };
       // physics in small steps
-      let rem = Math.min(dt, .1);
+      let rem = mode === 'card' ? 0 : Math.min(dt, .1);
       while (rem > 1e-6) { const h = Math.min(.02, rem); rem -= h;
         const ev = stepCar(player, ctl, h, isl);
         for (const e of ev) {
@@ -846,7 +844,7 @@ export function createStory(opts) {
       for (let i = hazards.length - 1; i >= 0; i--) if (!hazards[i].update(dt)) { hazards[i].dispose(); hazards.splice(i, 1); }
       for (let i = debris.length - 1; i >= 0; i--) { const d = debris[i]; d.life -= dt; d.vy -= 25 * dt; d.m.position.x += d.vx * dt; d.m.position.y += d.vy * dt; d.m.position.z += d.vz * dt; d.m.rotation.x += dt * 6; const gy = isl.ground(d.m.position.x, d.m.position.z); if (d.m.position.y < gy + .3) { d.m.position.y = gy + .3; d.vy *= -.3; d.vx *= .6; d.vz *= .6; } if (d.life <= 0) { scene.remove(d.m); debris.splice(i, 1); } }
       // boost pads
-      padCool -= dt; if (padCool <= 0) for (const P of isl.pads) { const dx = player.x - P.x, dz = player.z - P.z, sa = Math.sin(P.angle), ca = Math.cos(P.angle); if (Math.abs(dx * sa + dz * ca) < P.len / 2 + .5 && Math.abs(dx * ca - dz * sa) < P.w / 2 + .6 && Math.abs(player.y - P.y) < 1.5) { padCool = .6; turbo(player, .9, TOP * 1.18); sfx('boost'); break; } }
+      padCool -= dt; if (padCool <= 0 && (mode === 'free' || mode === 'mission') && canUseBoostPad(player)) for (const P of isl.pads) { const dx = player.x - P.x, dz = player.z - P.z, sa = Math.sin(P.angle), ca = Math.cos(P.angle); if (Math.abs(dx * sa + dz * ca) < P.len / 2 + .5 && Math.abs(dx * ca - dz * sa) < P.w / 2 + .6 && Math.abs(player.y - P.y) < 1.5) { padCool = .6; turbo(player, .9, TOP * 1.18); sfx('boost'); break; } }
       // safe point for respawns
       safeT -= dt; if (safeT <= 0 && player.grounded && player.surface === 'road' && player.spinT <= 0) { safeT = .8; lastSafe = { x: player.x, z: player.z, angle: player.angle }; }
       if (mode === 'free' || mode === 'card') { freeRoam(dt, t); stepTraffic(Math.min(dt, .05)); }
@@ -860,6 +858,7 @@ export function createStory(opts) {
     for (const G of gears) if (G.m.visible) { G.m.rotation.y = t * 2; G.m.position.y = G.y + Math.sin(t * 2.5 + G.x) * .35; }
     for (const b of beacons) { b.ring.rotation.z = t; b.icon.position.y = 8 + Math.sin(t * 2 + b.x) * .5; b.pillar.material.opacity = (state.done[b.m.id] ? .1 : .24) + Math.sin(t * 3 + b.z) * .05; }
     isl.update(dt, t, camera, player);
+    sky.material.uniforms.time.value = t;
     gps.update(dt, t, player);
     if (mode === 'map') { if (!mission) steerGps(); drawBigMap(t); }
     updateCamera(dt);

@@ -27,6 +27,7 @@ export function turbo(c, time, speed) {
   if (c.turboT > 0 && c.turboSpeed > speed) { c.turboT = Math.max(c.turboT, time); return; }
   c.turboT = time; c.turboSpeed = speed; c.speed = Math.max(c.speed, speed * .96);
 }
+export const canUseBoostPad = c => c.grounded && c.speed > 3 && c.spinT <= 0;
 export function spinOut(c, time = 1.1) { if (c.invuln > 0) return false; c.spinT = time; c.invuln = time + 1.2; c.drift = 0; c.driftT = 0; c.turboT = 0; return true; }
 
 // One physics step. input: { throttle -1…1, steer -1…1, brake bool }. world: island. Returns events (array of strings).
