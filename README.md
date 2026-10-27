@@ -251,6 +251,54 @@ In der Garage unter **SKINS**. Muster für die Karosserie, die man mit der Zeit 
 
 Die Skins stehen in `client/src/game/skins.js`. Online sehen alle deinen Skin.
 
+## Story-Modus: Apex-Insel
+Im Startmenü ganz oben: **STORY · APEX-INSEL**. Eine offene Insel (ca. 1,6 × 1,6 km), auf der du frei herumfährst. Das Phantom-Syndikat hat sie übernommen, und du holst sie dir Zone für Zone zurück.
+
+**Die Welt:** sieben Gebiete mit Straßennetz, Brücken und Rampen.
+- Port Apex: Hafenstadt mit Hochhäusern, Containern, Kränen, Frachtern und Leuchtturm
+- Sonnenküste: Strand
+- Smaragdwald: Dschungel mit Tempelpyramide
+- Rostcanyon: Tafelberge und Felsbogen
+- Frostgipfel: Gletscher mit gefrorenem See (rutschig!)
+- Glutberg: Vulkan mit Lavakrater und Serpentinenstraße bis zum Kraterrand
+- Mittelland: Felder, Windmühlen und ein Stuntpark
+
+Der Untergrund zählt: Gras, Sand, Schlamm und Schnee bremsen, Eis rutscht, Wasser und Lava setzen dich zurück.
+
+**Missionen:** Leuchtende Lichtsäulen auf der Insel; ranfahren und ENTER drücken. Sechs Kapitel mit je drei Aufgaben und einem Boss, also 24 Missionen mit je bis zu 3 Sternen. Die Zeitlimits werden aus einer simulierten sauberen Fahrt berechnet. Ohne Fehler schaffst du es knapp, für 3 Sterne brauchst du Drift-Turbos. Es gibt diese Aufgabentypen:
+- Zeitrennen durch Ringe, zum Teil mit Felsschlag und Lavabrocken
+- Kisten, Totems oder Generatoren rammen
+- Sterne sammeln, auch in der Luft über Rampen
+- einen Fahrer verfolgen und dreimal rammen
+- Drohnen entkommen
+- vor einer Lawine flüchten
+
+**Bosse:**
+| Kapitel | Boss | Art |
+|---|---|---|
+| 1 Port Apex | Viktor, der Hafenkönig | Bossrennen über die halbe Insel, er kippt Öl |
+| 2 Sonnenküste | Krake | Bosskampf: Tentakel schlagen Streifen, Tintenbälle; Kopf treffen, wenn er auftaucht |
+| 3 Smaragdwald | Tempelgolem | Bosskampf: nach dem Stampfer glüht sein Kern |
+| 4 Rostcanyon | Sandwurm | Boss-Verfolgungsjagd durch den Canyon, Sandfontänen vor dir |
+| 5 Frostgipfel | Frost-Mech | Bosskampf auf dem Eis: lenk seinen Sturmangriff gegen den Rand, dann den Reaktor treffen |
+| 6 Glutberg | Phantom, danach der Magma-Drache | Rennen bis zum Krater (Minen, Teleport), Finale im Krater |
+
+In Bosskämpfen hast du drei Herzen. Raketen holst du dir aus den Regenbogen-Kisten und feuerst sie mit **E** (Controller: LB). Sie treffen nur, wenn der Boss eine Lücke zeigt.
+
+**Zahnräder:** 30 goldene Zahnräder sind auf der Insel versteckt, zum Beispiel auf Hügeln, am Krater oder am Pier.
+
+**Belohnung:** Missionen und Zahnräder geben XP für dein Fahrerlevel. Sterne, Bestzeiten, Zahnräder und deine Position werden im Konto gespeichert.
+
+**Steuerung:**
+- Fahren und Driften wie im Rennen
+- **E** Rakete
+- **R** zurück auf die Straße
+- **M** Karte; dort kannst du direkt zu jeder Mission springen
+- **C** Kamera
+- **Esc** Pause
+- Controller: Y bzw. A startet Missionen, Back öffnet die Karte
+
+
 ## Projektstruktur
 ```
 client/
@@ -279,6 +327,12 @@ client/
     progression.js    XP, Level, Bestzeiten, Freischaltungen, Aufträge
     cups.js           Cups, Punkte, Gesamtwertung
   src/editor.js       Strecken-Editor (2D), Strecken-Codes
+  src/story/          Story-Modus Apex-Insel
+    island.js         Insel: Höhen, Zonen, Straßennetz, Rampen, Deko, Kollisionen, Kartenbild
+    drive.js          Fahrphysik für die offene Welt (auch für KI-Fahrer)
+    missions.js       Kapitel, Missionen, Routen, Zeit-Kalibrierung
+    bosses.js         Krake, Golem, Frost-Mech, Magma-Drache und Missions-Modelle
+    story.js          Steuerung, Kamera, HUD, Missionsablauf, Speichern
     race-audio.js     Sound
 server/server.js      Statische Auslieferung + WebSocket-Relay /ws
 ```

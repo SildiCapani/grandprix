@@ -23,7 +23,7 @@ const normalizeMode = value => MODES.includes(value) ? value : 'race';
 const stringList = value => Array.isArray(value) ? [...new Set(value.filter(item => typeof item === 'string' && item.length > 0 && item.length <= 160))] : [];
 
 export function createProfile() {
-  return { version: 2, totalXP: 0, totalPoints: 0, races: 0, wins: 0, records: {}, achievements: [], recentRaceIds: [], missions: [], missionSeq: 0, missionMaps: [], challenges: emptyChallenges() };
+  return { version: 2, totalXP: 0, totalPoints: 0, races: 0, wins: 0, records: {}, achievements: [], recentRaceIds: [], missions: [], missionSeq: 0, missionMaps: [], challenges: emptyChallenges(), story: emptyStory() };
 }
 
 // ---------- career rewards (only when the career switch is on) ----------
@@ -107,6 +107,24 @@ const CH_WEEK = [
   { id: 'wfast', label: 'Fahre 8 Rennen mit 150 km/h oder mehr', goal: 8, xp: 1000, gain: r => r.cc >= 150 ? 1 : 0 },
 ];
 const CH_MAPS = ['coast', 'canyon', 'neon', 'jungle', 'pirate'];
+// ---------- story mode (Apex-Insel) ----------
+export function emptyStory() { return { done: {}, best: {}, gears: [], seen: [], pos: null }; }
+function sanitizeStory(v) {
+  const s = emptyStory(); if (!v || typeof v !== 'object') return s;
+  if (v.done && typeof v.done === 'object') for (const [k, n] of Object.entries(v.done)) if (/^c[1-6][a-z]$/.test(k) && Number.isInteger(n) && n >= 1 && n <= 3) s.done[k] = n;
+  if (v.best && typeof v.best === 'object') for (const [k, n] of Object.entries(v.best)) if (/^c[1-6][a-z]$/.test(k) && Number.isFinite(n) && n > 0 && n < 3600) s.best[k] = Math.round(n * 100) / 100;
+  s.gears = [...new Set((Array.isArray(v.gears) ? v.gears : []).filter(g => typeof g === 'string' && /^g\d{1,2}$/.test(g)))].slice(0, 40);
+  s.seen = [...new Set((Array.isArray(v.seen) ? v.seen : []).filter(g => typeof g === 'string' && g.length <= 24))].slice(0, 30);
+  const p = v.pos; if (p && [p.x, p.z, p.angle].every(Number.isFinite) && Math.abs(p.x) < 1000 && Math.abs(p.z) < 1000) s.pos = { x: +p.x.toFixed(1), z: +p.z.toFixed(1), angle: +p.angle.toFixed(3) };
+  return s;
+}
+function mergeStory(a, b) {
+  const s = sanitizeStory(b), o = sanitizeStory(a);
+  for (const [k, n] of Object.entries(o.done)) s.done[k] = Math.max(n, s.done[k] || 0);
+  for (const [k, n] of Object.entries(o.best)) s.best[k] = s.best[k] == null ? n : Math.min(n, s.best[k]);
+  s.gears = [...new Set([...o.gears, ...s.gears])]; s.seen = [...new Set([...o.seen, ...s.seen])]; s.pos = s.pos || o.pos;
+  return s;
+}
 function emptyChallenges() { return { day: '', dp: {}, dd: [], week: '', wp: {}, wd: [] }; }
 const pad2 = n => String(n).padStart(2, '0');
 export const dayKey = (d = new Date()) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
@@ -215,6 +233,7 @@ export function sanitizeProfile(value) {
   profile.missionSeq = count(value.missionSeq);
   profile.missionMaps = stringList(value.missionMaps).filter(validMap);
   profile.challenges = sanitizeChallenges(value.challenges);
+  profile.story = sanitizeStory(value.story);
   if (object(value.records)) for (const map of MAPS) {
     const modes = value.records[map.id];
     if (!object(modes)) continue;
@@ -411,6 +430,7 @@ function keepProgress(current, incoming) {
   incoming.recentRaceIds = [...new Set([...current.recentRaceIds, ...incoming.recentRaceIds])].slice(-20);
   // Missions move forward only: keep whichever side is further along the sequence.
   incoming.challenges = mergeChallenges(current.challenges || emptyChallenges(), incoming.challenges);
+  incoming.story = mergeStory(current.story, incoming.story);
   if (current.missionSeq > incoming.missionSeq) { incoming.missions = current.missions; incoming.missionSeq = current.missionSeq; incoming.missionMaps = current.missionMaps; }
   for (const map of MAPS) for (const mode of MODES) {
     const old = current.records[map.id]?.[mode];
