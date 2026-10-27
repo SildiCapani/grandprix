@@ -938,8 +938,10 @@ export class RaceCore {
     else if (item === 'star') { c.starT = STAR_TIME; c.spinT = 0; c.spinAngle = 0; }
     else if (item === 'magnet') { c.magnetT = MAGNET_TIME; }
     else if (item === 'bolt') {
-      for (const f of this._field()) if (f.c !== c && !f.c.isNet) this._hit(f.c, 'bolt', c);
-      if (c === this.player || this.rivals.includes(c)) for (const e of this.externals) if (!e.star) this.emit('remotehit', { kind: 'bolt', target: e });
+      // only the drivers AHEAD of the user are struck
+      const field = this._field(), me = field.find(f => f.c === c), mine = me ? me.prog : (c.progress || 0);
+      for (const f of field) if (f.c !== c && !f.c.isNet && f.prog > mine) this._hit(f.c, 'bolt', c);
+      if (c === this.player || this.rivals.includes(c)) for (const e of this.externals) if (!e.star && Number.isFinite(e.progress) && e.progress > mine) this.emit('remotehit', { kind: 'bolt', target: e });
       this.emit('bolt', { player: c === this.player, name: c.name });
     }
     else if (item === 'boomerang') {
