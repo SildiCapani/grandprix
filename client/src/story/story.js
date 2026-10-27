@@ -6,6 +6,7 @@ import { CHAPTERS, MISSIONS, missionById, chapterMissions, openChapters, mission
 import { BOSS_CLASSES, droneModel, targetModel, starModel, itemBoxModel, rocketModel, projModel, wormModel, avalancheModel } from './bosses.js';
 import { createCar, animateCar } from '../game/car-model.js';
 import { createKartFx } from '../game/kart-fx.js';
+import { createGuide } from './guide.js';
 
 // =====================================================================================================================
 // Story mode "Apex-Insel": free roam on an open island, missions with stars, boss races, boss fights and chases.
@@ -30,7 +31,8 @@ export function createStory(opts) {
   let mission = null, rt = null, countdown = 0, cardFor = null, resultInfo = null, pauseFrom = 'free';
   let padCool = 0, elapsed = 0, lastSafe = null, safeT = 0, zoneNow = null, zoneBannerT = 0, respawnT = 0, fadeT = 0, timeT = 0;
   const npcs = new Set(), hazards = [], projectiles = [], rockets = [], boxes = [], debris = [], pops = [];
-  let beacons = [], gears = [], arrow, hearts = 3, ammo = 0, padPrev = [];
+  let beacons = [], gears = [], gps, hearts = 3, ammo = 0, padPrev = [];
+  let waypoint = null, gpsInfo = null, mapHover = null, mapListHover = null;
   const traffic = [];
 
   function load() {
@@ -61,9 +63,7 @@ export function createStory(opts) {
 
     isl = createIsland(); scene.add(isl.group);
     fx = createKartFx(scene);
-    arrow = (() => { const g = new THREE.Group(), m = new THREE.MeshBasicMaterial({ color: 0xffd23a, transparent: true, opacity: .9, depthTest: false, toneMapped: false });
-      const head = new THREE.Mesh(new THREE.ConeGeometry(.42, .9, 4), m); head.rotation.x = Math.PI / 2; head.position.z = .7; g.add(head); const tail = new THREE.Mesh(new THREE.BoxGeometry(.24, .14, .8), m); tail.position.z = -.2; g.add(tail);
-      g.renderOrder = 20; g.scale.setScalar(.75); g.visible = false; scene.add(g); return g; })();
+    gps = createGuide(scene, isl);
     placeGears();
     spawnTraffic();
     buildWeather();
@@ -76,7 +76,8 @@ export function createStory(opts) {
     root = document.createElement('div'); root.id = 'story'; root.hidden = true;
     root.innerHTML = `
       <div class="st-zone"><small id="stZoneCh"></small><b id="stZone"></b><span id="stProg"></span></div>
-      <div class="st-mini"><canvas id="stMini" width="220" height="220"></canvas><i class="st-n">N</i></div>
+      <div class="st-mini"><canvas id="stMini" width="300" height="300"></canvas><i class="st-n">N</i></div>
+      <div class="st-gps" id="stGps" hidden><span id="stGpsIcon"></span><div><small id="stGpsKind"></small><b id="stGpsName"></b></div><i id="stGpsDist"></i></div>
       <div class="st-obj" id="stObj" hidden><small id="stObjKind"></small><b id="stObjTitle"></b><span id="stObjText"></span><strong id="stObjTime"></strong><div class="st-boss" id="stBoss" hidden><em id="stBossName"></em><div><i id="stBossBar"></i></div></div></div>
       <div class="st-hearts" id="stHearts" hidden></div>
       <div class="st-ammo" id="stAmmo" hidden><span>🚀</span><b id="stAmmoN">0</b><small>E / LB</small></div>
@@ -88,7 +89,7 @@ export function createStory(opts) {
       <div class="st-card" id="stCard" hidden></div>
       <div class="st-modal" id="stModal" hidden></div>
       <div class="st-fade" id="stFade"></div>
-      <div class="st-keys">WASD fahren · Leertaste driften · E feuern · R zurück auf die Straße · M Karte · Esc Pause</div>`;
+      <div class="st-keys">WASD fahren · Leertaste driften · E feuern · R zurück auf die Straße · M Karte (GPS setzen) · Esc Pause</div>`;
     document.body.appendChild(root);
     mini = root.querySelector('#stMini'); miniCtx = mini.getContext('2d');
     root.addEventListener('click', e => { const b = e.target.closest('[data-st]'); if (!b) return; act(b.dataset.st, b.dataset.id); });
@@ -257,35 +258,101 @@ export function createStory(opts) {
   // map
   function openMap() {
     if (mode === 'paused') closeModal();
-    mode = 'map'; const done = state.done, openC = openChapters(done);
+    mode = 'map'; mapHover = mapListHover = null; const done = state.done, openC = openChapters(done);
     const rows = CHAPTERS.map(c => { const list = chapterMissions(c.id), isOpen = openC.includes(c.id);
       return `<div class="sm-ch ${isOpen ? '' : 'locked'}" style="--cc:${c.color}"><b>${c.n}. ${c.name}</b>${list.map(m => { const st = done[m.id] || 0, ok = missionOpen(m, done);
-        return `<button class="sm-m ${st ? 'done' : ''} ${ok ? '' : 'lock'}" ${ok ? `data-st="go" data-id="${m.id}"` : 'disabled'} title="${esc(m.line)}"><span>${m.icon}</span><em>${esc(m.name)}</em><i>${ok ? '★'.repeat(st) + '☆'.repeat(3 - st) : '🔒'}</i></button>`; }).join('')}</div>`; }).join('');
-    modal(`<div class="st-map"><div class="sm-left"><canvas id="stBigMap" width="560" height="560"></canvas><small>Klick auf eine Mission rechts: du wirst hingebracht.</small></div><div class="sm-right"><h2>APEX-INSEL</h2><div class="sm-stats"><span>⭐ ${Object.values(done).reduce((a, b) => a + b, 0)} / ${MISSIONS.length * 3}</span><span>⚙️ ${state.gears.length} / ${GEARS}</span></div>${rows}<button class="primary" data-st="closemap">SCHLIESSEN (M)</button></div></div>`);
-    drawBigMap();
+        return `<button class="sm-m ${st ? 'done' : ''} ${ok ? '' : 'lock'}" ${ok ? `data-st="go" data-id="${m.id}"` : 'disabled'} data-hover="${m.id}" title="${esc(m.line)}"><span>${m.icon}</span><em>${esc(m.name)}</em><i>${ok ? '★'.repeat(st) + '☆'.repeat(3 - st) : '🔒'}</i></button>`; }).join('')}</div>`; }).join('');
+    modal(`<div class="st-map"><div class="sm-left"><canvas id="stBigMap" width="1040" height="1040"></canvas><small><b>Klick</b> auf die Karte oder eine Mission: GPS-Route setzen · <b>Rechtsklick</b>: Wegpunkt löschen · Mission in der Liste: Schnellreise</small></div><div class="sm-right"><h2>APEX-INSEL</h2><div class="sm-stats"><span>⭐ ${Object.values(done).reduce((a, b) => a + b, 0)} / ${MISSIONS.length * 3}</span><span>⚙️ ${state.gears.length} / ${GEARS}</span></div>${rows}<button class="primary" data-st="closemap">SCHLIESSEN (M)</button></div></div>`);
+    const c = $('stBigMap'), at = e => { const r = c.getBoundingClientRect(); return [(e.clientX - r.left) / r.width * c.width, (e.clientY - r.top) / r.height * c.height]; };
+    c.addEventListener('mousemove', e => { mapHover = pickMap(...at(e)); c.style.cursor = mapHover ? 'pointer' : 'crosshair'; });
+    c.addEventListener('mouseleave', () => { mapHover = null; });
+    c.addEventListener('click', e => { const h = pickMap(...at(e)); if (h) { waypoint = { x: h.x, z: h.z, name: h.m.name }; sfx('tick'); toast(`GPS: ${h.m.icon} ${h.m.name}`, 1100); return; }
+      const [wx, wz] = mapToWorld(...at(e)); if (isl.terrainAt(wx, wz) < SEA) { toast('Da ist nur Wasser.', 900); return; } const nr = isl.nearestRoad(wx, wz, 40);
+      waypoint = nr && nr.d < 30 ? { x: nr.x, z: nr.z } : { x: wx, z: wz }; sfx('tick'); toast('📍 WEGPUNKT GESETZT', 1000); });
+    c.addEventListener('contextmenu', e => { e.preventDefault(); if (waypoint) { waypoint = null; sfx('tick'); toast('Wegpunkt gelöscht', 900); } });
+    $('stModal').querySelectorAll('[data-hover]').forEach(b => { b.addEventListener('mouseenter', () => mapListHover = b.dataset.hover); b.addEventListener('mouseleave', () => mapListHover = null); });
+    drawBigMap(timeT);
   }
   function closeMap() { closeModal(); mode = 'free'; }
-  function drawBigMap() {
-    const c = $('stBigMap'); if (!c) return; const g = c.getContext('2d'), S = c.width;
-    g.drawImage(isl.mapCanvas, 0, 0, S, S);
-    const P = (x, z) => { const [u, v] = isl.worldToMap(x, z); return [u * S, v * S]; };
-    g.font = '900 15px Arial'; g.textAlign = 'center';
-    for (const Z of ZONES) { const [x, y] = P(Z.x, Z.z); g.fillStyle = 'rgba(0,0,0,.55)'; g.fillText(Z.name.toUpperCase(), x + 1, y + 1); g.fillStyle = '#fff'; g.fillText(Z.name.toUpperCase(), x, y); }
-    for (const G of gears) if (G.got) { const [x, y] = P(G.x, G.z); g.fillStyle = '#ffd23a'; g.beginPath(); g.arc(x, y, 3, 0, TAU); g.fill(); }
-    g.font = '20px sans-serif';
-    for (const b of beacons) { const [x, y] = P(b.x, b.z); g.fillStyle = b.m.boss ? '#c8242a' : CHAPTERS.find(c => c.id === b.m.ch).color; g.beginPath(); g.arc(x, y, 13, 0, TAU); g.fill(); g.strokeStyle = '#fff'; g.lineWidth = 2.5; g.stroke(); g.fillText(b.m.icon, x, y + 7); }
-    const [px, py] = P(player.x, player.z); g.save(); g.translate(px, py); g.rotate(-player.angle + Math.PI); g.fillStyle = '#fff'; g.strokeStyle = '#111'; g.lineWidth = 2; g.beginPath(); g.moveTo(0, -11); g.lineTo(8, 8); g.lineTo(0, 4); g.lineTo(-8, 8); g.closePath(); g.fill(); g.stroke(); g.restore();
+  // big map view: the whole island fits, with a margin of sea around it
+  const MAPV = { x0: -830, z0: -830, size: 1660 };
+  const mapP = (x, z, S) => [(x - MAPV.x0) / MAPV.size * S, (z - MAPV.z0) / MAPV.size * S];
+  const mapToWorld = (u, v) => { const S = $('stBigMap').width; return [MAPV.x0 + u / S * MAPV.size, MAPV.z0 + v / S * MAPV.size]; };
+  function pickMap(u, v) { const S = $('stBigMap').width; let best = null, bd = 30; for (const b of beacons) { const [x, y] = mapP(b.x, b.z, S); const d = Math.hypot(u - x, v - (y - 26)); if (d < bd) { bd = d; best = b; } } return best; }
+  function drawBigMap(t = 0) {
+    const c = $('stBigMap'); if (!c) return; const g = c.getContext('2d'), S = c.width, H = isl.HALF, P = (x, z) => mapP(x, z, S), sc = S / MAPV.size;
+    // sea + island atlas
+    g.fillStyle = '#145f9a'; g.fillRect(0, 0, S, S);
+    const [ix, iy] = P(-H, -H); g.imageSmoothingEnabled = true; g.drawImage(isl.mapCanvas, ix, iy, H * 2 * sc, H * 2 * sc);
+    // grid like a printed atlas
+    g.strokeStyle = 'rgba(255,255,255,.08)'; g.lineWidth = 1; g.font = '800 15px Arial'; g.fillStyle = 'rgba(255,255,255,.45)'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    for (let k = 0; k <= 8; k++) { const w = -800 + k * 200, [u] = P(w, 0), [, v] = P(0, w); g.beginPath(); g.moveTo(u, 0); g.lineTo(u, S); g.moveTo(0, v); g.lineTo(S, v); g.stroke(); if (k < 8) { g.fillText('ABCDEFGH'[k], u + 100 * sc, 14); g.fillText(String(k + 1), 12, v + 100 * sc); } }
+    // zone names; chapters still locked are greyed out
+    const openC = openChapters(state.done);
+    for (const Z of ZONES) { const [x, y] = P(Z.x, Z.z), ch = CHAPTERS.find(q => q.id === Z.id), locked = ch && !openC.includes(ch.id);
+      g.save(); g.globalAlpha = locked ? .55 : 1; g.textAlign = 'center'; g.textBaseline = 'alphabetic';
+      if (ch) { g.font = '900 13px Arial'; const kt = locked ? `🔒 KAPITEL ${ch.n}` : `KAPITEL ${ch.n}`, w = g.measureText(kt).width + 16; g.fillStyle = Z.color; roundRect(g, x - w / 2, y - 44, w, 20, 10); g.fill(); g.fillStyle = '#10161c'; g.fillText(kt, x, y - 29); }
+      g.font = 'italic 1000 26px Arial'; g.lineWidth = 6; g.lineJoin = 'round'; g.strokeStyle = 'rgba(8,18,24,.75)'; g.strokeText(Z.name.toUpperCase(), x, y); g.fillStyle = '#fff'; g.fillText(Z.name.toUpperCase(), x, y); g.restore(); }
+    // landmarks
+    g.textAlign = 'center'; g.textBaseline = 'middle';
+    for (const L of isl.pois) { const [x, y] = P(L.x, L.z); g.fillStyle = 'rgba(255,255,255,.92)'; g.beginPath(); g.arc(x, y, 13, 0, TAU); g.fill(); g.strokeStyle = 'rgba(0,0,0,.35)'; g.lineWidth = 1.5; g.stroke(); g.font = '15px sans-serif'; g.fillText(L.icon, x, y + 1);
+      g.font = '800 12px Arial'; g.lineWidth = 3.5; g.strokeStyle = 'rgba(8,18,24,.7)'; g.strokeText(L.name, x, y + 24); g.fillStyle = '#fff'; g.fillText(L.name, x, y + 24); }
+    // gears already found
+    for (const G of gears) if (G.got) { const [x, y] = P(G.x, G.z); g.font = '14px sans-serif'; g.fillText('⚙️', x, y); }
+    // GPS route: soft glow, then marching dashes
+    const path = gps.path;
+    if (path.length > 1) { const col = gpsInfo?.color || '#4ad8ff'; g.lineCap = 'round'; g.lineJoin = 'round'; g.beginPath(); path.forEach(([x, z], k) => { const [u, v] = P(x, z); k ? g.lineTo(u, v) : g.moveTo(u, v); });
+      g.strokeStyle = 'rgba(0,0,0,.45)'; g.lineWidth = 11; g.stroke(); g.strokeStyle = col; g.lineWidth = 7; g.stroke(); g.setLineDash([10, 12]); g.lineDashOffset = -t * 40; g.strokeStyle = 'rgba(255,255,255,.95)'; g.lineWidth = 3; g.stroke(); g.setLineDash([]); }
+    // waypoint flag
+    if (waypoint) { const [x, y] = P(waypoint.x, waypoint.z); pinShape(g, x, y, '#4ad8ff', 1.05); g.font = '18px sans-serif'; g.fillText('📍', x, y - 27); }
+    // mission pins (teardrops), hovered one bigger with a label
+    const hovId = mapHover?.m.id || mapListHover;
+    const order = [...beacons].sort((a, b) => (a.m.id === hovId) - (b.m.id === hovId) || a.z - b.z);
+    for (const b of order) { const [x, y] = P(b.x, b.z), ch = CHAPTERS.find(q => q.id === b.m.ch), done = state.done[b.m.id], hov = b.m.id === hovId, col = b.m.boss ? '#e0283a' : ch.color, k = hov ? 1.3 : done ? .8 : 1;
+      if (!done) { const ph = ((t * .9 + b.x * .01) % 1 + 1) % 1; g.strokeStyle = col; g.globalAlpha = 1 - ph; g.lineWidth = 3; g.beginPath(); g.ellipse(x, y, 8 + ph * 22, (8 + ph * 22) * .5, 0, 0, TAU); g.stroke(); g.globalAlpha = 1; }
+      pinShape(g, x, y, col, k); g.font = `${Math.round(19 * k)}px sans-serif`; g.fillText(b.m.icon, x, y - 27 * k);
+      if (done) { g.font = '900 12px Arial'; g.fillStyle = '#ffd23a'; g.strokeStyle = '#10161c'; g.lineWidth = 3; const st = '★'.repeat(done); g.strokeText(st, x, y - 50 * k); g.fillText(st, x, y - 50 * k); }
+      if (hov) { const kind = { rings: 'Zeitrennen', smash: 'Zerstören', collect: 'Sammeln', chase: 'Verfolgung', escape: 'Flucht', race: 'Bossrennen', avalanche: 'Flucht', worm: 'Boss-Jagd', boss: 'Bosskampf' }[b.m.kind], d = Math.round(Math.hypot(b.x - player.x, b.z - player.z));
+        const l1 = `${b.m.icon} ${b.m.name}`, l2 = `${kind} · ${d} m · ${'★'.repeat(done || 0)}${'☆'.repeat(3 - (done || 0))}`; g.font = '900 17px Arial'; const w = Math.max(g.measureText(l1).width, 170) + 28, bx = clamp(x - w / 2, 8, S - w - 8), by = y - 128;
+        g.fillStyle = 'rgba(12,22,30,.94)'; roundRect(g, bx, by, w, 54, 12); g.fill(); g.strokeStyle = col; g.lineWidth = 2.5; g.stroke(); g.textAlign = 'left'; g.fillStyle = '#fff'; g.fillText(l1, bx + 14, by + 19); g.font = '700 13px Arial'; g.fillStyle = '#b8ccd4'; g.fillText(l2, bx + 14, by + 39); g.textAlign = 'center'; } }
+    // you
+    { const [x, y] = P(player.x, player.z), ph = (t * 1.2) % 1; g.strokeStyle = 'rgba(255,255,255,' + (1 - ph) + ')'; g.lineWidth = 3; g.beginPath(); g.arc(x, y, 12 + ph * 26, 0, TAU); g.stroke();
+      g.save(); g.translate(x, y); g.rotate(-player.angle + Math.PI); g.shadowColor = 'rgba(0,0,0,.6)'; g.shadowBlur = 8; g.fillStyle = '#fff'; g.strokeStyle = '#e34335'; g.lineWidth = 3.5; g.beginPath(); g.moveTo(0, -17); g.lineTo(12, 12); g.lineTo(0, 6); g.lineTo(-12, 12); g.closePath(); g.fill(); g.shadowBlur = 0; g.stroke(); g.restore(); }
+    // compass and scale bar
+    { const x = S - 62, y = 84; g.fillStyle = 'rgba(12,22,30,.75)'; g.beginPath(); g.arc(x, y, 34, 0, TAU); g.fill(); g.strokeStyle = 'rgba(255,255,255,.5)'; g.lineWidth = 2; g.stroke();
+      g.fillStyle = '#ff5a4a'; g.beginPath(); g.moveTo(x, y - 26); g.lineTo(x + 7, y); g.lineTo(x - 7, y); g.fill(); g.fillStyle = '#fff'; g.beginPath(); g.moveTo(x, y + 26); g.lineTo(x + 7, y); g.lineTo(x - 7, y); g.fill(); g.font = '900 14px Arial'; g.fillStyle = '#ff5a4a'; g.fillText('N', x, y - 46); }
+    { const L = 200 * sc, x = 26, y = S - 30; g.fillStyle = 'rgba(12,22,30,.75)'; roundRect(g, x - 12, y - 24, L + 24, 38, 8); g.fill(); g.fillStyle = '#fff'; g.fillRect(x, y, L / 2, 5); g.fillStyle = '#10161c'; g.fillRect(x + L / 2, y, L / 2, 5); g.strokeStyle = '#fff'; g.lineWidth = 1; g.strokeRect(x, y, L, 5); g.font = '800 12px Arial'; g.fillStyle = '#fff'; g.textAlign = 'left'; g.fillText('0', x - 2, y - 10); g.textAlign = 'right'; g.fillText('200 m', x + L + 4, y - 10); g.textAlign = 'center'; }
+    // soft vignette
+    const vg = g.createRadialGradient(S / 2, S / 2, S * .35, S / 2, S / 2, S * .75); vg.addColorStop(0, 'rgba(0,10,20,0)'); vg.addColorStop(1, 'rgba(0,10,20,.45)'); g.fillStyle = vg; g.fillRect(0, 0, S, S);
   }
+  function pinShape(g, x, y, col, k = 1) {
+    g.save(); g.translate(x, y); g.scale(k, k);
+    g.fillStyle = 'rgba(0,0,0,.35)'; g.beginPath(); g.ellipse(0, 0, 8, 3.5, 0, 0, TAU); g.fill();
+    g.beginPath(); g.moveTo(0, 0); g.bezierCurveTo(-6, -10, -17, -16, -17, -27); g.arc(0, -27, 17, Math.PI, 0); g.bezierCurveTo(17, -16, 6, -10, 0, 0); g.closePath();
+    g.fillStyle = col; g.fill(); g.lineWidth = 3; g.strokeStyle = '#fff'; g.stroke(); g.restore();
+  }
+  function roundRect(g, x, y, w, h, r) { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); }
   function drawMini() {
-    const g = miniCtx, S = mini.width, R = S / 2, img = isl.mapCanvas, H = isl.HALF, k = S / 380, th = player.angle + Math.PI, cs = Math.cos(th), sn = Math.sin(th);
-    g.save(); g.clearRect(0, 0, S, S); g.beginPath(); g.arc(R, R, R - 2, 0, TAU); g.clip(); g.fillStyle = '#1a7aa0'; g.fillRect(0, 0, S, S);
-    g.translate(R, R); g.rotate(th); g.scale(k, k); g.translate(-player.x, -player.z); g.imageSmoothingEnabled = true; g.drawImage(img, -H, -H, H * 2, H * 2);
+    const g = miniCtx, S = mini.width, R = S / 2, img = isl.mapCanvas, H = isl.HALF, view = 360 + clamp(Math.abs(player.speed) - 15, 0, 25) * 6, k = S / view, th = player.angle + Math.PI, cs = Math.cos(th), sn = Math.sin(th);
+    mini.zoom = (mini.zoom || k) + (k - (mini.zoom || k)) * .05; const kk = mini.zoom;
+    g.save(); g.clearRect(0, 0, S, S); g.beginPath(); g.arc(R, R, R - 2, 0, TAU); g.clip(); g.fillStyle = '#145f9a'; g.fillRect(0, 0, S, S);
+    g.translate(R, R); g.rotate(th); g.scale(kk, kk); g.translate(-player.x, -player.z); g.imageSmoothingEnabled = true; g.drawImage(img, -H, -H, H * 2, H * 2);
+    // GPS route on the minimap
+    const path = gps.path;
+    if (path.length > 1) { g.lineCap = 'round'; g.lineJoin = 'round'; g.beginPath(); path.forEach(([x, z], i) => i ? g.lineTo(x, z) : g.moveTo(x, z));
+      g.strokeStyle = 'rgba(0,0,0,.5)'; g.lineWidth = 11 / kk; g.stroke(); g.strokeStyle = gpsInfo?.color || (mission?.boss ? '#ff4a5a' : '#ffd23a'); g.lineWidth = 7 / kk; g.stroke(); g.strokeStyle = 'rgba(255,255,255,.9)'; g.lineWidth = 2.2 / kk; g.setLineDash([8 / kk, 9 / kk]); g.lineDashOffset = -timeT * 30 / kk; g.stroke(); g.setLineDash([]); }
     g.setTransform(1, 0, 0, 1, 0, 0);
-    const dot = (wx, wz, col, r = 6) => { const dx = wx - player.x, dz = wz - player.z; let x = (dx * cs - dz * sn) * k, y = (dx * sn + dz * cs) * k; const d = Math.hypot(x, y), m = R - 10; if (d > m) { x *= m / d; y *= m / d; } g.fillStyle = col; g.beginPath(); g.arc(R + x, R + y, r, 0, TAU); g.fill(); g.strokeStyle = '#fff'; g.lineWidth = 2; g.stroke(); };
-    if (!mission) for (const b of beacons) dot(b.x, b.z, b.m.boss ? '#ff3a4a' : CHAPTERS.find(c => c.id === b.m.ch).color, state.done[b.m.id] ? 4 : 6);
-    if (rt?.mapPoints) for (const [wx, wz, col] of rt.mapPoints()) dot(wx, wz, col, 5);
+    const proj = (wx, wz) => { const dx = wx - player.x, dz = wz - player.z; let x = (dx * cs - dz * sn) * kk, y = (dx * sn + dz * cs) * kk; const d = Math.hypot(x, y), m = R - 16, out = d > m; if (out) { x *= m / d; y *= m / d; } return [R + x, R + y, out]; };
+    const dot = (wx, wz, col, r = 7) => { const [x, y] = proj(wx, wz); g.fillStyle = col; g.beginPath(); g.arc(x, y, r, 0, TAU); g.fill(); g.strokeStyle = '#fff'; g.lineWidth = 2.5; g.stroke(); };
+    g.textAlign = 'center'; g.textBaseline = 'middle';
+    if (!mission) { for (const b of beacons) { const [x, y, out] = proj(b.x, b.z), ch = CHAPTERS.find(c => c.id === b.m.ch), col = b.m.boss ? '#ff3a4a' : ch.color, done = state.done[b.m.id];
+        g.fillStyle = col; g.beginPath(); g.arc(x, y, done ? 6 : out ? 8 : 12, 0, TAU); g.fill(); g.strokeStyle = '#fff'; g.lineWidth = 2.5; g.stroke(); if (!done && !out) { g.font = '14px sans-serif'; g.fillText(b.m.icon, x, y + 1); } }
+      if (waypoint) { const [x, y] = proj(waypoint.x, waypoint.z); g.font = '22px sans-serif'; g.fillText('📍', x, y - 8); } }
+    if (rt?.mapPoints) for (const [wx, wz, col] of rt.mapPoints()) dot(wx, wz, col, 6);
+    // inner ring shadow
+    const vg = g.createRadialGradient(R, R, R * .7, R, R, R); vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,.35)'); g.fillStyle = vg; g.fillRect(0, 0, S, S);
     g.restore();
-    g.fillStyle = '#fff'; g.strokeStyle = '#111'; g.lineWidth = 2; g.beginPath(); g.moveTo(R, R - 9); g.lineTo(R + 7, R + 7); g.lineTo(R, R + 3); g.lineTo(R - 7, R + 7); g.closePath(); g.fill(); g.stroke();
+    g.save(); g.translate(R, R); g.shadowColor = 'rgba(0,0,0,.6)'; g.shadowBlur = 6; g.fillStyle = '#fff'; g.strokeStyle = '#e34335'; g.lineWidth = 3; g.beginPath(); g.moveTo(0, -13); g.lineTo(10, 10); g.lineTo(0, 5); g.lineTo(-10, 10); g.closePath(); g.fill(); g.shadowBlur = 0; g.stroke(); g.restore();
     mini.parentElement.style.setProperty('--rot', th + 'rad');
   }
 
@@ -348,7 +415,7 @@ export function createStory(opts) {
   function endMission(silent = false) {
     disposeRuntime(); mission = null; if (!root) return;
     $('stObj').hidden = true; $('stHearts').hidden = true; $('stAmmo').hidden = true; $('stCount').hidden = true; $('stBoss').hidden = true;
-    beacons.forEach(q => q.g.visible = true); gears.forEach(G => G.m.visible = !G.got); arrow.visible = false;
+    beacons.forEach(q => q.g.visible = true); gears.forEach(G => G.m.visible = !G.got); gps.off(); gpsInfo = null;
     if (!silent) player.invuln = 1;
   }
   function disposeRuntime() {
@@ -473,7 +540,8 @@ export function createStory(opts) {
     return list;
   }
   let checkerTex = null; function checker() { if (checkerTex) return checkerTex; const c = document.createElement('canvas'); c.width = 64; c.height = 8; const g = c.getContext('2d'); for (let i = 0; i < 16; i++) for (let j = 0; j < 2; j++) { g.fillStyle = (i + j) % 2 ? '#111' : '#fff'; g.fillRect(i * 4, j * 4, 4, 4); } checkerTex = new THREE.CanvasTexture(c); checkerTex.magFilter = THREE.NearestFilter; return checkerTex; }
-  function pointArrow(x, z) { arrow.visible = true; arrow.position.set(player.x + Math.sin(player.angle) * 1.5, player.y + 2.5, player.z + Math.cos(player.angle) * 1.5); arrow.rotation.y = Math.atan2(x - player.x, z - player.z); }
+  // GPS line on the ground (see guide.js); missions in gold, boss fights in red
+  function guideTo(x, z, o = {}) { gps.target(x, z, o.color || (mission?.boss ? '#ff4a5a' : '#ffd23a'), o); }
   // timed par from an AI-like estimate: route length over a realistic average speed
   // limits come from a quick simulated drift-free run with the same physics: you need clean driving to make it, drift turbos for three stars
   const calCache = new Map();
@@ -488,10 +556,11 @@ export function createStory(opts) {
     rings(m, route) {
       const rings = makeRings(route, m.spacing || 55), limit = parTime(m, route); let next = 0;
       rings.forEach((r, i) => r.tor.material.opacity = i ? .45 : 1);
-      const rocks = []; let hzT = 2;
+      let hzT = 2, pk = 0, pS = 0;
       return {
         update(dt) {
-          const r = rings[next]; r.tor.rotation.z += dt * 2; pointArrow(r.x, r.z);
+          const r = rings[next]; r.tor.rotation.z += dt * 2;
+          const pr = routeProgress(route, player.x, player.z, pk); if (pr.d < 45) { pk = pr.k; pS = pr.s; gps.route(route, pS, rings[Math.min(next + 1, rings.length - 1)].s); } else guideTo(r.x, r.z);
           if (Math.hypot(player.x - r.x, player.z - r.z) < r.R + .5 && Math.abs(player.y - r.y) < r.R + 3) {
             sfx('ring'); fx.burst(r.x, r.y + 2, r.z, 'box'); scene.remove(r.g); next++;
             if (next >= rings.length) return finishMission(true, { time: elapsed, stars: timeStars(elapsed, m, route), detail: `Limit ${fmt(limit)} · ★★★ unter ${fmt(aiTime(m, route) * .96)}` });
@@ -524,7 +593,7 @@ export function createStory(opts) {
           let best = null, bd = 1e9;
           for (const q of list) { if (!q.alive) continue; q.g.userData.anim?.(t); const d = Math.hypot(player.x - q.x, player.z - q.z); if (d < bd) { bd = d; best = q; }
             if (d < 2.4 + (q.g.userData.r || 1.6) && Math.abs(player.y - q.y) < 4) { q.alive = false; left--; smashFx(q); sfx('smash'); player.speed *= .85; cam.shake = .5; toast(left ? `${left} übrig` : 'ALLE!', 700); } }
-          if (best) pointArrow(best.x, best.z);
+          if (best) guideTo(best.x, best.z);
           if (!left) return finishMission(true, { time: elapsed, stars: remainStars(limit - elapsed, limit) });
           if (elapsed > limit) finishMission(false, { reason: `Noch ${left} übrig.`, hint: 'Schau auf die Minikarte: violette Punkte sind die Ziele.' });
         },
@@ -547,7 +616,7 @@ export function createStory(opts) {
           let best = null, bd = 1e9;
           for (const q of list) { if (!q.alive) continue; q.g.rotation.y = t * 2.5; q.g.position.y = q.y + Math.sin(t * 3 + q.x) * .3; const d = Math.hypot(player.x - q.x, player.z - q.z); if (d < bd) { bd = d; best = q; }
             if (d < 3 && Math.abs(player.y + .6 - q.y) < 3) { q.alive = false; left--; scene.remove(q.g); sfx('pick'); fx.burst(q.x, q.y - 1, q.z, 'box'); } }
-          if (best) pointArrow(best.x, best.z);
+          if (best) guideTo(best.x, best.z);
           if (!left) return finishMission(true, { time: elapsed, stars: remainStars(limit - elapsed, limit) });
           if (elapsed > limit) finishMission(false, { reason: `Noch ${left} übrig.`, hint: 'Die Sterne in der Luft erreichst du über die Rampen.' });
         },
@@ -568,7 +637,7 @@ export function createStory(opts) {
           const want = routeSpeed(route, route.pts[n.k].s, TOP * c.capMul);
           boostT -= dt; if (boostT <= 0 && c.spinT <= 0) { boostT = 5 + Math.random() * 4; turbo(c, 1, TOP * 1.12); }
           npcDrive(n, aiStep(c, ahead.x, ahead.z, want, dt), dt);
-          pointArrow(c.x, c.z);
+          guideTo(c.x, c.z, { color: '#ff4a5a', pin: false });
           if (gap < 3.4 && Math.abs(player.y - c.y) < 2.5 && c.invuln <= 0 && player.speed > 5) { hits++; spinOut(c, 1.4); c.invuln = 2.6; player.speed *= .8; sfx('smash'); fx.burst(c.x, c.y, c.z, 'hit'); cam.shake = .6; toast(hits < m.hits ? `TREFFER ${hits} / ${m.hits}` : 'ERWISCHT!', 800); }
           if (hits >= m.hits) return finishMission(true, { time: elapsed, stars: remainStars(limit - elapsed, limit) });
           if (gap > 230) { escapeT += dt; if (escapeT > 3) return finishMission(false, { reason: 'Er ist entkommen.', hint: 'Bleib dran: Drift-Turbos holen schnell auf.' }); } else escapeT = 0;
@@ -594,7 +663,7 @@ export function createStory(opts) {
             g.rotation.y = Math.atan2(d.vx, d.vz); g.userData.anim(t);
             if (d.cool <= 0 && Math.hypot(player.x - g.position.x, player.z - g.position.z) < 3.2) { d.cool = 2.5; d.vx *= -.6; d.vz *= -.6; hurt('zap'); fx.burst(player.x, player.y + 1, player.z, 'zap'); }
           }
-          if (Math.hypot(player.x - A.x, player.z - A.z) > A.r) pointArrow(A.x, A.z); else arrow.visible = false;
+          if (Math.hypot(player.x - A.x, player.z - A.z) > A.r) guideTo(A.x, A.z); else gps.off();
           if (elapsed > m.time) finishMission(true, { time: elapsed, stars: hearts, detail: `${hearts} Herz${hearts > 1 ? 'en' : ''} übrig` });
         },
         hud: () => ({ kind: 'FLUCHT', title: m.name, text: Math.hypot(player.x - A.x, player.z - A.z) > A.r ? 'Zurück ins Gebiet!' : 'Weich den Drohnen aus!', time: m.time - elapsed }),
@@ -633,7 +702,7 @@ export function createStory(opts) {
           for (let i = drops.length - 1; i >= 0; i--) { const d = drops[i]; d.life -= dt; if (d.k === 'mine') d.g.scale.setScalar(1 + Math.sin(t * 8) * .15);
             if (Math.hypot(player.x - d.x, player.z - d.z) < (d.k === 'oil' ? 2.8 : 2.2)) { if (d.k === 'mine') { burst(d.x, d.g.position.y, d.z, 'zap'); player.vy = 8; player.grounded = false; } spinOut(player, d.k === 'oil' ? .9 : 1.2); sfx('hurt'); d.life = 0; }
             if (d.life <= 0) { scene.remove(d.g); drops.splice(i, 1); } }
-          pointArrow(...(() => { const p = routeAt(route, Math.min(route.length, pS + 40)); return [p.x, p.z]; })());
+          gps.route(route, pS, Math.min(route.length, pS + 280), '#ff4a5a');
           if (pS >= finishS) { const margin = finishedRival ? 0 : (finishS - rS) / Math.max(10, c.speed); finishMission(true, { time: elapsed, stars: margin > 3 ? 3 : margin > 1 ? 2 : 1, detail: `Vorsprung ${margin.toFixed(1)} s` }); }
           this.pos = pS >= rS ? 1 : 2; this.gap = (pS - rS);
         },
@@ -654,7 +723,7 @@ export function createStory(opts) {
           const p = routeAt(route, Math.max(0, wS)); wall.position.set(p.x, p.y, p.z); wall.rotation.y = p.angle; wall.userData.anim(t);
           if (Math.random() < dt * 20) fx.burst(p.x + (Math.random() - .5) * 30, p.y + 4, p.z, 'smoke');
           cam.shake = Math.max(cam.shake, clamp(1 - (pS - wS) / 60, 0, .7));
-          pointArrow(gate[0].x, gate[0].z);
+          gps.route(route, pS, Math.min(route.length, pS + 280), '#8ad8ff');
           if (wS >= pS - 3) return finishMission(false, { reason: 'Die Lawine hat dich erwischt.', hint: 'Nicht von der Straße abkommen: Tiefschnee bremst.' });
           if (pS >= finishS) finishMission(true, { time: elapsed, stars: pS - wS > 65 ? 3 : pS - wS > 32 ? 2 : 1, detail: `${Math.round(pS - wS)} m Vorsprung` });
         },
@@ -681,7 +750,7 @@ export function createStory(opts) {
           eruptT -= dt; if (eruptT <= 0) { eruptT = 2.4 + Math.random() * 1.6; const p = routeAt(route, pS + 30 + player.speed * 1.2); const off = (Math.random() - .5) * p.hw; aoe({ x: p.x + Math.cos(p.angle) * off, z: p.z - Math.sin(p.angle) * off, r: 6.5, delay: 1.3, kind: 'sand' }); }
           caughtT -= dt;
           if (wS >= pS - 4 && caughtT <= 0) { caughtT = 2; hurt('worm'); wS = pS - 75; toast('ER HAT DICH ERWISCHT!', 1000); }
-          pointArrow(gate[0].x, gate[0].z);
+          gps.route(route, pS, Math.min(route.length, pS + 280), '#ff4a5a');
           if (pS >= finishS) finishMission(true, { time: elapsed, stars: hearts, detail: `${hearts} Herz${hearts > 1 ? 'en' : ''} übrig` });
         },
         hud: () => ({ kind: 'BOSS-VERFOLGUNGSJAGD', title: `${m.name} · ${m.title}`, text: `Wurm ${Math.max(0, Math.round(pS - wS))} m hinter dir · ${Math.max(0, Math.round(finishS - pS))} m bis zum Ausgang`, warn: pS - wS < 35 }),
@@ -708,7 +777,7 @@ export function createStory(opts) {
           if (A.inner && d < A.inner) { hurt('lava'); const a = Math.atan2(player.z - A.z, player.x - A.x); player.x = A.x + Math.cos(a) * (A.inner + 3); player.z = A.z + Math.sin(a) * (A.inner + 3); }
           stepBoxes(dt, t);
           $('stBossBar').style.width = (boss.hp / boss.maxHp * 100) + '%'; $('stBoss').classList.toggle('vul', boss.vulnerable);
-          if (ammo === 0) { const b = boxes.filter(q => q.cool <= 0).sort((a, b) => Math.hypot(a.x - player.x, a.z - player.z) - Math.hypot(b.x - player.x, b.z - player.z))[0]; if (b) pointArrow(b.x, b.z); else arrow.visible = false; } else { const w = boss.weak(); pointArrow(w.x, w.z); }
+          if (ammo === 0) { const b = boxes.filter(q => q.cool <= 0).sort((a, b) => Math.hypot(a.x - player.x, a.z - player.z) - Math.hypot(b.x - player.x, b.z - player.z))[0]; if (b) guideTo(b.x, b.z, { direct: true, color: '#ffd23a' }); else gps.off(); } else { const w = boss.weak(); guideTo(w.x, w.z, { direct: true, pin: false }); }
           if (boss.hp <= 0) { cam.shake = 1.5; const w = boss.weak(); for (let i = 0; i < 6; i++) setTimeout(() => burst(w.x + (Math.random() - .5) * 10, w.y, w.z + (Math.random() - .5) * 10, 'fire'), i * 120); finishMission(true, { time: elapsed, stars: hearts, detail: `${hearts} Herz${hearts > 1 ? 'en' : ''} übrig` }); }
         },
         hud: () => ({ kind: 'BOSSKAMPF', title: m.name, text: ammo ? (boss.vulnerable ? 'JETZT FEUERN! (E)' : 'Warte auf die Lücke …') : 'Hol dir Raketen aus den Kisten', time: null, elapsed: true, hot: boss.vulnerable && ammo > 0 }),
@@ -791,6 +860,8 @@ export function createStory(opts) {
     for (const G of gears) if (G.m.visible) { G.m.rotation.y = t * 2; G.m.position.y = G.y + Math.sin(t * 2.5 + G.x) * .35; }
     for (const b of beacons) { b.ring.rotation.z = t; b.icon.position.y = 8 + Math.sin(t * 2 + b.x) * .5; b.pillar.material.opacity = (state.done[b.m.id] ? .1 : .24) + Math.sin(t * 3 + b.z) * .05; }
     isl.update(dt, t, camera, player);
+    gps.update(dt, t, player);
+    if (mode === 'map') { if (!mission) steerGps(); drawBigMap(t); }
     updateCamera(dt);
     stepWeather(dt, t);
     updateHud();
@@ -814,8 +885,18 @@ export function createStory(opts) {
     }
     // zone banner
     const z = isl.zoneAt(player.x, player.z); if (z !== zoneNow) { if (zoneNow && Date.now() - zoneBannerT > 8000) { banner('ZONE', z.name.toUpperCase(), '', 2, z.color); zoneBannerT = Date.now(); } zoneNow = z; }
-    // nearest open mission arrow (only when no mission is close)
-    const open = beacons.filter(b => !state.done[b.m.id]); if (open.length && !nearBeacon) { const b = open.sort((a, c) => Math.hypot(a.x - player.x, a.z - player.z) - Math.hypot(c.x - player.x, c.z - player.z))[0]; if (Math.hypot(b.x - player.x, b.z - player.z) > 40) pointArrow(b.x, b.z); else arrow.visible = false; } else arrow.visible = false;
+    steerGps();
+  }
+  // GPS: your own waypoint from the map, otherwise the nearest open mission
+  function steerGps() {
+    if (waypoint && Math.hypot(waypoint.x - player.x, waypoint.z - player.z) < 14) { toast('ZIEL ERREICHT', 1100); sfx('ring'); waypoint = null; }
+    const open = beacons.filter(b => !state.done[b.m.id]);
+    const goal = waypoint || (open.length ? (b => ({ x: b.x, z: b.z, b }))(open.sort((a, c) => Math.hypot(a.x - player.x, a.z - player.z) - Math.hypot(c.x - player.x, c.z - player.z))[0]) : null);
+    if (goal && !nearBeacon && Math.hypot(goal.x - player.x, goal.z - player.z) > 30) {
+      const b = goal.b, ch = b && CHAPTERS.find(c => c.id === b.m.ch);
+      gps.target(goal.x, goal.z, b ? (b.m.boss ? '#ff4a5a' : ch.color) : '#4ad8ff');
+      gpsInfo = b ? { icon: b.m.icon, kind: b.m.boss ? 'BOSS' : 'MISSION', name: b.m.name, color: b.m.boss ? '#ff4a5a' : ch.color } : { icon: '📍', kind: 'WEGPUNKT', name: goal.name || 'Dein Ziel', color: '#4ad8ff' };
+    } else { gps.off(); gpsInfo = null; }
   }
 
   function snapCamera() { const a = player.angle; cam.pos.set(player.x - Math.sin(a) * 8, player.y + 3.6, player.z - Math.cos(a) * 8); cam.look.set(player.x, player.y + 1, player.z); }
@@ -842,6 +923,11 @@ export function createStory(opts) {
     if (rt && (mode === 'mission' || mode === 'count')) { const h = rt.hud?.() || {};
       $('stObjKind').textContent = h.kind || ''; $('stObjTitle').textContent = h.title || ''; $('stObjText').textContent = h.text || '';
       $('stObjTime').textContent = h.time != null ? fmt(h.time) : h.elapsed ? fmt(elapsed) : ''; $('stObj').classList.toggle('warn', !!h.warn); $('stObj').classList.toggle('hot', !!h.hot); }
+    const gi = (mode === 'free' || mode === 'card') && gps.active && gpsInfo; $('stGps').hidden = !gi;
+    if (gi) { const path = gps.path; let L = 0; for (let k = 1; k < path.length; k++) L += Math.hypot(path[k][0] - path[k - 1][0], path[k][1] - path[k - 1][1]);
+      $('stGps').style.setProperty('--gc', gi.color); $('stGpsIcon').textContent = gi.icon; let ahead = path[path.length - 1]; for (let k = 1, d = 0; k < path.length; k++) { d += Math.hypot(path[k][0] - path[k - 1][0], path[k][1] - path[k - 1][1]); if (d > 18) { ahead = path[k]; break; } }
+      const turn = L > 40 && Math.abs(angleDiff(Math.atan2(ahead[0] - player.x, ahead[1] - player.z), player.angle)) > 2.1; $('stGps').classList.toggle('turn', turn);
+      $('stGpsKind').textContent = turn ? '↩ BITTE WENDEN' : gi.kind; $('stGpsName').textContent = gi.name; $('stGpsDist').textContent = L > 950 ? (L / 1000).toFixed(1) + ' km' : Math.round(L / 10) * 10 + ' m'; }
     drawMini();
   }
 
