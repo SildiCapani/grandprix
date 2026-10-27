@@ -439,4 +439,4 @@ export function spikeShell() {
 }
 
 // Shared with the driver heads (avatars.js).
-export { kit, E as sE, Cp as sCp, P as sP };
+export { kit, E as sE, Cp as sCp, P as sP, shiftParts };

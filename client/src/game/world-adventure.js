@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { buildOcean } from './world-ocean.js';
 import { bird, bat, gummyBear, dragon, penguin, orca, seal, polarBear, dolphin, krakenHead, husky, tentacle } from './critters.js';
 
 // Season 3 worlds: the course runs over water / chocolate / an abyss, with open edges to fall off.
@@ -8,7 +9,7 @@ import { bird, bat, gummyBear, dragon, penguin, orca, seal, polarBear, dolphin, 
 // Everything that moves is animated through ctx.updaters. The terrain is shaped by the course itself:
 // flat land along the road, cliffs down to the sea / abyss, and nothing at all under the bridges.
 
-export const ADVENTURE_THEMES = Object.freeze(['pirate', 'candy', 'castle', 'arctic', 'rooftops', 'galaxy']);
+export const ADVENTURE_THEMES = Object.freeze(['pirate', 'candy', 'castle', 'arctic', 'rooftops', 'galaxy', 'beach', 'reef', 'abyss']);
 
 export function buildAdventure(ctx) {
   const { group, track, W, r, inst, M, G, std, free, updaters, canvasTex, clouds, speckle, textPanel, glowTex, weather, theme, at } = ctx;
@@ -144,6 +145,7 @@ export function buildAdventure(ctx) {
   }, 1);
 
   ({ pirate: buildPirate, candy: buildCandy, castle: buildCastle, arctic: buildArctic, rooftops: buildRooftops, galaxy: buildGalaxy })[theme]?.();
+  if (theme === 'beach' || theme === 'reef' || theme === 'abyss') buildOcean({ group, track, W, r, inst, M, G, std, free, updaters, canvasTex, textPanel, glowTex, weather, at, fallY, fbm, add, shapedTerrain, terrainH: () => terrainH, waterPlane, onLand, inWater, alongRoad, flock, sprite, roadStrip, striped }, theme);
 
   // =====================================================================================
   function buildPirate() {

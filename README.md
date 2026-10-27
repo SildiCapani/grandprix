@@ -118,6 +118,9 @@ Wer drüberfährt, klappt einen Gleitschirm in Kartfarbe auf, steigt hoch und se
 16. **Polarlicht-Fjord**: Brücken zwischen Eisschollen, Sprung über einen Gletscherspalt, Abkürzung durch die Eishöhle. Polarlicht, Pinguine, springende Orcas, ein Buckelwal, Eisbär, Forschungsstation und Hundeschlitten.
 17. **Neon-Dächer**: Die Straße läuft über die Dächer einer Stadt bei Nacht. Zwei Sprünge zwischen Hochhäusern, Brücken ohne Geländer, Abkürzung übers Parkdeck. Fliegende Autos, Verkehr tief unten, Luftschiff, Hubschrauber mit Suchscheinwerfer und Feuerwerk.
 18. **Galaxie**: eine leuchtende Glasstraße durchs All, eine Spirale um die Sonne und zwei Sprünge. Außer auf der Startgeraden gibt es **keine einzige Leitplanke**. Drumherum eine sich drehende Spiralgalaxie, Nebel, Planeten mit Ringen, ein Schwarzes Loch, Weltraumwale, Kometen und eine Raumstation.
+19. **Surfer-Bucht**: Strandpromenade mit Palmen, Rettungstürmen und Beachvolleyball, dann ein langer Pier übers Meer (mit Sprung) zum Riesenrad und Karussell. Leuchtturm mit drehendem Lichtkegel auf der Klippe, Surfer, Segelboote, Delfine. Abkürzung durch die Dünen.
+20. **Korallenriff**: Rennen auf dem Meeresgrund. Weniger Schwerkraft, Lichtstrahlen von der Wasseroberfläche, tanzende Lichtmuster am Boden, Korallen, wogender Seetang, ein Felsbogen über der Straße, ein Schiffswrack mit Schatztruhe, Fischschwärme, Schildkröten, Mantarochen und ein Walhai. Sprung über eine Spalte, Abkürzung durch den Sand.
+21. **Tiefsee-Graben**: eine leuchtende Straße über dem Abgrund, **ohne Leitplanken**. Schwarze Raucher, ein Riesen-Anglerfisch mit Leuchtköder, leuchtende Quallen, ein Walskelett, ein U-Boot mit Suchscheinwerfern und überall leuchtendes Plankton. Ein Sprung und ein langer Gleitflug.
 
 ### Absturz & Rettungsdrohne
 Auf den Strecken 13–18 haben manche Stücke **kein Geländer** (dort fehlen die Leitplanken). Fährst du da über den Rand, stürzt du ins Wasser, in die Schokolade oder in den Nebel. Dann holt dich die **Rettungsdrohne** ab und setzt dich kurz vor der Absturzstelle wieder auf die Straße. Das kostet etwa 2,5 Sekunden. Die KI kann auch runterfallen, zum Beispiel nach einem Panzer-Treffer an der Kante. Online sehen alle die Drohne.
@@ -158,6 +161,9 @@ Auf Strecken, wo es passt, kommt einem etwas in die Quere. Treffer schleudern di
 | Zuckerland | rollende Donuts und ein Riesen-Gummibär |
 | Drachenburg | Drachenfeuer auf einer Straßenhälfte (Seite wechselt) |
 | Neon-Dächer | Schwebeautos fliegen tief über die Brücken |
+| Surfer-Bucht | Wellen rollen über die Straße, ein Riesen-Wasserball springt über den Pier |
+| Korallenriff | Quallen sinken auf die Straße, Meeresschildkröten kreuzen |
+| Tiefsee-Graben | ein heißer Schlot glüht auf der Straße, ein Leucht-Aal schlängelt sich quer |
 
 Alles läuft nach der Rennuhr ab, online sehen also alle dasselbe.
 
@@ -191,6 +197,7 @@ Alles läuft nach der Rennuhr ab, online sehen also alle dasselbe.
 - **Sternen-Cup:** Sternenbahn, Wolkeninseln, Mond
 - **Abenteuer-Cup:** Piratenbucht, Zuckerland, Drachenburg
 - **Kosmos-Cup:** Polarlicht-Fjord, Neon-Dächer, Galaxie
+- **Ozean-Cup:** Surfer-Bucht, Korallenriff, Tiefsee-Graben
 
 Pokal-Bonus: Gold 300 XP, Silber 200 XP, Bronze 100 XP.
 

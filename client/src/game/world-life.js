@@ -15,8 +15,8 @@ export function buildLife(ctx) {
   const add = (o, x, y, z) => { o.position.set(x, y, z); group.add(o); return o; };
   const sprite = (tex, color, size, additive = true) => { const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, color, transparent: true, depthWrite: false, blending: additive ? THREE.AdditiveBlending : THREE.NormalBlending, toneMapped: false })); s.scale.setScalar(size); return s; };
   const roadY = t => track.heightAt(t);
-  const S3 = ['pirate', 'candy', 'castle', 'arctic', 'rooftops', 'galaxy'];
-  const elevatedOnly = ['space', 'sky', 'galaxy'];
+  const S3 = ['pirate', 'candy', 'castle', 'arctic', 'rooftops', 'galaxy', 'beach', 'reef', 'abyss'];
+  const elevatedOnly = ['space', 'sky', 'galaxy', 'abyss'];
 
   // ---------- cloth that flaps in the wind (one shared time uniform for every flag) ----------
   const wind = { value: 0 };

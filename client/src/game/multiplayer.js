@@ -1,8 +1,8 @@
 // Four-player, host-authoritative WebRTC sessions. Signalling stays in the
 // invitation/answer codes; only car and race data travel over the data channels.
-const MAP_IDS = new Set(['coast', 'canyon', 'neon', 'volcano', 'glacier', 'stars', 'jungle', 'savanna', 'forest', 'sky', 'sakura', 'moon', 'pirate', 'candy', 'castle', 'arctic', 'rooftops', 'galaxy', 'arena', 'colosseum', 'icering', 'custom']);
+const MAP_IDS = new Set(['coast', 'canyon', 'neon', 'volcano', 'glacier', 'stars', 'jungle', 'savanna', 'forest', 'sky', 'sakura', 'moon', 'pirate', 'candy', 'castle', 'arctic', 'rooftops', 'galaxy', 'beach', 'reef', 'abyss', 'arena', 'colosseum', 'icering', 'custom']);
 // Online cups (3 races, points per place), team battles (red vs blue) and shared custom tracks.
-const CUP_IDS = new Set(['kueste', 'wildnis', 'gipfel', 'sterne', 'abenteuer', 'kosmos']);
+const CUP_IDS = new Set(['kueste', 'wildnis', 'gipfel', 'sterne', 'abenteuer', 'kosmos', 'ozean']);
 const ID_RE = /^[a-zA-Z0-9_-]{1,64}$/, TRACK_RE = /^APX1-[A-Za-z0-9_-]{8,8000}$/;
 const trackCodeOf = v => typeof v === 'string' && TRACK_RE.test(v) ? v : '';
 function cleanCup(c) {

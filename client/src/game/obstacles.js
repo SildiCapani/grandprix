@@ -21,6 +21,13 @@ const DEFS = {
   rooftops: [{ type: 'cross', kind: 'hovercar', at: [110, -128], every: 5.5, dur: 2, r: 2, lift: 1.1 }, { type: 'cross', kind: 'hovercar', at: [-137, 46], every: 6.5, dur: 2, r: 2, lift: 1.1, offset: 3 }],
   galaxy: [{ type: 'impact', kind: 'meteor', from: [90, 182], to: [252, 0], every: 5, warn: 1.8, count: 2, r: 2.6 },
     { type: 'impact', kind: 'meteor', from: [-70, -205], to: [-160, -70], every: 5.5, warn: 1.8, count: 2, r: 2.6, offset: 2 }],
+  // ocean cup: surf waves and a bouncing beach ball, jellyfish sinking onto the road and a sea turtle, black-smoker eruptions and a giant eel
+  beach: [{ type: 'cross', kind: 'wave', at: [-80, 136], every: 7, dur: 3.2, r: 2.6 }, { type: 'cross', kind: 'wave', at: [30, 130], every: 8, dur: 3.2, r: 2.6, offset: 3.5 },
+    { type: 'cross', kind: 'ball', at: [-100, -112], every: 6, dur: 2.6, r: 1.5, arc: 4, offset: 2 }],
+  reef: [{ type: 'impact', kind: 'jelly', from: [-22, -182], to: [-182, -202], every: 5, warn: 1.9, count: 2, r: 2.2 },
+    { type: 'cross', kind: 'turtle', at: [-60, 178], every: 9, dur: 5, r: 1.8, offset: 3 }],
+  abyss: [{ type: 'zone', kind: 'vent', from: [40, -138], to: [-35, -126], side: 'alt', every: 6.5, warn: 1.4, dur: 1.6 },
+    { type: 'cross', kind: 'eel', at: [-250, -40], every: 8, dur: 2.4, r: 2.2, lift: .6, offset: 3 }],
 };
 
 const wrap = v => ((v % 1) + 1) % 1;

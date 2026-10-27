@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { jellyfish, turtle, eel } from './ocean-critters.js';
 import { cannonball, lavaBubble, hotRock, boulder, snowball, stoneball, donut, gummyBear, rhino, orca, hoverCar, tentacle } from './critters.js';
 
 // Draws the moving obstacles (game/obstacles.js) every frame: warning rings, falling cannonballs / lava bombs / meteors
@@ -8,7 +9,7 @@ function glowTex(inner, outer) {
   const gr = g.createRadialGradient(32, 32, 0, 32, 32, 32); gr.addColorStop(0, inner); gr.addColorStop(1, outer); g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
   return new THREE.CanvasTexture(c);
 }
-const BOOM = { cannon: 0xd8d0c8, lava: 0xff7a20, meteor: 0xb07aff };
+const BOOM = { cannon: 0xd8d0c8, lava: 0xff7a20, meteor: 0xb07aff, jelly: 0xff8ae8 };
 
 export function createObstacleFx(scene) {
   const fire = glowTex('rgba(255,240,180,1)', 'rgba(255,80,0,0)'), puff = glowTex('rgba(255,255,255,.95)', 'rgba(255,255,255,0)');
@@ -54,6 +55,21 @@ export function createObstacleFx(scene) {
       case 'whale': { const m = orca(); m.scale.setScalar(r * .62); return m; }
       case 'hovercar': { const m = hoverCar(CARS[n % CARS.length]); m.scale.setScalar(r * .8); return m; }
       case 'tentacle': { const m = tentacle(); m.scale.setScalar(1.25); return m; }
+      case 'jelly': { const m = jellyfish([0xff7ae8, 0x7ae0ff, 0xc08aff][n % 3]); m.scale.setScalar(1.15); return m; }
+      case 'turtle': { const m = turtle(); m.scale.setScalar(r * .95); return m; }
+      case 'eel': { const m = eel(); m.scale.setScalar(r * .75); return m; }
+      case 'ball': { // beach ball: coloured segments
+        const g = new THREE.Group(), cols = [0xff4a4a, 0xffffff, 0x3ab8ff, 0xffffff, 0xffd23a, 0xffffff];
+        cols.forEach((c, i) => { const seg = new THREE.Mesh(new THREE.SphereGeometry(r, 16, 12, i / 6 * Math.PI * 2, Math.PI * 2 / 6), new THREE.MeshStandardMaterial({ color: c, roughness: .35 })); seg.castShadow = true; g.add(seg); });
+        return g; }
+      case 'wave': { // a curling surf wave with a foam crest, moving across the road
+        const g = new THREE.Group(), L = 8;
+        const body = new THREE.Mesh(new THREE.CylinderGeometry(1.9, 1.9, L, 28, 1, true, -.2, Math.PI * 1.25), new THREE.MeshStandardMaterial({ color: 0x2ab8d8, roughness: .15, metalness: .1, transparent: true, opacity: .82, side: THREE.DoubleSide, emissive: 0x0a4a6a, emissiveIntensity: .25 }));
+        body.rotation.z = Math.PI / 2; body.position.y = 1.9; g.add(body);
+        const foam = new THREE.Mesh(new THREE.CylinderGeometry(.42, .42, L + .2, 12), new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: .6 })); foam.rotation.z = Math.PI / 2; foam.position.set(0, 3.55, .55); g.add(foam);
+        const base = new THREE.Mesh(new THREE.BoxGeometry(L, .5, 3.4), body.material); base.position.set(0, .25, -.6); g.add(base);
+        g.userData.anim = (t) => { foam.position.y = 3.55 + Math.sin(t * 6) * .12; body.scale.y = 1 + Math.sin(t * 4) * .03; };
+        return g; }
     }
     return new THREE.Group();
   }
@@ -69,11 +85,12 @@ export function createObstacleFx(scene) {
       u.boom = [spr(fire, BOOM[h.kind], 1), spr(puff, h.kind === 'cannon' ? 0x9a948c : 0x5a4a5a, 1, false), spr(fire, 0xffe8a0, 1)]; u.boom.forEach(b => g.add(b));
     } else if (h.type === 'cross') {
       const roller = new THREE.Group(); g.add(roller); u.roller = roller; u.m = model(h.kind, h.r); roller.add(u.m);
-      u.walker = ['gummy', 'rhino', 'whale', 'hovercar'].includes(h.kind); u.wheel = h.kind === 'donut';
+      u.walker = ['gummy', 'rhino', 'whale', 'hovercar', 'wave', 'turtle', 'eel'].includes(h.kind); u.wheel = h.kind === 'donut';
+      if (h.kind === 'wave') { u.spray = [0, 1, 2, 3].map(() => { const d = spr(puff, 0xffffff, 1, false); g.add(d); return d; }); }
       if (h.kind === 'whale') { u.splash = spr(puff, 0xffffff, 7, false); g.add(u.splash); }
       if (['rhino', 'boulder', 'stoneball', 'snowball', 'donut', 'gummy'].includes(h.kind)) { u.dust = [0, 1, 2].map(() => { const d = spr(puff, h.kind === 'snowball' ? 0xffffff : 0xd8c8a8, 1, false); g.add(d); return d; }); }
     } else if (h.type === 'zone') {
-      if (h.kind === 'fire') { u.flames = [0, 1, 2, 3].map(k => { const f = spr(fire, k % 2 ? 0xffb02a : 0xff5a10, 1); f.material.opacity = .85; g.add(f); return f; }); u.glow = new THREE.Mesh(discGeo, new THREE.MeshBasicMaterial({ color: 0xff6a10, transparent: true, opacity: .2, depthWrite: false, toneMapped: false, polygonOffset: true, polygonOffsetFactor: -4 })); g.add(u.glow); }
+      if (h.kind === 'fire' || h.kind === 'vent') { const vent = h.kind === 'vent'; u.flames = [0, 1, 2, 3].map(k => { const f = vent && k % 2 ? spr(puff, 0x2a2a30, 1, false) : spr(fire, vent ? 0xff8a3a : k % 2 ? 0xffb02a : 0xff5a10, 1); f.material.opacity = .85; g.add(f); return f; }); u.glow = new THREE.Mesh(discGeo, new THREE.MeshBasicMaterial({ color: 0xff6a10, transparent: true, opacity: .2, depthWrite: false, toneMapped: false, polygonOffset: true, polygonOffsetFactor: -4 })); g.add(u.glow); }
       else { u.m = model('tentacle'); g.add(u.m); u.splash = spr(puff, 0xffffff, 5, false); g.add(u.splash); }
     }
     g.userData = u; scene.add(g); return g;
@@ -92,17 +109,19 @@ export function createObstacleFx(scene) {
         u.ring.visible = u.disc.visible = h.boom === 0; u.ring.scale.setScalar(h.r * (1.1 - h.warn * .15)); u.disc.scale.setScalar(h.r * h.warn); mat.ring.opacity = .55 + pulse * .45;
         u.ring.position.y = u.disc.position.y = .05;
         u.body.visible = h.boom === 0; u.body.position.y = .9 + h.fall * h.fall * 30;
-        if (h.kind === 'cannon') u.m.rotation.set(-.6, 0, Math.sin(time * 5) * .2); else if (h.kind === 'lava') { u.m.rotation.set(-.5 + Math.sin(time * 9) * .1, 0, 0); u.m.scale.set(1.05 + Math.sin(time * 14) * .06, 1.05 - Math.sin(time * 14) * .06, 1.05); } else u.m.rotation.set(time * 3, time * 2, 0);
-        u.trail.visible = u.body.visible && h.fall > .02; u.trail.position.y = u.body.position.y + 2; u.trail.scale.set(2.6, 4.5, 1);
+        if (h.kind === 'jelly') { u.body.position.y = .9 + h.fall * 14; u.m.userData.anim(time); u.m.rotation.set(0, time * .3, 0); }
+        else if (h.kind === 'cannon') u.m.rotation.set(-.6, 0, Math.sin(time * 5) * .2); else if (h.kind === 'lava') { u.m.rotation.set(-.5 + Math.sin(time * 9) * .1, 0, 0); u.m.scale.set(1.05 + Math.sin(time * 14) * .06, 1.05 - Math.sin(time * 14) * .06, 1.05); } else u.m.rotation.set(time * 3, time * 2, 0);
+        u.trail.visible = u.body.visible && h.fall > .02 && h.kind !== 'jelly'; u.trail.position.y = u.body.position.y + 2; u.trail.scale.set(2.6, 4.5, 1);
         const b = h.boom; u.boom.forEach((s, k) => { s.visible = b > 0; if (!s.visible) return; s.scale.setScalar(h.r * (1.5 + b * [3.5, 5, 2][k])); s.position.y = 1 + b * [1, 3, .5][k]; s.material.opacity = (1 - b) * [1, .7, 1][k]; });
       } else if (h.type === 'cross') {
-        const lift = h.kind === 'whale' || h.kind === 'hovercar' ? 0 : ['rhino', 'gummy'].includes(h.kind) ? 0 : h.r;
+        const lift = h.kind === 'whale' || h.kind === 'hovercar' ? 0 : ['rhino', 'gummy', 'wave', 'turtle', 'eel'].includes(h.kind) ? 0 : h.r;
         g.position.set(h.x, h.y + lift, h.z);
         g.rotation.y = h.heading;
         if (u.wheel) u.roller.children[0].userData.spin.rotation.z = -h.roll;
         else if (!u.walker) u.roller.rotation.x = h.roll;
         else { u.m.userData.anim(time, 1); if (h.kind === 'hovercar') u.roller.position.y = Math.sin(time * 4) * .15; }
         if (h.kind === 'whale') { u.roller.rotation.x = (h.u - .5) * 1.5; if (u.splash) { const near = h.u < .15 || h.u > .85; u.splash.visible = near; u.splash.position.set(0, -h.y + h.ground - .5, 0); } }
+        if (u.spray) u.spray.forEach((d, k) => { const ph = (time * 1.6 + k / 4) % 1; d.position.set((k - 1.5) * 2.2, 3.2 + ph * 2, .4 - ph * 1.5); d.scale.setScalar(1 + ph * 2.5); d.material.opacity = (1 - ph) * .7; });
         if (u.dust) u.dust.forEach((d, k) => { const ph = (time * 2.2 + k / 3) % 1; d.position.set(0, -lift + .4 + ph * 1.2, -1.2 - ph * 2.5); d.scale.setScalar(.8 + ph * 2.2); d.material.opacity = (1 - ph) * .55; });
       } else if (h.type === 'zone') {
         g.position.set(h.x, h.y, h.z);

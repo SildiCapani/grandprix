@@ -55,6 +55,16 @@ const ARCTIC = [[-160, 170, 1], [-30, 176, 1], [90, 168, 1], [175, 130, 2], [215
 // Neon rooftops: the road runs over the roofs of a night city, bridges and jumps between the towers.
 const ROOFTOPS = [[-170, 175, 30], [-40, 180, 30], [80, 172, 31], [170, 140, 33], [220, 70, 36], [224, -20, 38], [190, -100, 38], [120, -140, 36],
   [40, -120, 34], [-20, -170, 32], [-100, -200, 32], [-190, -182, 31], [-255, -115, 30], [-195, -40, 30], [-125, 15, 31], [-150, 80, 31], [-240, 110, 30], [-240, 160, 30]];
+// ---- Season 4: the ocean cup ----
+// Surfer bay: beach promenade, a long pleasure pier over the sea with a jump back onto the sand, dunes, a cliff with a lighthouse, the beach town.
+const BEACH = [[-200, 130, .5], [-80, 136, .5], [30, 130, .5], [110, 148, 1.5], [150, 206, 3], [142, 262, 3.5], [188, 300, 3.5], [250, 272, 3], [262, 205, 2.5],
+  [256, 125, 1], [236, 42, 1.5], [190, -28, 3], [120, -62, 5], [42, -44, 5], [-20, -92, 4], [-100, -112, 2], [-180, -82, 1.5], [-240, -10, 1], [-250, 70, .5], [-236, 116, .5]];
+// Coral reef: on the sea floor – coral valley, a crevasse jump in low "underwater" gravity, kelp forest, a sunken galleon, a rock arch.
+const REEF = [[-190, 172, 0], [-60, 178, 0], [70, 172, 0], [165, 142, 1], [222, 80, 3], [232, 0, 5], [200, -72, 6], [130, -104, 5], [68, -64, 3], [18, -112, 2],
+  [-22, -182, 3], [-100, -222, 4], [-182, -202, 4], [-242, -142, 3], [-252, -60, 2], [-228, 30, 1], [-250, 108, .5], [-238, 158, 0]];
+// Deep-sea trench: a glowing road floating in the dark over the abyss – dives down past the black smokers and climbs back up.
+const ABYSS = [[-190, 190, 24], [-60, 195, 24], [70, 186, 23], [170, 150, 20], [228, 80, 17], [236, 0, 14], [205, -75, 11], [140, -120, 8], [60, -140, 5],
+  [-20, -122, 4], [-110, -150, 6], [-195, -118, 9], [-250, -40, 13], [-242, 50, 17], [-262, 128, 21], [-232, 182, 24]];
 const FOREST = [[-170, 175], [-40, 175], [90, 175], [180, 150], [225, 85], [215, 10], [170, -40], [100, -60], [62, -100], [70, -170], [20, -222], [-60, -218], [-112, -160], [-104, -95], [-130, -40], [-175, -12], [-200, -30], [-200, -80], [-200, -110], [-211.7, -138.3], [-240, -150], [-268.3, -138.3], [-280, -110], [-280, -40], [-282, 40], [-268, 118], [-228, 165]];
 
 export const MAPS = Object.freeze([
@@ -239,6 +249,38 @@ export const MAPS = Object.freeze([
     parTimes: { gold: 309, silver: 349, bronze: 399 },
     boostPads: [],
     sectors: [{ name: 'Sternentor', t: 0 }, { name: 'Sonnenspirale', t: 0.22 }, { name: 'Nebelsprung', t: 0.6 }],
+  },
+  {
+    id: 'beach', index: 18, name: 'Surfer-Bucht', subtitle: 'Strandpromenade · Pier mit Riesenrad und Sprung zurück an den Strand · Leuchtturm-Klippe',
+    width: 10.6, theme: 'beach', unlockXP: 0, botScale: 1.14, deck: 'pillars', fallY: -3,
+    nodes: BEACH,
+    jumps: [{ at: [261, 190], gap: 14 }],
+    voids: [{ from: [126, 168], to: [261, 196] }],
+    open: [{ from: [134, 182], to: [260, 210], side: 0 }],
+    shortcuts: [{ path: [[230, 25], [200, 12], [162, -20], [130, -50]], width: 8.5, surface: 'sand' }],
+    parTimes: { gold: 227, silver: 257, bronze: 293 },
+    boostPads: [],
+    sectors: [{ name: 'Promenade', t: 0 }, { name: 'Vergnügungspier', t: 0.18 }, { name: 'Leuchtturm-Klippe', t: 0.55 }],
+  },
+  {
+    id: 'reef', index: 19, name: 'Korallenriff', subtitle: 'Unter Wasser · Korallental · Spalten-Sprung in Schwerelosigkeit · Kelpwald und Schiffswrack',
+    width: 10.6, theme: 'reef', unlockXP: 0, botScale: 1.14, fallY: -8, gravity: .72,
+    nodes: REEF,
+    jumps: [{ at: [232, 22], gap: 16 }],
+    shortcuts: [{ path: [[118, -116], [85, -128], [50, -126], [26, -120]], width: 8.5, surface: 'sand' }],
+    parTimes: { gold: 223, silver: 252, bronze: 288 },
+    boostPads: [],
+    sectors: [{ name: 'Korallental', t: 0 }, { name: 'Felsspalte', t: 0.24 }, { name: 'Kelpwald', t: 0.6 }],
+  },
+  {
+    id: 'abyss', index: 20, name: 'Tiefsee-Graben', subtitle: 'Leuchtstraße im Dunkeln · Schwarze Raucher · Gleitflug über den Schlund · ohne Leitplanken',
+    width: 11.2, theme: 'abyss', unlockXP: 0, botScale: 1.18, deck: 'float', fallY: -60, gravity: .68,
+    nodes: ABYSS,
+    jumps: [{ at: [-60, -136], gap: 14 }, { at: [180, -103], gap: 62, glide: true }],
+    voids: 'all', open: [{ from: [-60, 195], to: [-250, 150], side: 0 }, { from: [140, -120], to: [-110, -150], side: 0 }],
+    parTimes: { gold: 208, silver: 235, bronze: 268 },
+    boostPads: [],
+    sectors: [{ name: 'Lichtkante', t: 0 }, { name: 'Raucherfeld', t: 0.36 }, { name: 'Aufstieg', t: 0.7 }],
   },
 ].map(normalizeMap));
 
@@ -442,7 +484,7 @@ for (const arena of ARENAS) TRACKS.set(arena.id, buildTrack(arena));
 
 // ---------- player-built tracks (editor) ----------
 export const CUSTOM_ID = 'custom';
-export const CUSTOM_THEMES = Object.freeze(['day', 'desert', 'night', 'volcano', 'snow', 'space', 'jungle', 'savanna', 'forest', 'sky', 'sakura', 'moon', 'pirate', 'candy', 'castle', 'arctic', 'rooftops', 'galaxy']);
+export const CUSTOM_THEMES = Object.freeze(['day', 'desert', 'night', 'volcano', 'snow', 'space', 'jungle', 'savanna', 'forest', 'sky', 'sakura', 'moon', 'pirate', 'candy', 'castle', 'arctic', 'rooftops', 'galaxy', 'beach', 'reef', 'abyss']);
 const r1 = v => Math.round(v * 10) / 10;
 // Editor definition → a full map entry. def = { name, theme, nodes: [[x, z, y]], jumps: [{ node, gap }] }
 export function customMapFromDef(def) {

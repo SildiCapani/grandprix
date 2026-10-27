@@ -3,7 +3,7 @@ import { FALL_TIME } from './race-core.js';
 
 // The rescue drone ("Hopsi"): when a kart falls off an open edge it flies in, hooks the kart with its winch
 // and lowers it back onto the road, then zooms off. Plus splash bursts where karts hit water / chocolate / mist.
-const SPLASH_COLOR = { pirate: 0xe6f8ff, candy: 0x7a4020, castle: 0xe8dcf4, arctic: 0xe6f8ff, rooftops: 0xffe0a0, galaxy: 0xc8a0ff };
+const SPLASH_COLOR = { pirate: 0xe6f8ff, candy: 0x7a4020, castle: 0xe8dcf4, arctic: 0xe6f8ff, rooftops: 0xffe0a0, galaxy: 0xc8a0ff, beach: 0xe6f8ff, reef: 0xbfeeff, abyss: 0x7ae8ff };
 
 function glow() {
   const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d');
