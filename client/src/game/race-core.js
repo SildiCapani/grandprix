@@ -102,11 +102,11 @@ export function boostPadLayout(track) {
 }
 // Kart-style luck: the further back you are, the better the item.
 function rollItem(frac, lastTwo = false, rnd = Math.random) {
-  const table = lastTwo ? [['rocket', .18], ['star', .16], ['red', .08], ['mushroom3', .18], ['blue', .1], ['swap', .16], ['bolt', .14]]
+  const table = lastTwo ? [['rocket', .2], ['star', .18], ['red', .1], ['mushroom3', .22], ['blue', .1], ['swap', .16], ['bolt', .04]]
     : frac < .2 ? [['banana', .32], ['green', .28], ['mushroom', .1], ['bubble', .12], ['spring', .06], ['boomerang', .07], ['magnet', .05]]
     : frac < .5 ? [['banana', .13], ['green', .18], ['red', .17], ['mushroom', .08], ['mushroom3', .07], ['bubble', .08], ['spring', .08], ['ink', .06], ['boomerang', .07], ['fire3', .05], ['magnet', .03]]
-    : frac < .8 ? [['green', .05], ['red', .18], ['mushroom', .1], ['mushroom3', .13], ['star', .07], ['blue', .07], ['swap', .1], ['ink', .08], ['spring', .05], ['fire3', .07], ['magnet', .06], ['bolt', .04]]
-    : [['red', .16], ['mushroom3', .26], ['star', .2], ['blue', .08], ['swap', .12], ['bolt', .08], ['magnet', .1]];
+    : frac < .8 ? [['green', .05], ['red', .18], ['mushroom', .1], ['mushroom3', .13], ['star', .07], ['blue', .07], ['swap', .1], ['ink', .08], ['spring', .05], ['fire3', .08], ['magnet', .07], ['bolt', .015]]
+    : [['red', .16], ['mushroom3', .26], ['star', .2], ['blue', .08], ['swap', .14], ['bolt', .025], ['magnet', .12]];
   let x = rnd();
   for (const [item, w] of table) { if ((x -= w) <= 0) return item; }
   return table[table.length - 1][0];
@@ -415,12 +415,19 @@ export class RaceCore {
       remaining -= step;
       if (this.status === 'countdown') {
         this.countdown = Math.max(0, this.countdown - step);
+        // turbo start: hold the gas from the right moment ("1" on the lights) until GO; much too early stalls the engine
+        if (controls.throttle > .5) { if (this._tsPress == null) this._tsPress = this.countdown; } else this._tsPress = null;
         if (this.countdown <= 0.000001) {
           this.countdown = 0;
           this.status = 'racing';
           this.emit('go');
+          this._turboStart();
         }
-      } else if (this.status === 'racing') this._step(step, controls);
+      } else if (this.status === 'racing') {
+        const p = this.player;
+        if (p.stallT > 0) { p.stallT = Math.max(0, p.stallT - step); this._step(step, { ...controls, throttle: Math.min(0, controls.throttle) }); }
+        else this._step(step, controls);
+      }
       else if (this.status === 'finished') { this._coast(step); if (this.rivals.length) { this._stepRivals(step); this._stepItems(step); } }
     }
   }
@@ -472,6 +479,16 @@ export class RaceCore {
     c.turboT = Math.max(0, c.turboT - dt);
     c.padCool = Math.max(0, c.padCool - dt);
     c.boosting = c.shroomT > 0 || c.turboT > 0 || c.rocketT > 0;
+  }
+  _turboStart() {
+    const r = this._tsPress, p = this.player; this._tsPress = null;
+    if (r != null && r >= .2 && r <= 1.05) {
+      const perfect = r >= .4 && r <= .8;
+      this._turbo(p, perfect ? 1.4 : .8, (perfect ? 28.5 : 26.5) * K, 'start');
+      this.emit('turbostart', { perfect, x: p.x, z: p.z, y: p.y });
+    } else if (r != null && r > 1.7) { p.stallT = 1.1; this.emit('stall', { x: p.x, z: p.z, y: p.y }); }
+    // the AI drivers get it right now and then too
+    for (const b of this.rivals) if (Math.random() < .2 + (b.itemIQ || .5) * .35) this._turbo(b, .6 + Math.random() * .6, 26.5 * K, 'bot');
   }
   _turbo(c, time, speed, kind) {
     if (c.turboT > 0 && c.turboSpeed > speed) { c.turboT = Math.max(c.turboT, time); return; }
@@ -1176,7 +1193,9 @@ export class RaceCore {
           const frac = this._rankFrac(c), n = c === this.player && this.rankFrac ? (this.onlineCount || 2) : this._field().length;
           c.pending = this.mode === 'battle' ? rollBattleItem(Math.random, this.battleType) : rollItem(frac, n >= 3 && frac >= (n - 2.5) / (n - 1)); c.roulette = c === this.player ? ROULETTE_TIME : .6;
           if (c.pending === 'blue') { if (this.blueCount >= BLUE_MAX || frac < .25) c.pending = 'red'; else this.blueCount++; }
-          if (this.mode !== 'battle' && n >= 3 && frac >= .999 && Math.random() < .3 && !this.shells.some(x => x.type === 'giant')) c.pending = 'giant';
+          if (this.mode !== 'battle' && n >= 3 && frac >= .999 && Math.random() < .1 && this.elapsed - (this._lastGiant ?? -99) > 40 && !this.shells.some(x => x.type === 'giant')) { c.pending = 'giant'; this._lastGiant = this.elapsed; }
+          // at most one lightning every 35 s in the whole field
+          if (c.pending === 'bolt') { if (this.elapsed - (this._lastBolt ?? -99) < 35) c.pending = 'mushroom3'; else this._lastBolt = this.elapsed; }
           if (c === this.player) this.emit('itembox', {});
         }
         break;

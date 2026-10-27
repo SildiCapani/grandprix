@@ -749,3 +749,8 @@ body.mirror #minimap{transform:scaleX(-1)}
 .wizard-menu .wiz-icon{display:inline-block;transition:transform .25s}.wizard-menu .wiz-card:hover .wiz-icon{transform:scale(1.25) rotate(-8deg)}
 .diamond{color:#c8f6ff!important;text-shadow:0 0 12px #6ae0ffaa}
 .res-medal.diamond span{filter:drop-shadow(0 0 14px #6ae0ff)}.res-medal.diamond small{color:#c8f6ff}
+
+/* lightning: the sky goes dark blue, then two white flashes */
+#boltFlash{background:radial-gradient(circle at 50% 20%,#ffffff,#cfe8ff 30%,#3a5ab855 65%,#0a1430aa)!important}
+#boltFlash.on{animation:boltFlash2 .9s ease-out!important}
+@keyframes boltFlash2{0%{opacity:.0}6%{opacity:1}14%{opacity:.15}22%{opacity:.95}34%{opacity:.25}100%{opacity:0}}

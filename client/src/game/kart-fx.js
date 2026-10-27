@@ -71,7 +71,10 @@ export function createKartFx(scene, opts = {}) {
   }
   // Hit: a burst of hot sparks and a white puff ring. Item box: a rainbow sparkle.
   const RAINBOW = [0xff4a4a, 0xffd04a, 0x5ad86a, 0x3ab8ff, 0xc44dff].map(c => new THREE.Color(c));
+  const ZAP = [0xffffff, 0xbfe6ff, 0x6ab8ff].map(c => new THREE.Color(c));
   function burst(x, y, z, kind = 'hit') {
+    if (kind === 'zap') { for (let i = 0; i < 46; i++) { const a = Math.random() * Math.PI * 2, v = 4 + Math.random() * 9; emit(add, x, y + .5 + Math.random(), z, Math.cos(a) * v, 1 + Math.random() * 7, Math.sin(a) * v, .3 + Math.random() * .35, .12, -.4, ZAP[i % 3], 1, -6, 2.5); } return; }
+    if (kind === 'smoke') { for (let i = 0; i < 10; i++) emit(soft, x + (Math.random() - .5) * .6, y + .5, z + (Math.random() - .5) * .6, (Math.random() - .5) * .8, 1 + Math.random(), (Math.random() - .5) * .8, 1.1 + Math.random() * .5, .45, 2.4, _c.setRGB(.35, .35, .38), .6, .2, 1); return; }
     const box = kind === 'box';
     for (let i = 0; i < (box ? 26 : 34); i++) { const a = Math.random() * Math.PI * 2, v = 3 + Math.random() * 5; emit(add, x, y + .6, z, Math.cos(a) * v, 2 + Math.random() * 5, Math.sin(a) * v, .45 + Math.random() * .3, box ? .16 : .14, -.3, box ? RAINBOW[i % 5] : (i % 3 ? FIRE[1] : FIRE[0]), 1, -9, 1.2); }
     if (!box) for (let i = 0; i < 14; i++) { const a = i / 14 * Math.PI * 2; emit(soft, x + Math.cos(a) * .5, y + .4, z + Math.sin(a) * .5, Math.cos(a) * 4, .8, Math.sin(a) * 4, .5, .5, 1.6, _c.setRGB(1, 1, 1), .6, 0, 3); }
